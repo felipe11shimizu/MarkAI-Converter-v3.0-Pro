@@ -1,0 +1,250 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="MarkAI Converter v3.0 Pro — Converta PDF, DOCX, XLSX, código-fonte e mais em Markdown perfeito, 100% no navegador." />
+  <title>MarkAI Converter v3.0 — Pro Edition</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark-dimmed.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://unpkg.com/mammoth@1.6.0/mammoth.browser.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
+  </div>
+  <div class="app-shell" id="appShell">
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+            <path d="M16 2L30 9V23L16 30L2 23V9L16 2Z" stroke="url(#g1)" stroke-width="1.5" fill="rgba(99,102,241,0.12)"/>
+            <path d="M10 16h12M16 10v12" stroke="#22d3ee" stroke-width="2.2" stroke-linecap="round"/>
+            <defs><linearGradient id="g1" x1="2" y1="2" x2="30" y2="30"><stop offset="0%" stop-color="#6366f1"/><stop offset="100%" stop-color="#22d3ee"/></linearGradient></defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-name">MarkAI<span class="brand-accent"> Converter</span></h1>
+          <span class="brand-badge">v3.0 Pro</span>
+        </div>
+      </div>
+      <p class="header-tagline">Converta qualquer documento em Markdown perfeito &mdash; 100% no navegador.</p>
+      <div class="header-actions">
+        <div class="status-pill" id="statusPill">
+          <span class="status-dot" id="statusDot"></span>
+          <span class="status-text" id="statusText">Pronto</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btnSettings">
+          <i data-lucide="settings-2"></i><span>Configurações</span>
+        </button>
+      </div>
+    </header>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="panel" id="uploadPanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="upload-cloud"></i>Importar Arquivos</span>
+            <span class="badge-count" id="queueCount">0</span>
+          </div>
+          <div class="drop-zone" id="dropZone" role="button" tabindex="0">
+            <input type="file" id="fileInput" multiple accept=".txt,.csv,.md,.json,.pdf,.docx,.xlsx,.xls,.py,.js,.ts,.html,.css,.sql,.sh,.rb,.go,.rs,.java,.cpp,.c,.php,.yaml,.yml,.xml,.kt,.swift" style="display:none" />
+            <div class="drop-zone-content">
+              <div class="drop-icon-wrap"><i data-lucide="file-plus-2"></i></div>
+              <p class="drop-title">Arraste arquivos aqui</p>
+              <p class="drop-sub">ou <button class="link-btn" id="browseBtn" type="button">selecione do computador</button></p>
+              <p class="drop-hint">PDF &middot; DOCX &middot; XLSX &middot; CSV &middot; JSON &middot; Código</p>
+            </div>
+          </div>
+        </div>
+        <div class="panel panel-queue" id="queuePanel" style="display:none">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="list-ordered"></i>Fila de Conversão</span>
+            <button class="btn-icon-xs" id="btnClearQueue" title="Limpar fila"><i data-lucide="trash-2"></i></button>
+          </div>
+          <ul class="queue-list" id="queueList"></ul>
+          <div class="queue-actions">
+            <button class="btn btn-primary btn-full" id="btnMergeAll"><i data-lucide="layers"></i>Juntar Todos (Merge)</button>
+            <button class="btn btn-secondary btn-full" id="btnConvertAll"><i data-lucide="zap"></i>Converter Todos</button>
+              <button class="btn btn-outline btn-full" id="btnDownloadZip" style="margin-top:0.5rem"><i data-lucide="archive"></i>Baixar Todos (ZIP)</button>
+          </div>
+        </div>
+        <div class="panel" id="urlPanel">
+          <div class="panel-header"><span class="panel-title"><i data-lucide="globe"></i>Importar URL</span></div>
+          <div class="input-row">
+            <input type="url" class="input-field" id="urlInput" placeholder="https://exemplo.com/artigo..." />
+            <button class="btn btn-accent" id="btnFetchUrl"><i data-lucide="arrow-right"></i></button>
+          </div>
+        </div>
+        <div class="panel" id="chatPanel">
+          <div class="panel-header"><span class="panel-title"><i data-lucide="message-square-text"></i>Formatar Conversa IA</span></div>
+          <textarea class="input-textarea" id="chatInput" rows="6" placeholder="Cole aqui uma transcrição de chat...&#10;&#10;User: Olá!&#10;AI: Olá! Como posso ajudar?"></textarea>
+          <button class="btn btn-secondary btn-full mt-xs" id="btnFormatChat"><i data-lucide="wand-2"></i>Formatar Conversa</button>
+        </div>
+      </aside>
+      <section class="workspace">
+        <div class="empty-state" id="emptyState">
+          <div class="empty-art">
+            <svg width="140" height="140" viewBox="0 0 140 140" fill="none">
+              <circle cx="70" cy="70" r="68" stroke="rgba(99,102,241,0.18)" stroke-width="1.5"/>
+              <circle cx="70" cy="70" r="52" stroke="rgba(99,102,241,0.10)" stroke-width="1"/>
+              <rect x="42" y="52" width="56" height="8" rx="4" fill="rgba(99,102,241,0.25)"/>
+              <rect x="42" y="66" width="40" height="6" rx="3" fill="rgba(99,102,241,0.18)"/>
+              <rect x="42" y="78" width="48" height="6" rx="3" fill="rgba(99,102,241,0.18)"/>
+              <circle cx="104" cy="104" r="22" fill="rgba(34,211,238,0.08)" stroke="rgba(34,211,238,0.25)" stroke-width="1.5"/>
+              <path d="M96 104l5 5 10-10" stroke="#22d3ee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <h2 class="empty-title">Nenhum documento carregado</h2>
+          <p class="empty-sub">Arraste arquivos, cole uma URL ou formate uma conversa de IA no painel à esquerda.</p>
+          <div class="empty-chips">
+            <span class="chip chip-red">PDF</span><span class="chip chip-blue">DOCX</span>
+            <span class="chip chip-green">XLSX</span><span class="chip chip-yellow">CSV</span>
+            <span class="chip chip-orange">JSON</span><span class="chip chip-purple">Python</span>
+            <span class="chip chip-cyan">JS/TS</span><span class="chip chip-gray">+15 mais</span>
+          </div>
+        </div>
+        <div class="workspace-content" id="workspaceContent" style="display:none">
+          <div class="workspace-toolbar">
+            <div class="toolbar-left">
+              <div class="doc-meta">
+                <span class="doc-name" id="docName">documento.md</span>
+                <div class="doc-stats">
+                  <span id="statWords">0 palavras</span><span class="dot-sep">·</span>
+                  <span id="statLines">0 linhas</span><span class="dot-sep">·</span>
+                  <span id="statChars">0 chars</span>
+                </div>
+              </div>
+            </div>
+            <div class="toolbar-right">
+              <button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
+              <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
+              <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
+              <button class="btn btn-ghost btn-icon-sm" id="btnReset"><i data-lucide="x"></i></button>
+            </div>
+          </div>
+          <div class="progress-wrap" id="progressWrap" style="display:none">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+          <div class="tab-bar" role="tablist">
+            <button class="tab active" id="tabRaw" data-panel="panelRaw"><i data-lucide="code-2"></i> Raw</button>
+            <button class="tab" id="tabPreview" data-panel="panelPreview"><i data-lucide="eye"></i> Preview</button>
+            <button class="tab" id="tabSplit" data-panel="panelSplit"><i data-lucide="columns-2"></i> Split</button>
+          </div>
+          <div class="panels-container">
+            <div class="editor-panel active" id="panelRaw">
+              <textarea class="code-editor" id="markdownEditor" spellcheck="false" placeholder="O Markdown gerado aparecerá aqui..."></textarea>
+            </div>
+            <div class="editor-panel" id="panelPreview" style="display:none">
+              <div class="preview-scroll"><article class="markdown-body" id="markdownPreview"></article></div>
+            </div>
+            <div class="editor-panel split-panel" id="panelSplit" style="display:none">
+              <textarea class="code-editor" id="markdownEditorSplit" spellcheck="false"></textarea>
+              <div class="split-divider"></div>
+              <div class="preview-scroll"><article class="markdown-body" id="markdownPreviewSplit"></article></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div class="proc-overlay" id="procOverlay" style="display:none">
+      <div class="proc-card">
+        <svg class="proc-spinner" viewBox="0 0 50 50">
+          <circle class="sp-track" cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
+          <circle class="sp-fill" cx="25" cy="25" r="20" fill="none" stroke-width="4" stroke-dasharray="125.66" stroke-dashoffset="94.25"/>
+        </svg>
+        <p class="proc-label" id="procLabel">Processando…</p>
+        <p class="proc-sub" id="procSub">Aguarde enquanto convertemos seu documento</p>
+      </div>
+    </div>
+  </div>
+
+  <dialog class="modal" id="modalSettings">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="settingsTitle"><i data-lucide="settings-2"></i> Configurações</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseSettings"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <div class="settings-section">
+          <h3 class="settings-section-title"><i data-lucide="sparkles"></i> Motor de IA</h3>
+          <div class="form-group">
+            <label class="form-label" for="aiProvider">Provedor</label>
+            <select class="input-field" id="aiProvider">
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI (GPT)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="aiModel">Modelo</label>
+            <select class="input-field" id="aiModel">
+              <option value="gemini-1.5-flash">Gemini 1.5 Flash (rápido)</option>
+              <option value="gemini-1.5-pro">Gemini 1.5 Pro (preciso)</option>
+              <option value="gpt-4o-mini">GPT-4o Mini (rápido)</option>
+              <option value="gpt-4o">GPT-4o (preciso)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="aiApiKey">Chave de API</label>
+            <div class="input-pw-wrap">
+              <input type="password" class="input-field" id="aiApiKey" placeholder="Cole sua API Key aqui..." autocomplete="off" />
+              <button class="btn btn-ghost btn-icon-sm" id="btnToggleKey" type="button"><i data-lucide="eye"></i></button>
+            </div>
+            <p class="form-hint">Salva no localStorage. Nunca compartilhada além do provedor selecionado.</p>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3 class="settings-section-title"><i data-lucide="sliders-horizontal"></i> Preferências</h3>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <label class="form-label" for="toggleSyntaxHL">Syntax Highlighting</label>
+              <p class="form-hint">Coloração de código no preview.</p>
+            </div>
+            <label class="toggle-switch" for="toggleSyntaxHL"><input type="checkbox" id="toggleSyntaxHL" checked /><span class="slider"></span></label>
+          </div>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <label class="form-label" for="toggleAutoPreview">Preview automático</label>
+              <p class="form-hint">Atualiza preview ao editar.</p>
+            </div>
+            <label class="toggle-switch" for="toggleAutoPreview"><input type="checkbox" id="toggleAutoPreview" checked /><span class="slider"></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" id="btnClearApiKey"><i data-lucide="trash-2"></i> Limpar Chave</button>
+        <button class="btn btn-primary" id="btnSaveSettings"><i data-lucide="check"></i> Salvar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal modal-lg" id="modalPreview">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="eye"></i> <span id="previewFileName">Pré-visualização</span></h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnClosePreview"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body modal-preview-body">
+        <article class="markdown-body" id="previewContent"></article>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnPreviewRaw">Ver Raw</button>
+        <button class="btn btn-primary" id="btnUsePreview"><i data-lucide="check"></i> Usar este resultado</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div class="toast-container" id="toastContainer"></div>
+  <script src="script.js"></script>
+</body>
+</html>
+
