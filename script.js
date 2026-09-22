@@ -270,6 +270,7 @@ const WorkspaceStore = (() => {
         sourceType: item.sourceType || 'file',
         sourceUrl: item.sourceUrl || null,
         file: item.file || null,
+        order: index,
         updatedAt: Date.now()
       });
     }
