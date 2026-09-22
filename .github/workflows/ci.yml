@@ -22,3 +22,5 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: node --check script.js
+      - run: node --check video_automation_validator.js
+      - run: node tests/test_video_automation_validator.js
