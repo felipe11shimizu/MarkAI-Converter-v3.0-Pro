@@ -21,7 +21,7 @@
   ]);
 
   const PLATFORM_ACTIONS = {
-    pyautogui: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'drag', 'wait']),
+    pyautogui: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'wait']),
     playwright: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'upload', 'open', 'navigate', 'check', 'submit']),
     selenium: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'upload', 'open', 'navigate', 'submit']),
     rpa: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'wait']),
@@ -157,6 +157,15 @@
     }
 
     if (platform === 'playwright' || platform === 'selenium') {
+      if ((TARGET_ACTIONS.has(action) || action === 'open' || action === 'navigate') && !target.selector && !target.text) {
+        pushIssue(
+          issues,
+          'error',
+          'LOCATOR_MISSING',
+          'A ação web não possui um locator ou texto utilizável pelo gerador.',
+          'Informe um seletor verificável ou um texto visível utilizável como locator.'
+        );
+      }
       if (action === 'type' || action === 'select' || action === 'upload') {
         if (!target.selector) {
           pushIssue(
@@ -167,14 +176,6 @@
             'Informe um seletor verificável do campo ou elemento.'
           );
         }
-      } else if (TARGET_ACTIONS.has(action) && hasPoint(target) && !target.selector && !target.text) {
-        pushIssue(
-          issues,
-          'error',
-          'COORDINATE_ONLY_WEB',
-          'Somente coordenadas foram identificadas, mas a plataforma web exige um locator.',
-          'Confirme um seletor ou um texto/controle utilizável como locator.'
-        );
       }
     }
   }
