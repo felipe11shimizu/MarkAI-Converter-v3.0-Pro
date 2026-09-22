@@ -26,6 +26,7 @@ const AppState = (() => {
       autoPreview: true,
     },
     previewItemId: null,
+    compareState: null,
   };
 
   const proxy = new Proxy(_state, {
@@ -173,7 +174,7 @@ const MarkItDownEngine = (() => {
     const data = await resp.json();
     if (!data?.markdown) throw new Error('MarkItDown retornou conteúdo vazio.');
     if (onProgress) onProgress(1);
-    return data.markdown;
+    return { markdown: data.markdown, meta: data };
   }
 
   return { isAvailable, convert };
@@ -534,6 +535,19 @@ const FileParserStrategy = (() => {
   }
 
   // ── DISPATCH ──
+  async function parseBrowser(item, onProgress) {
+    const { file, ext } = item;
+    if (ext === 'pdf') return parsePdf(file, onProgress);
+    if (ext === 'docx' || ext === 'doc') return parseDocx(file);
+    if (ext === 'xlsx' || ext === 'xls') return parseXlsx(file);
+    if (ext === 'csv') return parseCsv(file);
+    if (ext === 'json') return parseJson(file);
+    if (MARKITDOWN_ONLY_EXTS.has(ext)) throw new Error(`O formato .${ext} requer o backend Microsoft MarkItDown ativo.`);
+    if (ext === 'txt' || ext === 'md') return parseTxt(file);
+    if (CODE_LANGS[ext]) return parseCode(file);
+    return parseTxt(file);
+  }
+
   async function parse(item, onProgress) {
     const { file, ext } = item;
 
@@ -541,25 +555,14 @@ const FileParserStrategy = (() => {
     // Browser parsers remain the automatic fallback for offline/static usage.
     try {
       const remote = await MarkItDownEngine.convert(file, onProgress);
-      if (remote) return remote;
+      if (remote) return remote.markdown;
     } catch (e) {
       console.warn('[MarkAI] MarkItDown conversion failed; using browser fallback:', e);
     }
-
-    if (ext === 'pdf') return parsePdf(file, onProgress);
-    if (ext === 'docx' || ext === 'doc') return parseDocx(file);
-    if (ext === 'xlsx' || ext === 'xls') return parseXlsx(file);
-    if (ext === 'csv') return parseCsv(file);
-    if (ext === 'json') return parseJson(file);
-    if (MARKITDOWN_ONLY_EXTS.has(ext)) {
-      throw new Error(`O formato .${ext} requer o backend Microsoft MarkItDown ativo.`);
-    }
-    if (ext === 'txt' || ext === 'md') return parseTxt(file);
-    if (CODE_LANGS[ext]) return parseCode(file);
-    return parseTxt(file);
+    return parseBrowser(item, onProgress);
   }
 
-  return { parse };
+  return { parse, parseBrowser };
 })();
 
 
@@ -868,6 +871,29 @@ Rules:
 
 
 // ══════════════════════════════════════════════
+const ConversionQuality = (() => {
+  function metrics(markdown) {
+    const text = String(markdown || '');
+    return {
+      characters: text.length,
+      lines: text ? text.split(/\r?\n/).length : 0,
+      headings: (text.match(/^#{1,6}\s+/gm) || []).length,
+      tables: (text.match(/^\|.*\|$/gm) || []).length,
+      links: (text.match(/\[[^\]]+\]\([^\)]+\)/g) || []).length,
+      words: text.trim() ? text.trim().split(/\s+/).length : 0
+    };
+  }
+  function diffScore(a, b) {
+    const left = String(a || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const right = String(b || '').split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+    const max = Math.max(left.length, right.length, 1);
+    const same = left.filter((line, i) => line === right[i]).length;
+    return Math.round((1 - same / max) * 100);
+  }
+  return { metrics, diffScore };
+})();
+
+// ══════════════════════════════════════════════
 // 8. UI MANAGER — DOM, events, toasts, modals
 // ══════════════════════════════════════════════
 const UIManager = (() => {
@@ -884,7 +910,7 @@ const UIManager = (() => {
     emptyState: $('emptyState'), workspaceContent: $('workspaceContent'),
     docName: $('docName'),
     statWords: $('statWords'), statLines: $('statLines'), statChars: $('statChars'),
-    btnEnhanceAI: $('btnEnhanceAI'), btnCopy: $('btnCopy'),
+    btnEnhanceAI: $('btnEnhanceAI'), btnCopy: $('btnCopy'), btnCompare: $('btnCompare'),
     btnDownload: $('btnDownload'), btnReset: $('btnReset'),
     progressWrap: $('progressWrap'), progressBar: $('progressBar'),
     markdownEditor: $('markdownEditor'),
@@ -903,6 +929,10 @@ const UIManager = (() => {
     modalPreview: $('modalPreview'), btnClosePreview: $('btnClosePreview'),
     previewFileName: $('previewFileName'), previewContent: $('previewContent'),
     btnUsePreview: $('btnUsePreview'), btnPreviewRaw: $('btnPreviewRaw'),
+    modalCompare: $('modalCompare'), btnCloseCompare: $('btnCloseCompare'), compareFileName: $('compareFileName'),
+    compareMarkitdown: $('compareMarkitdown'), compareBrowser: $('compareBrowser'),
+    compareMarkitdownStats: $('compareMarkitdownStats'), compareBrowserStats: $('compareBrowserStats'),
+    btnUseMarkItDown: $('btnUseMarkItDown'), btnUseBrowser: $('btnUseBrowser'),
     toastContainer: $('toastContainer'),
   };
 
@@ -1017,6 +1047,9 @@ const UIManager = (() => {
           <button class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="${item.id}" title="Converter">
             <i data-lucide="zap"></i>
           </button>
+          <button class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="${item.id}" title="Comparar motores">
+            <i data-lucide="columns-2"></i>
+          </button>
           <button class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="${item.id}" title="Baixar Arquivo">
             <i data-lucide="download"></i>
           </button>
@@ -1119,8 +1152,21 @@ const UIManager = (() => {
     setProgress(0.1);
 
     try {
-      const result = await FileParserStrategy.parse(item, p => setProgress(p));
-      QueueManager.update(id, { status: 'done', result });
+      let result = null, engine = 'browser', conversionMeta = null;
+      if (await MarkItDownEngine.isAvailable()) {
+        try {
+          const remote = await MarkItDownEngine.convert(item.file, p => setProgress(p));
+          if (remote?.markdown) {
+            result = remote.markdown;
+            engine = 'markitdown';
+            conversionMeta = remote.meta || null;
+          }
+        } catch (remoteError) {
+          console.warn('[MarkAI] Fallback local:', remoteError);
+        }
+      }
+      if (!result) result = await FileParserStrategy.parseBrowser(item, p => setProgress(p));
+      QueueManager.update(id, { status: 'done', result, engine, conversionMeta });
       renderQueue();
       setProgress(1);
       loadMarkdown(result, item.name.replace(/\.[^.]+$/, '') + '.md');
@@ -1132,6 +1178,46 @@ const UIManager = (() => {
       setProgress(0, false);
       setStatus('Erro na conversão', 'error');
       toast(`Erro: ${e.message}`, 'error');
+    }
+  }
+
+  // ── MOTOR COMPARISON ──
+  async function compareItem(id) {
+    const item = QueueManager.getById(id);
+    if (!item) return;
+    if (['pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'].includes(item.ext)) {
+      toast('Este formato não possui parser local para comparação.', 'warning');
+      return;
+    }
+    showProcessing('Comparando motores…', item.name);
+    try {
+      const settled = await Promise.allSettled([
+        MarkItDownEngine.convert(item.file),
+        FileParserStrategy.parseBrowser(item)
+      ]);
+      const remote = settled[0].status === 'fulfilled' ? settled[0].value : null;
+      const local = settled[1].status === 'fulfilled' ? settled[1].value : null;
+      if (!remote?.markdown && !local) throw new Error('Nenhum dos motores conseguiu converter o arquivo.');
+      const rmd = remote?.markdown || '';
+      const bmd = local || '';
+      const rm = ConversionQuality.metrics(rmd);
+      const bm = ConversionQuality.metrics(bmd);
+      const diff = ConversionQuality.diffScore(rmd, bmd);
+      els.compareFileName.textContent = item.name;
+      els.compareMarkitdown.value = rmd || 'MarkItDown indisponível ou falhou.';
+      els.compareBrowser.value = bmd || 'Conversor local indisponível para este formato.';
+      els.compareMarkitdownStats.textContent = rmd
+        ? 'chars: ' + rm.characters.toLocaleString('pt-BR') + ' · linhas: ' + rm.lines + ' · headings: ' + rm.headings + ' · tabelas: ' + rm.tables + ' · links: ' + rm.links + ' · divergência: ' + diff + '%'
+        : 'Indisponível';
+      els.compareBrowserStats.textContent = bmd
+        ? 'chars: ' + bm.characters.toLocaleString('pt-BR') + ' · linhas: ' + bm.lines + ' · headings: ' + bm.headings + ' · tabelas: ' + bm.tables + ' · links: ' + bm.links + ' · divergência: ' + diff + '%'
+        : 'Indisponível';
+      AppState.set('compareState', { id, markitdown: rmd, browser: bmd });
+      hideProcessing();
+      els.modalCompare.showModal();
+    } catch (e) {
+      hideProcessing();
+      toast('Erro na comparação: ' + e.message, 'error');
     }
   }
 
@@ -1249,6 +1335,8 @@ const UIManager = (() => {
         }
       } else if (btn.classList.contains('qi-btn-convert')) {
         convertItem(id);
+      } else if (btn.classList.contains('qi-btn-compare')) {
+        compareItem(id);
             } else if (btn.classList.contains('qi-btn-download')) {
         const item = QueueManager.getById(id);
         if (item && item.result) {
@@ -1413,6 +1501,26 @@ const UIManager = (() => {
     });
 
     els.aiProvider.addEventListener('change', _filterModels);
+
+    // Comparison Modal
+    els.btnCloseCompare.addEventListener('click', () => els.modalCompare.close());
+    els.modalCompare.addEventListener('click', e => { if (e.target === els.modalCompare) els.modalCompare.close(); });
+    els.btnUseMarkItDown.addEventListener('click', () => {
+      const s = AppState.get('compareState');
+      const item = s?.id ? QueueManager.getById(s.id) : null;
+      if (!s?.markitdown || !item) { toast('Resultado MarkItDown indisponível.', 'warning'); return; }
+      QueueManager.update(item.id, { status:'done', result:s.markitdown, engine:'markitdown' });
+      renderQueue(); loadMarkdown(s.markitdown, item.name.replace(/\.[^.]+$/, '') + '.md');
+      els.modalCompare.close();
+    });
+    els.btnUseBrowser.addEventListener('click', () => {
+      const s = AppState.get('compareState');
+      const item = s?.id ? QueueManager.getById(s.id) : null;
+      if (!s?.browser || !item) { toast('Resultado local indisponível.', 'warning'); return; }
+      QueueManager.update(item.id, { status:'done', result:s.browser, engine:'browser' });
+      renderQueue(); loadMarkdown(s.browser, item.name.replace(/\.[^.]+$/, '') + '.md');
+      els.modalCompare.close();
+    });
 
     // Preview Modal
     els.btnClosePreview.addEventListener('click', () => els.modalPreview.close());
