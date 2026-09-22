@@ -292,3 +292,35 @@ def test_batch_reports_invalid_file_without_aborting(monkeypatch):
     assert body["successful"] == 1
     assert body["failed"] == 1
     assert body["results"][1]["status_code"] == 415
+
+
+def test_video_analysis_endpoint_accepts_supported_video(monkeypatch):
+    monkeypatch.setattr(
+        api,
+        "_analyze_video_file",
+        lambda filename, data, task_prompt="": {
+            "ok": True,
+            "engine": "video-task-analyzer",
+            "filename": filename,
+            "analysis": {"objetivo": "Teste", "etapas": []},
+            "transcript": "",
+            "frames_analyzed": 1,
+            "frame_interval_seconds": 5,
+        },
+    )
+    response = client.post(
+        "/api/analyze-video",
+        files={"file": ("demo.mp4", b"fake-video", "video/mp4")},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "video-task-analyzer"
+    assert body["filename"] == "demo.mp4"
+
+
+def test_video_analysis_endpoint_rejects_unsupported_extension():
+    response = client.post(
+        "/api/analyze-video",
+        files={"file": ("demo.pdf", b"fake", "application/pdf")},
+    )
+    assert response.status_code == 415
