@@ -969,21 +969,23 @@ Rules:
 - Use blockquotes for important callouts
 - Do NOT add commentary, preamble, or explanation — return ONLY the Markdown.`;
 
-  async function enhance(markdown) {
+  async function enhance(markdown, customPrompt = '') {
     const settings = AppState.get('settings');
+    const prompt = String(customPrompt || '').trim();
     if (!settings.apiKey) throw new Error('API Key não configurada. Abra Configurações.');
 
     if (settings.aiProvider === 'gemini') {
-      return _callGemini(markdown, settings.apiKey, settings.aiModel);
+      return _callGemini(markdown, settings.apiKey, settings.aiModel, prompt);
     } else {
-      return _callOpenAI(markdown, settings.apiKey, settings.aiModel);
+      return _callOpenAI(markdown, settings.apiKey, settings.aiModel, prompt);
     }
   }
 
-  async function _callGemini(text, apiKey, model) {
+  async function _callGemini(text, apiKey, model, customPrompt = '') {
+    const effectiveSystemPrompt = customPrompt ? SYSTEM_PROMPT + '\n\nAdditional user instructions:\n' + customPrompt : SYSTEM_PROMPT;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
     const body = {
-      system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      system_instruction: { parts: [{ text: effectiveSystemPrompt }] },
       contents: [{ parts: [{ text }] }],
       generationConfig: { temperature: 0.2, maxOutputTokens: 8192 },
     };
@@ -1001,7 +1003,8 @@ Rules:
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || text;
   }
 
-  async function _callOpenAI(text, apiKey, model) {
+  async function _callOpenAI(text, apiKey, model, customPrompt = '') {
+    const effectiveSystemPrompt = customPrompt ? SYSTEM_PROMPT + '\n\nAdditional user instructions:\n' + customPrompt : SYSTEM_PROMPT;
     const resp = await window.fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -1011,7 +1014,7 @@ Rules:
       body: JSON.stringify({
         model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: effectiveSystemPrompt },
           { role: 'user', content: text },
         ],
         temperature: 0.2,
@@ -1095,6 +1098,7 @@ const UIManager = (() => {
     btnExportWorkspaceZip: $('btnExportWorkspaceZip'), workspaceHistoryCount: $('workspaceHistoryCount'),
     workspaceHistoryList: $('workspaceHistoryList'), workspaceTabVersions: $('workspaceTabVersions'), workspaceTabAI: $('workspaceTabAI'),
     aiProvider: $('aiProvider'), aiModel: $('aiModel'), aiApiKey: $('aiApiKey'),
+    workspaceAIPrompt: $('workspaceAIPrompt'),
     toggleSyntaxHL: $('toggleSyntaxHL'), toggleAutoPreview: $('toggleAutoPreview'),
     modalPreview: $('modalPreview'), btnClosePreview: $('btnClosePreview'),
     previewFileName: $('previewFileName'), previewContent: $('previewContent'),
@@ -1858,9 +1862,10 @@ const UIManager = (() => {
       els.btnEnhanceAI.disabled = true;
       setStatus('IA processando…', 'busy');
       try {
-        const improved = await AIEngine.enhance(md);
+        const customPrompt = els.workspaceAIPrompt?.value?.trim() || '';
+        const improved = await AIEngine.enhance(md, customPrompt);
         const projectId = AppState.get('currentProjectId');
-        if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
+        if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: customPrompt || 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
         loadMarkdown(improved, AppState.get('currentFileName'));
         await _saveWorkspaceVersion('ai');
         toast('✓ Markdown melhorado pela IA!', 'success');
