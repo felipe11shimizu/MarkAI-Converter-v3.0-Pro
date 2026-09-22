@@ -3069,7 +3069,7 @@ const VideoTaskAnalyzer = (() => {
         badge.className = 'video-review-badge ' + status.className;
         badge.textContent = status.label;
         const validationBadge = document.createElement('span');
-        validationBadge.className = 'video-review-badge ' + ({ ready: 'approved', warning: 'pending', blocked: 'ignored' }[validation.status] || 'pending');
+        validationBadge.className = 'video-review-badge ' + ({ ready: 'validation-ready', warning: 'validation-warning', blocked: 'validation-blocked' }[validation.status] || 'validation-warning');
         validationBadge.textContent = 'Validação: ' + ({ ready: 'Pronta', warning: 'Revisar', blocked: 'Bloqueada' }[validation.status] || 'Revisar');
         const statusSelect = document.createElement('select');
         statusSelect.className = 'input-field input-field-sm';
