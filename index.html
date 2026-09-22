@@ -67,6 +67,21 @@
             </div>
           </div>
         </div>
+        <div class="panel workspace-panel" id="workspacePanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="folder-kanban"></i>Workspace</span>
+            <button class="btn-icon-xs" id="btnWorkspace" title="Gerenciar workspace"><i data-lucide="external-link"></i></button>
+          </div>
+          <div class="workspace-panel-body">
+            <select class="input-field input-field-sm" id="workspaceProjectSelect" aria-label="Projeto ativo"></select>
+            <div class="workspace-quick-actions">
+              <button class="btn btn-secondary btn-sm" id="btnWorkspaceSave"><i data-lucide="save"></i>Salvar</button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceVersion"><i data-lucide="history"></i>Versão</button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceExport"><i data-lucide="archive"></i>Exportar</button>
+            </div>
+            <p class="form-hint workspace-status" id="workspaceStatus">Workspace local ativo</p>
+          </div>
+        </div>
         <div class="panel panel-queue" id="queuePanel" style="display:none">
           <div class="panel-header">
             <span class="panel-title"><i data-lucide="list-ordered"></i>Fila de Conversão</span>
@@ -127,7 +142,7 @@
               </div>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceToolbar"><i data-lucide="folder-kanban"></i><span>Workspace</span></button><button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCompare" title="Comparar MarkItDown x conversor local"><i data-lucide="columns-2"></i><span>Comparar</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
               <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
@@ -169,6 +184,47 @@
       </div>
     </div>
   </div>
+
+  <dialog class="modal modal-lg" id="modalWorkspace">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="folder-kanban"></i> Workspace</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseWorkspace"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body workspace-modal-body">
+        <div class="workspace-project-create">
+          <input class="input-field" id="workspaceProjectName" placeholder="Nome do novo projeto..." />
+          <button class="btn btn-primary" id="btnCreateWorkspaceProject"><i data-lucide="plus"></i>Novo projeto</button>
+        </div>
+        <div class="workspace-grid">
+          <section class="workspace-section">
+            <div class="workspace-section-head">
+              <h3>Projetos</h3>
+              <button class="btn btn-ghost btn-sm" id="btnRenameWorkspaceProject"><i data-lucide="pencil"></i>Renomear</button>
+            </div>
+            <div class="workspace-project-list" id="workspaceProjectList"></div>
+            <div class="workspace-project-actions">
+              <button class="btn btn-ghost btn-sm" id="btnDeleteWorkspaceProject"><i data-lucide="trash-2"></i>Excluir projeto</button>
+              <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceJson"><i data-lucide="file-json"></i>Exportar JSON</button>
+              <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceZip"><i data-lucide="archive"></i>Exportar ZIP</button>
+            </div>
+          </section>
+          <section class="workspace-section">
+            <div class="workspace-section-head"><h3>Histórico do projeto</h3><span class="badge-count" id="workspaceHistoryCount">0</span></div>
+            <div class="workspace-tabs">
+              <button class="workspace-tab active" id="workspaceTabVersions">Versões</button>
+              <button class="workspace-tab" id="workspaceTabAI">IA</button>
+            </div>
+            <div class="workspace-history-list" id="workspaceHistoryList"></div>
+          </section>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="form-hint">Os dados ficam armazenados localmente neste navegador via IndexedDB.</span>
+        <button class="btn btn-primary" id="btnWorkspaceDone"><i data-lucide="check"></i>Concluído</button>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="modal" id="modalSettings">
     <div class="modal-card">
