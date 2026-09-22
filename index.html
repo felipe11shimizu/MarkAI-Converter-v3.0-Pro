@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="MarkAI Converter v3.0 Pro — Converta PDF, DOCX, XLSX, código-fonte e mais em Markdown perfeito, 100% no navegador." />
-  <title>MarkAI Converter v3.0 — Pro Edition</title>
+  <meta name="description" content="MarkAI Converter v3.1 Pro — Conversão híbrida com Microsoft MarkItDown + fallback no navegador." />
+  <title>MarkAI Converter v3.1 — Pro Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark-dimmed.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -35,10 +36,10 @@
         </div>
         <div class="brand-text">
           <h1 class="brand-name">MarkAI<span class="brand-accent"> Converter</span></h1>
-          <span class="brand-badge">v3.0 Pro</span>
+          <span class="brand-badge">v3.1 Pro</span>
         </div>
       </div>
-      <p class="header-tagline">Converta qualquer documento em Markdown perfeito &mdash; 100% no navegador.</p>
+      <p class="header-tagline">Converta documentos com MarkItDown no servidor ou automaticamente pelo navegador.</p>
       <div class="header-actions">
         <div class="status-pill" id="statusPill">
           <span class="status-dot" id="statusDot"></span>
@@ -199,7 +200,22 @@
               <input type="password" class="input-field" id="aiApiKey" placeholder="Cole sua API Key aqui..." autocomplete="off" />
               <button class="btn btn-ghost btn-icon-sm" id="btnToggleKey" type="button"><i data-lucide="eye"></i></button>
             </div>
-            <p class="form-hint">Salva no localStorage. Nunca compartilhada além do provedor selecionado.</p>
+            <p class="form-hint">A chave permanece no navegador e é enviada somente ao provedor escolhido quando você usar a função de IA.</p>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3 class="settings-section-title"><i data-lucide="server"></i> Motor de Conversão</h3>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <label class="form-label" for="toggleMarkItDown">Microsoft MarkItDown</label>
+              <p class="form-hint">Prioriza o motor oficial no backend quando disponível e usa o conversor local como fallback.</p>
+            </div>
+            <label class="toggle-switch" for="toggleMarkItDown"><input type="checkbox" id="toggleMarkItDown" checked /><span class="slider"></span></label>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="markitdownEndpoint">Endpoint MarkItDown</label>
+            <input type="url" class="input-field" id="markitdownEndpoint" value="http://localhost:8000" placeholder="http://localhost:8000" />
+            <p class="form-hint">Ex.: http://localhost:8000. O app verifica automaticamente se o serviço está disponível.</p>
           </div>
         </div>
         <div class="settings-section">
