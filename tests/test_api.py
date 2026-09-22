@@ -12,6 +12,8 @@ def test_health():
     assert body["ok"] is True
     assert body["engine"] == "markitdown"
     assert "ocr" in body
+    assert body["url_engine"]["enabled"] is True
+    assert body["url_engine"]["youtube"] is True
 
 
 def test_missing_extension():
@@ -117,3 +119,38 @@ def test_convert_batch(monkeypatch):
     assert body["total"] == 2
     assert body["successful"] == 2
     assert body["failed"] == 0
+
+
+def test_remote_url_uses_markitdown_local_conversion(monkeypatch):
+    class FakeResult:
+        markdown = "# Página\n\nConteúdo remoto"
+
+    def fake_fetch(url):
+        return url, b"<html><body><h1>Página</h1><p>Conteúdo remoto</p></body></html>", "text/html"
+
+    monkeypatch.setattr(api, "_fetch_remote_url", fake_fetch)
+    monkeypatch.setattr(api._engine, "convert_local", lambda path: FakeResult())
+
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://example.com/article"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "markitdown-url"
+    assert body["final_url"] == "https://example.com/article"
+    assert "Conteúdo remoto" in body["markdown"]
+
+
+def test_remote_url_rejects_private_host(monkeypatch):
+    def fake_dns(*args, **kwargs):
+        return [(None, None, None, None, ("127.0.0.1", 0))]
+
+    monkeypatch.setattr(api.socket, "getaddrinfo", fake_dns)
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "http://internal.example/article"},
+    )
+
+    assert response.status_code == 403
