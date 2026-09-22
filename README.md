@@ -93,7 +93,14 @@ Variáveis disponíveis:
 - `MARKAI_CORS_ORIGINS`: origens permitidas separadas por vírgula.
 - `MARKAI_MAX_URL_MB`: limite para conteúdo remoto. Padrão: 20 MB.
 - `MARKAI_URL_TIMEOUT_SECONDS`: timeout de acesso remoto. Padrão: 30 segundos.
-- `MARKAI_URL_MAX_REDIRECTS`: máximo de redirecionamentos. Padrão: 3.
+- `MARKAI_URL_MAX_REDIRECTS`: máximo de redirecionamentos.
+- `MARKAI_YOUTUBE_CACHE_TTL_SECONDS`: TTL do cache de transcripts. Padrão: 900 segundos.
+- `MARKAI_YOUTUBE_HTTP_PROXY`: proxy HTTP opcional para o provider YouTube.
+- `MARKAI_YOUTUBE_HTTPS_PROXY`: proxy HTTPS opcional para o provider YouTube.
+- `MARKAI_YOUTUBE_VISUAL_ENABLED`: habilita a obtenção do vídeo do YouTube para análise visual. Padrão: `false`.
+- `MARKAI_YOUTUBE_VISUAL_MAX_MB`: limite do arquivo de vídeo visual. Padrão: 150 MB.
+- `MARKAI_YOUTUBE_VISUAL_MAX_DURATION_SECONDS`: duração máxima para análise visual. Padrão: 2700 segundos.
+- `MARKAI_YOUTUBE_VISUAL_MAX_HEIGHT`: altura máxima do vídeo baixado para análise visual. Padrão: 480 px. Padrão: 3.
 
 Exemplo:
 
@@ -189,6 +196,15 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - controles de YouTube no frontend.
 
 ### Fase 6 — Video Intelligence e automação — EM EVOLUÇÃO
+- análise multimodal de vídeos locais com identificação de ações de tela.
+- obtenção opcional de vídeos públicos do YouTube para análise visual via provider `yt-dlp`.
+- correlação entre segmentos da transcrição e frames da mesma linha do tempo.
+- identificação de sistema, tela, elementos, coordenadas, seletores, decisões, erros e pré/pós-condições.
+- geração inicial de PyAutoGUI, Playwright, Selenium e RPA.
+- modo YouTube separa transcrição leve da análise visual; quando a legenda falha, a análise visual pode continuar usando ASR, desde que a configuração de IA esteja disponível.
+- próxima evolução: matriz de evidência fala × frame × ação, score de confiabilidade por etapa e revisão assistida antes da geração do código.
+
+
 - análise multimodal de vídeos locais com identificação de ações de tela.
 - geração inicial de PyAutoGUI, Playwright, Selenium e RPA.
 - próxima evolução: correlação transcript × frames × eventos × decisões.
