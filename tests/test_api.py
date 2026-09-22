@@ -69,17 +69,23 @@ def test_upload_limit(monkeypatch):
 
 
 
-def test_youtube_url_uses_markitdown(monkeypatch):
-    class FakeResult:
-        markdown = "# Vídeo\n\nTranscrição de teste."
+def test_youtube_url_uses_transcript_service(monkeypatch):
+    monkeypatch.setattr(
+        api._youtube_service,
+        "transcribe_url",
+        lambda url, languages=None: {
+            "provider": "youtube-transcript-api",
+            "video_id": "abc123",
+            "canonical_url": url,
+            "markdown": "# Vídeo\n\nTranscrição de teste.",
+            "quality": {"segments": 1},
+            "language": "Português",
+            "language_code": "pt",
+            "is_generated": True,
+            "segments": [{"index": 1, "start": 0, "duration": 1, "end": 1, "text": "Transcrição de teste."}],
+        },
+    )
 
-    calls = []
-
-    def fake_convert(url):
-        calls.append(url)
-        return FakeResult()
-
-    monkeypatch.setattr(api._engine, "convert", fake_convert)
     response = client.post(
         "/api/convert-url",
         json={"url": "https://www.youtube.com/watch?v=abc123"},
@@ -88,9 +94,62 @@ def test_youtube_url_uses_markitdown(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["ok"] is True
-    assert body["engine"] == "markitdown-youtube"
+    assert body["engine"] == "youtube-transcript-api"
     assert "Transcrição de teste" in body["markdown"]
-    assert calls == ["https://www.youtube.com/watch?v=abc123"]
+
+
+def test_youtube_transcribe_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api._youtube_service,
+        "transcribe_url",
+        lambda url, **kwargs: {
+            "provider": "youtube-transcript-api",
+            "video_id": "dQw4w9WgXcQ",
+            "url": url,
+            "canonical_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "source_type": "video",
+            "language": "Português",
+            "language_code": "pt",
+            "is_generated": True,
+            "translated": False,
+            "translation_language": None,
+            "segments": [{"index": 1, "start": 0, "duration": 1, "end": 1, "text": "Olá"}],
+            "quality": {"segments": 1, "characters": 3, "words": 1},
+            "markdown": "# Transcrição do YouTube\n\nOlá",
+        },
+    )
+    response = client.post(
+        "/api/youtube/transcribe",
+        json={"url": "https://youtu.be/dQw4w9WgXcQ", "languages": ["pt", "en"]},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "youtube-transcript-api"
+    assert body["video_id"] == "dQw4w9WgXcQ"
+    assert body["language_code"] == "pt"
+
+
+def test_youtube_transcripts_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api._youtube_service,
+        "list_transcripts",
+        lambda video_id: {
+            "video_id": video_id,
+            "count": 2,
+            "transcripts": [
+                {"language": "Português", "language_code": "pt", "is_generated": True, "is_translatable": True, "translation_languages": []},
+                {"language": "English", "language_code": "en", "is_generated": False, "is_translatable": False, "translation_languages": []},
+            ],
+        },
+    )
+    response = client.post(
+        "/api/youtube/transcripts",
+        json={"url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["count"] == 2
+    assert body["video_id"] == "dQw4w9WgXcQ"
 
 
 def test_convert_url_rejects_unsupported_scheme():
