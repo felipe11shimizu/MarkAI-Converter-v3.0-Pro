@@ -875,3 +875,23 @@ body::before {
   .video-analysis-grid { grid-template-columns: 1fr; }
   .video-steps,.video-transcript { max-height:30vh; }
 }
+
+
+/* Video Task Analyzer — automation action details */
+.video-automation-action {
+  margin-top: .65rem;
+  padding: .65rem .75rem;
+  border: 1px solid rgba(99,102,241,.22);
+  border-radius: .55rem;
+  background: rgba(99,102,241,.06);
+  display: grid;
+  gap: .2rem;
+}
+.video-automation-action strong {
+  font-size: .78rem;
+  letter-spacing: .01em;
+}
+.video-automation-action small {
+  color: var(--text-muted, #94a3b8);
+  line-height: 1.4;
+}
