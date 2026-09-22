@@ -124,6 +124,16 @@
     const action = text(step?.tipo_acao) || 'other';
     const target = getTarget(step);
 
+    if (platform === 'pyautogui' && ['click', 'double_click', 'type', 'select'].includes(action) && !hasPoint(target)) {
+      pushIssue(
+        issues,
+        'error',
+        'COORDINATE_MISSING',
+        'A ação PyAutoGUI não possui coordenadas confirmadas para o elemento alvo.',
+        'Informe X/Y observáveis no vídeo ou revise a etapa para uma estratégia de foco previamente validada.'
+      );
+    }
+
     if (TARGET_ACTIONS.has(action) && !hasTargetText(target)) {
       pushIssue(
         issues,
