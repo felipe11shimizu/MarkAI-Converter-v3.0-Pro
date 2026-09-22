@@ -152,4 +152,15 @@ function step(overrides = {}) {
   assert.ok(result.issues.some(x => x.code === 'COORDINATE_MISSING'));
 }
 
+
+
+{
+  const result = validator.validateStep(step({
+    tipo_acao: 'click',
+    alvo: { descricao: 'Continuar', texto: 'Continuar', seletores: [], x: null, y: null },
+  }), 'pyautogui', { transcriptAvailable: true });
+  assert.equal(result.status, 'blocked');
+  assert.ok(result.issues.some(x => x.code === 'COORDINATE_MISSING'));
+}
+
 console.log('video automation validator tests passed');
