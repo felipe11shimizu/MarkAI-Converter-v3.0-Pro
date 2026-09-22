@@ -28,7 +28,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
 
-APP_VERSION = "3.3.0"
+APP_VERSION = "3.4.0"
 MAX_UPLOAD_MB = max(1, int(os.getenv("MARKAI_MAX_UPLOAD_MB", "100")))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_URL_MB = max(1, int(os.getenv("MARKAI_MAX_URL_MB", "20")))
