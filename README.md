@@ -141,15 +141,16 @@ Download / ZIP
 - métricas básicas de conversão: tempo, caracteres, linhas, headings, tabelas e links.
 - OCR opcional com `markitdown-ocr`, controlado por variável de ambiente.
 
-O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX e XLSX. Ele é opt-in neste projeto porque adiciona custo e dependência de credenciais. citeturn0search1turn0search2
+O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX e XLSX. Ele é opt-in neste projeto porque adiciona custo e dependência de credenciais.
 
-### Fase 3 — Qualidade e comparação — EM DESENVOLVIMENTO
+### Fase 3 — Qualidade e comparação — IMPLANTADA
 - Exibir métricas de qualidade no frontend.
-- Comparar MarkItDown x parser local.
-- Permitir selecionar o resultado desejado.
-- Registrar avisos de conversão.
+- Comparar MarkItDown x parser local lado a lado.
+- Exibir divergência aproximada entre os resultados.
+- Permitir selecionar e aplicar o resultado desejado.
+- Identificar o motor utilizado na conversão da fila.
 
-### Fase 4 — Workspace — PLANEJADA
+### Fase 4 — Workspace — PRÓXIMA
 - Projetos persistentes.
 - arquivos e ordem de processamento.
 - versões do Markdown.
@@ -159,7 +160,11 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 ### Fase 5 — Modularização — PLANEJADA
 Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
 
-### Fase 6 — CI/CD e testes de regressão — PRÓXIMA
+### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
+- GitHub Actions.
+- testes automatizados do backend.
+- validação sintática do JavaScript.
+- próximos incrementos: cobertura dos formatos, arquivos grandes e testes de segurança.
 - GitHub Actions.
 - testes dos principais formatos.
 - testes de arquivos grandes.
@@ -167,9 +172,9 @@ Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA
 - testes de segurança.
 
 ### OCR: observação operacional
-A documentação atual do MarkItDown recomenda restringir entradas não confiáveis e usar a API mais estreita possível; este backend usa `convert_local()` e arquivos temporários. citeturn0search4turn0search9
+A documentação atual do MarkItDown recomenda restringir entradas não confiáveis e usar a API mais estreita possível; este backend usa `convert_local()` e arquivos temporários.
 
-O plugin OCR é recente e possui issues abertas em cenários específicos de PDF/DOCX. Por isso o recurso permanece opcional e o conversor convencional continua disponível como fallback. citeturn0search5turn0search8
+O plugin OCR é recente e possui issues abertas em cenários específicos de PDF/DOCX. Por isso o recurso permanece opcional e o conversor convencional continua disponível como fallback.
 
 ### Configuração OCR
 
