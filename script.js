@@ -179,7 +179,7 @@ const MarkItDownEngine = (() => {
 
   async function convertUrl(url) {
     if (!(await isAvailable(true))) {
-      throw new Error('Backend MarkItDown indisponível. Para YouTube, inicie o backend local antes da conversão.');
+      throw new Error('Backend MarkItDown indisponível. Para converter URLs, inicie o backend local antes da conversão.');
     }
 
     const resp = await window.fetch(_endpoint() + '/api/convert-url', {
@@ -626,122 +626,20 @@ const MergeEngine = (() => {
 // 5. URL FETCHER
 // ══════════════════════════════════════════════
 const URLFetcher = (() => {
-  const PROXIES = [
-    url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-    url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  ];
-
   async function fetch(url) {
-    if (isYouTubeUrl(url)) {
-      const result = await MarkItDownEngine.convertUrl(url);
+    const normalized = String(url || '').trim();
+    if (!normalized) throw new Error('Informe uma URL.');
+
+    try {
+      const result = await MarkItDownEngine.convertUrl(normalized);
       return result.markdown;
-    }
-
-    let html = null;
-    let err = null;
-
-    for (const proxy of PROXIES) {
-      try {
-        const resp = await window.fetch(proxy(url), { signal: AbortSignal.timeout(12000) });
-        if (!resp.ok) continue;
-        const data = await resp.json().catch(() => null);
-        if (data && data.contents) { html = data.contents; break; }
-        const text = await resp.text();
-        if (text && text.trim().startsWith('<')) { html = text; break; }
-      } catch(e) { err = e; }
-    }
-
-    if (!html) throw new Error('Não foi possível acessar a URL. Tente outro proxy ou verifique a conexão.');
-
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const title = doc.querySelector('title')?.textContent?.trim() || url;
-
-    // Extract main content
-    const contentEl =
-      doc.querySelector('article') ||
-      doc.querySelector('main') ||
-      doc.querySelector('[role="main"]') ||
-      doc.querySelector('.content, .post, .article, #content, #main') ||
-      doc.body;
-
-    // Remove noise
-    for (const sel of ['script','style','nav','footer','header','aside','.sidebar','.ads','.ad','iframe']) {
-      contentEl.querySelectorAll(sel).forEach(el => el.remove());
-    }
-
-    let md = `# ${title}\n\n`;
-    md += `> **Fonte:** [${url}](${url})\n> **Extraído:** ${new Date().toLocaleString('pt-BR')}\n\n---\n\n`;
-    md += _domToMarkdown(contentEl);
-    return md.trimEnd();
-  }
-
-  function _domToMarkdown(el) {
-    let md = '';
-    for (const node of el.childNodes) {
-      if (node.nodeType === 3) {
-        const t = node.textContent.trim();
-        if (t) md += t + ' ';
-      } else if (node.nodeType === 1) {
-        const tag = node.tagName.toLowerCase();
-        const inner = _domToMarkdown(node).trim();
-        if (!inner) continue;
-        switch(tag) {
-          case 'h1': md += `\n\n# ${inner}\n\n`; break;
-          case 'h2': md += `\n\n## ${inner}\n\n`; break;
-          case 'h3': md += `\n\n### ${inner}\n\n`; break;
-          case 'h4': md += `\n\n#### ${inner}\n\n`; break;
-          case 'h5': case 'h6': md += `\n\n##### ${inner}\n\n`; break;
-          case 'p': md += `\n\n${inner}\n\n`; break;
-          case 'strong': case 'b': md += `**${inner}**`; break;
-          case 'em': case 'i': md += `*${inner}*`; break;
-          case 'code': md += `\`${inner}\``; break;
-          case 'pre': md += `\n\n\`\`\`\n${inner}\n\`\`\`\n\n`; break;
-          case 'a': {
-            const href = node.href;
-            md += href ? `[${inner}](${href})` : inner; break;
-          }
-          case 'br': md += '\n'; break;
-          case 'hr': md += '\n\n---\n\n'; break;
-          case 'li': md += inner + '\n'; break;
-          case 'ul': {
-            const items = inner.split('\n').filter(Boolean);
-            md += '\n\n' + items.map(i => `- ${i}`).join('\n') + '\n\n'; break;
-          }
-          case 'ol': {
-            const items = inner.split('\n').filter(Boolean);
-            md += '\n\n' + items.map((i, n) => `${n+1}. ${i}`).join('\n') + '\n\n'; break;
-          }
-          case 'blockquote': md += `\n\n> ${inner.replace(/\n/g,'\n> ')}\n\n`; break;
-          case 'table': {
-            const rows = node.querySelectorAll('tr');
-            if (rows.length > 0) {
-              const hcells = rows[0].querySelectorAll('th,td');
-              if (hcells.length) {
-                const headers = Array.from(hcells).map(c => c.textContent.trim());
-                md += '\n\n| ' + headers.join(' | ') + ' |\n';
-                md += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
-                for (let i = 1; i < rows.length; i++) {
-                  const cells = Array.from(rows[i].querySelectorAll('td')).map(c => c.textContent.trim());
-                  md += '| ' + cells.join(' | ') + ' |\n';
-                }
-                md += '\n'; break;
-              }
-            }
-            md += inner; break;
-          }
-          case 'img': {
-            const alt = node.alt || '';
-            const src = node.src || '';
-            if (src) md += `\n\n![${alt}](${src})\n\n`;
-            break;
-          }
-          case 'script': case 'style': case 'nav': case 'footer':
-          case 'header': case 'aside': case 'iframe': break;
-          default: md += inner;
-        }
+    } catch (error) {
+      const message = error?.message || 'Não foi possível converter a URL.';
+      if (/Backend MarkItDown indisponível/i.test(message)) {
+        throw new Error('O motor de URLs está offline. Inicie o backend MarkItDown e tente novamente.');
       }
+      throw new Error(message);
     }
-    return md;
   }
 
   function isYouTubeUrl(url) {
