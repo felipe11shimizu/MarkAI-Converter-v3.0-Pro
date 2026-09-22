@@ -202,17 +202,20 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - identificação de sistema, tela, elementos, coordenadas, seletores, decisões, erros e pré/pós-condições.
 - geração inicial de PyAutoGUI, Playwright, Selenium e RPA.
 - modo YouTube separa transcrição leve da análise visual; quando a legenda falha, a análise visual pode continuar usando ASR, desde que a configuração de IA esteja disponível.
-- próxima evolução: matriz de evidência fala × frame × ação, score de confiabilidade por etapa e revisão assistida antes da geração do código.
+- matriz de evidência fala × frame × ação × decisão com correlação determinística no frontend.
+- score operacional por etapa combinando confiança do modelo, evidência observável, qualidade do alvo e condições.
+- validador de automação por plataforma com estados Pronta / Revisar / Bloqueada.
+- bloqueio de geração para etapas sem revisão, com alertas somente após revisão explícita e bloqueios sempre impeditivos.
+- proteção de dados sensíveis com placeholder {{DADO_SENSIVEL}} no editor e nas exportações JSON.
 
-
-- análise multimodal de vídeos locais com identificação de ações de tela.
-- geração inicial de PyAutoGUI, Playwright, Selenium e RPA.
-- próxima evolução: correlação transcript × frames × eventos × decisões.
 
 ### Fase 7 — Modularização — PRÓXIMA
+A evolução de validação foi isolada em `video_automation_validator.js`; a modularização do restante do `script.js` permanece como etapa posterior para reduzir risco de regressão.
 Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
 
 ### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
+- testes determinísticos do validador de automação no Node.js executados no GitHub Actions.
+- validação sintática do motor principal, do módulo de validação e cobertura dos cenários de locator, coordenada, ação incompatível, dado sensível e confiança.
 - GitHub Actions.
 - testes automatizados do backend.
 - validação sintática do JavaScript.
