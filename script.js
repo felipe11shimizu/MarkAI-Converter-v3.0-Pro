@@ -297,8 +297,7 @@ const WorkspaceStore = (() => {
     if (!markdown) return null;
     const version = {
       id: _id('version'), projectId, documentId: documentId || null,
-      name: name || 'documento.md', markdown, source, prompt: prompt || '',
-      createdAt: Date.now()
+      name: name || 'documento.md', markdown, source, prompt: prompt || '',      createdAt: Date.now()
     };
     await put('versions', version);
     return version;
@@ -367,7 +366,7 @@ const MarkItDownEngine = (() => {
 
   function _endpoint() {
     const s = AppState.get('settings');
-    return (s.markitdownEndpoint || 'http://localhost:8000').replace(/\\/$/, '');
+    return (s.markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
   }
 
   async function isAvailable(force = false) {
@@ -597,7 +596,6 @@ const FileParserStrategy = (() => {
     }
     return md.trimEnd();
   }
-
   // ── DOCX ──
   async function parseDocx(file) {
     const buffer = await file.arrayBuffer();
@@ -897,7 +895,6 @@ const ChatFormatter = (() => {
   const AI_PATTERN = /^(ai|assistant|assistente|gemini|chatgpt|gpt|claude|bot|copilot|bing|resposta|answer)\s*:\s*/i;
   // Timestamp
   const TIMESTAMP_PATTERN = /^\[?(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)\]?\s*/i;
-
   function format(text) {
     const lines = text.split('\n');
     let md = '# Conversa com IA\n\n';
@@ -1197,8 +1194,7 @@ const UIManager = (() => {
     } else {
       AppState.set('currentMd', '');
       els.workspaceContent.style.display = 'none';
-      els.emptyState.style.display = 'flex';
-    }
+      els.emptyState.style.display = 'flex';    }
     await _refreshWorkspaceProjects();
     await _renderWorkspaceHistory();
     if (els.workspaceStatus) els.workspaceStatus.textContent = 'Projeto: ' + (els.workspaceProjectSelect.selectedOptions[0]?.textContent || '');
@@ -1797,350 +1793,3 @@ const UIManager = (() => {
       loadMarkdown(md, 'conversa_ia.md');
       toast('✓ Conversa formatada!', 'success');
     });
-
-    // Tabs
-    [els.tabRaw, els.tabPreview, els.tabSplit].forEach(tab => {
-      tab.addEventListener('click', () => _switchTab(tab));
-    });
-
-    // Editor auto-sync
-    function _onEditorInput(editor, e) {
-      const md = editor.value;
-      AppState.set('currentMd', md);
-      _updateStats(md);
-      // Sync sibling editor
-      if (editor === els.markdownEditor) els.markdownEditorSplit.value = md;
-      else els.markdownEditor.value = md;
-      // Auto preview
-      if (AppState.get('settings').autoPreview && AppState.get('activePanel') !== 'panelRaw') {
-        _renderPreview(md);
-      }
-      if (AppState.get('activePanel') === 'panelSplit') _renderPreview(md);
-    }
-    els.markdownEditor.addEventListener('input', e => { _onEditorInput(els.markdownEditor, e); _scheduleWorkspaceSave(); });
-    els.markdownEditorSplit.addEventListener('input', e => { _onEditorInput(els.markdownEditorSplit, e); _scheduleWorkspaceSave(); });
-    // Copy
-    els.btnCopy.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(AppState.get('currentMd'));
-        const origHTML = els.btnCopy.innerHTML;
-        els.btnCopy.innerHTML = '<i data-lucide="check"></i><span>Copiado!</span>';
-        lucide.createIcons();
-        setTimeout(() => { els.btnCopy.innerHTML = origHTML; lucide.createIcons(); }, 2000);
-        toast('Markdown copiado!', 'success');
-      } catch(e) {
-        toast('Erro ao copiar.', 'error');
-      }
-    });
-
-    // Download
-    els.btnDownload.addEventListener('click', () => {
-      const md = AppState.get('currentMd');
-      if (!md) { toast('Nenhum conteúdo para baixar.', 'warning'); return; }
-      const fileName = AppState.get('currentFileName') || 'documento.md';
-      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast(`✓ ${fileName} baixado!`, 'success');
-    });
-
-    // Reset
-    els.btnReset.addEventListener('click', async () => {
-      AppState.set('currentMd', '');
-      els.markdownEditor.value = '';
-      els.markdownEditorSplit.value = '';
-      els.markdownPreview.innerHTML = '';
-      els.markdownPreviewSplit.innerHTML = '';
-      els.workspaceContent.style.display = 'none';
-      els.emptyState.style.display = 'flex';
-      _updateStats('');
-      setProgress(0, false);
-      setStatus('Pronto', 'idle');
-      _scheduleWorkspaceSave();
-    });
-
-    // AI Enhance
-    els.btnEnhanceAI.addEventListener('click', async () => {
-      const md = AppState.get('currentMd');
-      if (!md) { toast('Sem conteúdo para melhorar.', 'warning'); return; }
-      const settings = AppState.get('settings');
-      if (!settings.apiKey) {
-        toast('Configure sua API Key em Configurações.', 'warning');
-        els.modalSettings.showModal();
-        return;
-      }
-      els.btnEnhanceAI.classList.add('loading');
-      els.btnEnhanceAI.disabled = true;
-      setStatus('IA processando…', 'busy');
-      try {
-        const customPrompt = els.workspaceAIPrompt?.value?.trim() || '';
-        const improved = await AIEngine.enhance(md, customPrompt);
-        const projectId = AppState.get('currentProjectId');
-        if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: customPrompt || 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
-        loadMarkdown(improved, AppState.get('currentFileName'));
-        await _saveWorkspaceVersion('ai');
-        toast('✓ Markdown melhorado pela IA!', 'success');
-        setStatus('IA concluída', 'idle');
-      } catch(e) {
-        toast(`Erro IA: ${e.message}`, 'error');
-        setStatus('Erro na IA', 'error');
-      } finally {
-        els.btnEnhanceAI.classList.remove('loading');
-        els.btnEnhanceAI.disabled = false;
-      }
-    });
-
-    // Settings Modal
-    els.btnSettings.addEventListener('click', () => {
-      _syncSettingsUI();
-      els.modalSettings.showModal();
-    });
-    els.btnCloseSettings.addEventListener('click', () => els.modalSettings.close());
-    els.modalSettings.addEventListener('click', e => { if (e.target === els.modalSettings) els.modalSettings.close(); });
-
-    els.btnSaveSettings.addEventListener('click', () => {
-      const s = AppState.get('settings');
-      s.aiProvider = els.aiProvider.value;
-      s.aiModel = els.aiModel.value;
-      s.apiKey = els.aiApiKey.value;
-      s.markitdownEnabled = els.toggleMarkItDown.checked;
-      s.markitdownEndpoint = els.markitdownEndpoint.value.trim() || 'http://localhost:8000';
-      s.syntaxHL = els.toggleSyntaxHL.checked;
-      s.autoPreview = els.toggleAutoPreview.checked;
-      AppState.set('settings', s);
-      AppState.saveSettings();
-      els.modalSettings.close();
-      toast('✓ Configurações salvas!', 'success');
-    });
-
-    els.btnClearApiKey.addEventListener('click', () => {
-      els.aiApiKey.value = '';
-      const s = AppState.get('settings');
-      s.apiKey = '';
-      AppState.set('settings', s);
-      AppState.saveSettings();
-      toast('Chave removida.', 'info');
-    });
-
-    els.btnToggleKey.addEventListener('click', () => {
-      const isPass = els.aiApiKey.type === 'password';
-      els.aiApiKey.type = isPass ? 'text' : 'password';
-      els.btnToggleKey.querySelector('i').setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
-      lucide.createIcons();
-    });
-
-    els.aiProvider.addEventListener('change', _filterModels);
-
-    // Comparison Modal
-    els.btnCloseCompare.addEventListener('click', () => els.modalCompare.close());
-    els.modalCompare.addEventListener('click', e => { if (e.target === els.modalCompare) els.modalCompare.close(); });
-    els.btnUseMarkItDown.addEventListener('click', () => {
-      const s = AppState.get('compareState');
-      const item = s?.id ? QueueManager.getById(s.id) : null;
-      if (!s?.markitdown || !item) { toast('Resultado MarkItDown indisponível.', 'warning'); return; }
-      QueueManager.update(item.id, { status:'done', result:s.markitdown, engine:'markitdown' });
-      renderQueue(); loadMarkdown(s.markitdown, item.name.replace(/\.[^.]+$/, '') + '.md');
-      els.modalCompare.close();
-    });
-    els.btnUseBrowser.addEventListener('click', () => {
-      const s = AppState.get('compareState');
-      const item = s?.id ? QueueManager.getById(s.id) : null;
-      if (!s?.browser || !item) { toast('Resultado local indisponível.', 'warning'); return; }
-      QueueManager.update(item.id, { status:'done', result:s.browser, engine:'browser' });
-      renderQueue(); loadMarkdown(s.browser, item.name.replace(/\.[^.]+$/, '') + '.md');
-      els.modalCompare.close();
-    });
-
-    els.btnCompare.addEventListener('click', () => {
-      const current = AppState.get('currentFileName') || '';
-      const base = current.replace(/\.[^.]+$/, '');
-      const item = QueueManager.getOrdered().find(i => i.name.replace(/\.[^.]+$/, '') === base) || QueueManager.getOrdered().find(i => i.result);
-      if (!item) { toast('Nenhum arquivo disponível para comparação.', 'warning'); return; }
-      compareItem(item.id);
-    });
-
-    // Preview Modal
-    els.btnClosePreview.addEventListener('click', () => els.modalPreview.close());
-    els.modalPreview.addEventListener('click', e => { if (e.target === els.modalPreview) els.modalPreview.close(); });
-    els.btnUsePreview.addEventListener('click', () => {
-      const id = AppState.get('previewItemId');
-      const item = id ? QueueManager.getById(id) : null;
-      if (item && item.result) {
-        loadMarkdown(item.result, item.name.replace(/\.[^.]+$/, '') + '.md');
-      }
-      els.modalPreview.close();
-    });
-    els.btnPreviewRaw.addEventListener('click', () => {
-      _previewRawMode = !_previewRawMode;
-      const id = AppState.get('previewItemId');
-      const item = id ? QueueManager.getById(id) : null;
-      if (item && item.result) {
-        if (_previewRawMode) {
-          els.previewContent.innerHTML = `<pre><code>${item.result.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`;
-          els.btnPreviewRaw.textContent = 'Ver Preview';
-        } else {
-          els.previewContent.innerHTML = marked.parse(item.result);
-          els.btnPreviewRaw.textContent = 'Ver Raw';
-        }
-      }
-    });
-  }
-
-  // ── SETTINGS UI ──
-  function _syncSettingsUI() {
-    const s = AppState.get('settings');
-    els.aiProvider.value = s.aiProvider || 'gemini';
-    els.aiModel.value = s.aiModel || 'gemini-1.5-flash';
-    els.aiApiKey.value = s.apiKey || '';
-    els.toggleMarkItDown.checked = s.markitdownEnabled !== false;
-    els.markitdownEndpoint.value = s.markitdownEndpoint || 'http://localhost:8000';
-    els.toggleSyntaxHL.checked = s.syntaxHL !== false;
-    els.toggleAutoPreview.checked = s.autoPreview !== false;
-    _filterModels();
-  }
-
-  function _filterModels() {
-    const provider = els.aiProvider.value;
-    const geminiOpts = els.aiModel.querySelectorAll('option[value^="gemini"]');
-    const openaiOpts = els.aiModel.querySelectorAll('option[value^="gpt"]');
-    geminiOpts.forEach(o => o.style.display = provider === 'gemini' ? '' : 'none');
-    openaiOpts.forEach(o => o.style.display = provider === 'openai' ? '' : 'none');
-    // Select first visible
-    const first = Array.from(els.aiModel.options).find(o => o.style.display !== 'none');
-    if (first && !els.aiModel.value.startsWith(provider === 'gemini' ? 'gemini' : 'gpt')) {
-      els.aiModel.value = first.value;
-    }
-  }
-
-  function _applySettings() {
-    _syncSettingsUI();
-  }
-
-  // ── MARKED + HIGHLIGHT CONFIG ──
-  function _setupMarkdown() {
-    marked.setOptions({
-      gfm: true, breaks: false,
-      highlight: (code, lang) => {
-        if (!AppState.get('settings').syntaxHL) return code;
-        if (lang && hljs.getLanguage(lang)) {
-          return hljs.highlight(code, { language: lang }).value;
-        }
-        return hljs.highlightAuto(code).value;
-      }
-    });
-  }
-
-  // ── FILE SELECTION ──
-  function _onFilesSelected(files) {
-    const added = QueueManager.add(files);
-      _scheduleWorkspaceSave();
-    renderQueue();
-    toast(`${added.length} arquivo(s) adicionado(s) à fila.`, 'success');
-
-    // Auto-convert single file
-    if (AppState.get('queue').length === 1 && added.length === 1) {
-      setTimeout(() => convertItem(added[0].id), 100);
-    }
-  }
-
-  // ── URL FETCH ──
-  async function _fetchUrl() {
-    const url = els.urlInput.value.trim();
-    if (!url) { toast('Digite uma URL válida.', 'warning'); return; }
-    if (!url.startsWith('http')) { toast('URL deve começar com http:// ou https://', 'warning'); return; }
-
-    showProcessing('Buscando URL…', url);
-    setStatus('Buscando URL…', 'busy');
-    try {
-      const md = await URLFetcher.fetch(url);
-      hideProcessing();
-      loadMarkdown(md, 'pagina_web.md');
-      setStatus('URL carregada', 'idle');
-      toast('✓ Conteúdo extraído com sucesso!', 'success');
-    } catch(e) {
-      hideProcessing();
-      setStatus('Erro na URL', 'error');
-      toast(`Erro: ${e.message}`, 'error');
-    }
-  }
-
-  // ── PREVIEW MODAL ──
-  async function _previewItem(id) {
-    const item = QueueManager.getById(id);
-    if (!item) return;
-    AppState.set('previewItemId', id);
-
-    els.previewFileName.textContent = item.name;
-    els.previewContent.innerHTML = '';
-
-    let result = item.result;
-    if (!result) {
-      showProcessing('Convertendo para preview…', item.name);
-      try {
-        result = await FileParserStrategy.parse(item);
-        QueueManager.update(id, { status: 'done', result });
-        renderQueue();
-      } catch(e) {
-        hideProcessing();
-        toast(`Erro ao pré-visualizar: ${e.message}`, 'error');
-        return;
-      }
-      hideProcessing();
-    }
-
-    const renderedPreview = marked.parse(result);
-    els.previewContent.innerHTML = window.DOMPurify
-      ? DOMPurify.sanitize(renderedPreview, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] })
-      : renderedPreview;
-    if (AppState.get('settings').syntaxHL) {
-      els.previewContent.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
-    }
-    els.btnPreviewRaw.textContent = 'Ver Raw';
-    _previewRawMode = false;
-    els.modalPreview.showModal();
-  }
-
-  return { init, renderQueue, loadMarkdown, toast };
-})();
-
-// ══════════════════════════════════════════════
-// 9. BOOT
-// ══════════════════════════════════════════════
-document.addEventListener('DOMContentLoaded', () => {
-  // Initialize Lucide icons
-  lucide.createIcons();
-
-  // PDF.js global worker
-  if (window['pdfjs-dist/build/pdf']) {
-    window['pdfjs-dist/build/pdf'].GlobalWorkerOptions.workerSrc =
-      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  }
-
-  // Boot UI
-  UIManager.init();
-
-  // Global drag-over-page prevention (only allow on drop zone)
-  document.addEventListener('dragover', e => e.preventDefault());
-  document.addEventListener('drop', e => {
-    e.preventDefault();
-    const files = e.dataTransfer?.files;
-    if (files?.length && !e.target.closest('#dropZone')) {
-      const added = QueueManager.add(files);
-      UIManager.renderQueue();
-      UIManager.toast(`${added.length} arquivo(s) adicionado(s)!`, 'success');
-      if (AppState.get('queue').length === 1 && added.length === 1) {
-        const item = AppState.get('queue')[0];
-        if (item) {
-          UIManager.toast('Arquivo adicionado à fila. Clique em Converter para iniciar.', 'info');
-        }
-      }
-    }
-  });
-});
-
-
-
