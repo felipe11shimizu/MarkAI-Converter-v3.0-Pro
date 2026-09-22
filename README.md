@@ -123,3 +123,59 @@ Download / ZIP
 - Criar fila de conversão server-side para lotes muito grandes.
 - Adicionar autenticação/rate limiting antes de exposição pública.
 - Migrar gradualmente o frontend monolítico de `script.js` para módulos.
+
+
+## Roadmap de implantação
+
+### Fase 1 — Fundação e segurança — IMPLANTADA
+- MarkItDown como motor preferencial com fallback local.
+- `convert_local()` no backend.
+- allowlist de extensões, limite de upload e CORS configurável.
+- DOMPurify no preview.
+- IDs da fila com `crypto.randomUUID()`.
+- health check e testes automatizados.
+
+### Fase 2 — Motor documental avançado — IMPLANTADA
+- Suporte via MarkItDown para PowerPoint, EPUB, ZIP, imagens e áudio, além dos formatos já existentes.
+- endpoint `POST /api/convert-batch` para lotes.
+- métricas básicas de conversão: tempo, caracteres, linhas, headings, tabelas e links.
+- OCR opcional com `markitdown-ocr`, controlado por variável de ambiente.
+
+O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX e XLSX. Ele é opt-in neste projeto porque adiciona custo e dependência de credenciais. citeturn0search1turn0search2
+
+### Fase 3 — Qualidade e comparação — EM DESENVOLVIMENTO
+- Exibir métricas de qualidade no frontend.
+- Comparar MarkItDown x parser local.
+- Permitir selecionar o resultado desejado.
+- Registrar avisos de conversão.
+
+### Fase 4 — Workspace — PLANEJADA
+- Projetos persistentes.
+- arquivos e ordem de processamento.
+- versões do Markdown.
+- prompts e resultados de IA.
+- histórico e exportações.
+
+### Fase 5 — Modularização — PLANEJADA
+Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
+
+### Fase 6 — CI/CD e testes de regressão — PRÓXIMA
+- GitHub Actions.
+- testes dos principais formatos.
+- testes de arquivos grandes.
+- lint e validação JavaScript.
+- testes de segurança.
+
+### OCR: observação operacional
+A documentação atual do MarkItDown recomenda restringir entradas não confiáveis e usar a API mais estreita possível; este backend usa `convert_local()` e arquivos temporários. citeturn0search4turn0search9
+
+O plugin OCR é recente e possui issues abertas em cenários específicos de PDF/DOCX. Por isso o recurso permanece opcional e o conversor convencional continua disponível como fallback. citeturn0search5turn0search8
+
+### Configuração OCR
+
+```powershell
+$env:MARKAI_OCR_ENABLED="true"
+$env:MARKAI_OCR_MODEL="gpt-4o"
+$env:OPENAI_API_KEY="SUA_CHAVE"
+uvicorn backend.app:app --reload --port 8000
+```
