@@ -15,6 +15,7 @@ import os
 import tempfile
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +27,8 @@ MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 OCR_ENABLED = os.getenv("MARKAI_OCR_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 OCR_MODEL = os.getenv("MARKAI_OCR_MODEL", "gpt-4o")
 OCR_API_KEY = os.getenv("MARKAI_OCR_API_KEY") or os.getenv("OPENAI_API_KEY")
+
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".pptx", ".xlsx", ".xls", ".csv", ".json", ".xml", ".html", ".htm", ".txt", ".md", ".epub", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".wav", ".mp3", ".m4a", ".py", ".js", ".ts", ".jsx", ".tsx", ".css", ".scss", ".sql", ".sh", ".rb", ".go", ".rs", ".java", ".cpp", ".c", ".cs", ".php", ".yaml", ".yml", ".toml", ".ini", ".r", ".lua", ".pl", ".kt", ".swift", ".vue", ".svelte"}
 
@@ -53,6 +56,63 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def _is_youtube_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+        return parsed.scheme in {"http", "https"} and parsed.hostname in YOUTUBE_HOSTS
+    except ValueError:
+        return False
+
+
+def _quality(markdown: str) -> dict:
+    lines = markdown.splitlines()
+    return {
+        "characters": len(markdown),
+        "lines": len(lines),
+        "headings": sum(1 for line in lines if line.lstrip().startswith("#")),
+        "table_lines": sum(1 for line in lines if "|" in line),
+        "links": markdown.count("]("),
+    }
+
+
+def _read_upload(file: UploadFile):
+    filename = Path(file.filename or "documento").name
+    suffix = Path(filename).suffix.lower()
+    if not suffix:
+        raise HTTPException(status_code=400, detail="Arquivo sem extensão.")
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=415, detail=f"Extensão não habilitada: {suffix}")
+    return filename, suffix
+
+
+def _convert_bytes(filename: str, suffix: str, data: bytes):
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"Arquivo excede o limite de {MAX_UPLOAD_MB} MB.")
+    temp_path = None
+    started = time.perf_counter()
+    try:
+        with tempfile.NamedTemporaryFile(prefix="markai_", suffix=suffix, delete=False) as tmp:
+            tmp.write(data)
+            temp_path = Path(tmp.name)
+        result = _engine.convert_local(str(temp_path))
+        markdown = result.markdown or ""
+        if not markdown.strip():
+            raise HTTPException(status_code=422, detail="O MarkItDown não retornou conteúdo Markdown.")
+        return {
+            "ok": True, "engine": "markitdown", "filename": filename, "markdown": markdown,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "quality": _quality(markdown),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Falha na conversão de {filename}: {type(exc).__name__}") from exc
+    finally:
+        if temp_path:
+            temp_path.unlink(missing_ok=True)
+
+
 def _build_engine():
     if not OCR_ENABLED or not OCR_API_KEY:
         return MarkItDown()
@@ -78,58 +138,33 @@ def health():
 
 @app.post("/api/convert")
 async def convert(file: UploadFile = File(...)):
-    filename = Path(file.filename or "documento").name
-    suffix = Path(filename).suffix.lower()
-
-    if not suffix:
-        raise HTTPException(status_code=400, detail="Arquivo sem extensão.")
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise HTTPException(status_code=415, detail=f"Extensão não habilitada: {suffix}")
-
+    filename, suffix = _read_upload(file)
     data = await file.read(MAX_UPLOAD_BYTES + 1)
-    if len(data) > MAX_UPLOAD_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Arquivo excede o limite de {MAX_UPLOAD_MB} MB.",
-        )
+    return _convert_bytes(filename, suffix, data)
 
-    temp_path: Path | None = None
+
+@app.post("/api/convert-url")
+async def convert_url(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL não informada.")
+    if not _is_youtube_url(url):
+        raise HTTPException(status_code=403, detail="Por segurança, este endpoint aceita somente URLs do YouTube.")
     started = time.perf_counter()
     try:
-        with tempfile.NamedTemporaryFile(
-            prefix="markai_", suffix=suffix, delete=False
-        ) as tmp:
-            tmp.write(data)
-            temp_path = Path(tmp.name)
-
-        result = _engine.convert_local(str(temp_path))
+        result = _engine.convert(url)
         markdown = result.markdown or ""
-
         if not markdown.strip():
-            raise HTTPException(
-                status_code=422,
-                detail="O MarkItDown não retornou conteúdo Markdown.",
-            )
-
+            raise HTTPException(status_code=422, detail="O MarkItDown não encontrou transcrição/conteúdo no vídeo.")
         return {
-            "ok": True,
-            "engine": "markitdown",
-            "filename": filename,
-            "markdown": markdown,
+            "ok": True, "engine": "markitdown-youtube", "url": url, "markdown": markdown,
             "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
-            "quality": {"characters": len(markdown), "lines": len(markdown.splitlines()), "headings": sum(1 for line in markdown.splitlines() if line.lstrip().startswith("#")), "table_lines": sum(1 for line in markdown.splitlines() if "|" in line), "links": markdown.count("](")},
+            "quality": _quality(markdown),
         }
     except HTTPException:
         raise
     except Exception as exc:
-        # Do not expose local paths or internal tracebacks to clients.
-        raise HTTPException(
-            status_code=422,
-            detail=f"Falha na conversão de {filename}: {type(exc).__name__}",
-        ) from exc
-    finally:
-        if temp_path:
-            temp_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=422, detail=f"Falha ao processar YouTube: {type(exc).__name__}") from exc
 
 
 @app.post("/api/convert-batch")
@@ -139,7 +174,8 @@ async def convert_batch(files: list[UploadFile] = File(...)):
     results = []
     for file in files:
         try:
-            filename, suffix, data = _read_upload(file)
+            filename, suffix = _read_upload(file)
+            data = await file.read(MAX_UPLOAD_BYTES + 1)
             results.append(_convert_bytes(filename, suffix, data))
         except HTTPException as exc:
             results.append({"ok": False, "filename": Path(file.filename or "documento").name, "error": exc.detail, "status_code": exc.status_code})
