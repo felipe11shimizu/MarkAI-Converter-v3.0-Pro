@@ -3310,16 +3310,27 @@ const VideoTaskAnalyzer = (() => {
     $('videoReviewFilter')?.addEventListener('change', () => {
       if (lastAnalysis) render(lastAnalysis, { open: false });
     });
+    $('btnValidateVideoAutomation')?.addEventListener('click', () => {
+      if (!lastAnalysis) return;
+      const platform = _currentAutomationPlatform(lastAnalysis);
+      const validation = _validateAnalysis(lastAnalysis, platform);
+      render(lastAnalysis, { open: false });
+      const summary = validation.summary;
+      const message =
+        'Validação ' + platform + ': ' + summary.ready + ' prontas, ' +
+        summary.warning + ' com alertas e ' + summary.blocked + ' bloqueadas.';
+      if (typeof toast === 'function') toast(message, summary.blocked ? 'warning' : 'success');
+    });
     $('btnApproveAllVideoSteps')?.addEventListener('click', () => {
       _approveAllVideoSteps();
-      if (typeof toast === 'function') toast('Todas as etapas foram aprovadas para geração.', 'success');
+      if (typeof toast === 'function') toast('Todas as etapas foram marcadas como aprovadas; alertas e bloqueios ainda impedem a geração automática.', 'info');
     });
 
     $('btnGenerateVideoAutomation')?.addEventListener('click', () => {
       renderAutomation($('videoAutomationTarget')?.value || 'pyautogui');
     });
     $('videoAutomationTarget')?.addEventListener('change', event => {
-      if (lastAnalysis) renderAutomation(event.target.value);
+      if (lastAnalysis) render(lastAnalysis, { open: false });
     });
     $('btnCopyVideoAutomation')?.addEventListener('click', async () => {
       if (!lastAnalysis) return;
