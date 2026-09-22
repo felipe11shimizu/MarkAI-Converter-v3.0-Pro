@@ -3001,7 +3001,7 @@ const VideoTaskAnalyzer = (() => {
     const suggestedPlatform = MarkAIAutomationValidator.normalizePlatform(
       analysis?.automacao?.plataforma_sugerida || 'pyautogui'
     );
-    if (automationTarget && ['pyautogui', 'playwright', 'selenium', 'rpa'].includes(suggestedPlatform) && !automationTarget.value) {
+    if (automationTarget && ['pyautogui', 'playwright', 'selenium', 'rpa'].includes(suggestedPlatform) && !analysis.validacao_plataforma) {
       automationTarget.value = suggestedPlatform;
     }
     const platform = automationTarget?.value || suggestedPlatform;
