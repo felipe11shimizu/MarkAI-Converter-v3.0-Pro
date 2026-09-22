@@ -58,12 +58,12 @@
             <span class="badge-count" id="queueCount">0</span>
           </div>
           <div class="drop-zone" id="dropZone" role="button" tabindex="0">
-            <input type="file" id="fileInput" multiple accept=".txt,.csv,.md,.json,.xml,.pdf,.docx,.doc,.pptx,.xlsx,.xls,.epub,.zip,.html,.htm,.py,.js,.ts,.jsx,.tsx,.css,.scss,.sql,.sh,.rb,.go,.rs,.java,.cpp,.c,.cs,.php,.yaml,.yml,.toml,.ini,.r,.lua,.pl,.kt,.swift,.vue,.svelte,.png,.jpg,.jpeg,.gif,.webp,.wav,.mp3,.m4a" style="display:none" />
+            <input type="file" id="fileInput" multiple accept=".txt,.csv,.md,.json,.xml,.pdf,.docx,.doc,.pptx,.xlsx,.xls,.epub,.zip,.html,.htm,.py,.js,.ts,.jsx,.tsx,.css,.scss,.sql,.sh,.rb,.go,.rs,.java,.cpp,.c,.cs,.php,.yaml,.yml,.toml,.ini,.r,.lua,.pl,.kt,.swift,.vue,.svelte,.png,.jpg,.jpeg,.gif,.webp,.wav,.mp3,.m4a,.mp4,.mov,.webm,.mkv,.avi" style="display:none" />
             <div class="drop-zone-content">
               <div class="drop-icon-wrap"><i data-lucide="file-plus-2"></i></div>
               <p class="drop-title">Arraste arquivos aqui</p>
               <p class="drop-sub">ou <button class="link-btn" id="browseBtn" type="button">selecione do computador</button></p>
-              <p class="drop-hint">PDF &middot; DOCX &middot; XLSX &middot; CSV &middot; JSON &middot; Código</p>
+              <p class="drop-hint">PDF &middot; DOCX &middot; XLSX &middot; CSV &middot; JSON &middot; Vídeo &middot; Código</p>
             </div>
           </div>
         </div>
@@ -95,6 +95,16 @@
             <button class="btn btn-secondary btn-full" id="btnConvertAll"><i data-lucide="zap"></i>Converter Todos</button>
               <button class="btn btn-outline btn-full" id="btnDownloadZip" style="margin-top:0.5rem"><i data-lucide="archive"></i>Baixar Todos (ZIP)</button>
           </div>
+        </div>
+        <div class="panel video-panel" id="videoPanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="video"></i>Analisar Vídeo</span>
+            <span class="badge-count video-badge">IA</span>
+          </div>
+          <input type="file" id="videoInput" accept=".mp4,.mov,.webm,.mkv,.avi,video/*" style="display:none" />
+          <button class="btn btn-accent btn-full" id="btnVideoAnalyze"><i data-lucide="scan-search"></i>Analisar tarefas</button>
+          <textarea class="input-textarea video-prompt" id="videoPrompt" rows="3" placeholder="Opcional: diga o que deseja identificar. Ex.: descreva o passo a passo do RPA e os sistemas utilizados."></textarea>
+          <p class="form-hint">Arraste um vídeo para a área de importação ou use este botão. O sistema identifica etapas, ações, telas, decisões e resultados.</p>
         </div>
         <div class="panel" id="urlPanel">
           <div class="panel-header"><span class="panel-title"><i data-lucide="globe"></i>Importar URL</span></div>
@@ -228,6 +238,36 @@
     </div>
   </dialog>
 
+  <dialog class="modal modal-lg" id="modalVideoAnalysis">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="scan-search"></i> Análise de Tarefas do Vídeo</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseVideoAnalysis"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body video-analysis-body">
+        <div class="video-analysis-summary" id="videoAnalysisSummary"></div>
+        <div class="video-analysis-grid">
+          <section>
+            <h3>Etapas identificadas</h3>
+            <div class="video-steps" id="videoSteps"></div>
+          </section>
+          <section>
+            <h3>Transcrição</h3>
+            <pre class="video-transcript" id="videoTranscript"></pre>
+          </section>
+        </div>
+        <details class="video-json-details">
+          <summary>JSON estruturado</summary>
+          <pre class="video-json" id="videoJson"></pre>
+        </details>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCopyVideoJson"><i data-lucide="copy"></i>Copiar JSON</button>
+        <button class="btn btn-primary" id="btnDownloadVideoJson"><i data-lucide="download"></i>Baixar JSON</button>
+        <button class="btn btn-ghost" id="btnCloseVideoAnalysis2">Concluído</button>
+      </div>
+    </div>
+  </dialog>
   <dialog class="modal" id="modalSettings">
     <div class="modal-card">
       <div class="modal-header">
