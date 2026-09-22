@@ -262,10 +262,12 @@ def _analyze_video_file(filename: str, data: bytes, task_prompt: str = ""):
         prompt = f"""
 Analise esta gravação de tela/vídeo para engenharia reversa de processo.
 Identifique as tarefas realmente executadas, em ordem temporal, sem inventar ações que não estejam visíveis ou na transcrição.
-Para cada etapa, informe timestamp aproximado, ação, sistema/tela, elementos acionados, dados informados e resultado observado quando possível.
-Separe ações observáveis de inferências. Identifique repetições, decisões, esperas, erros e pontos que exigiriam confirmação humana.
+Para cada etapa, informe a ação de tela necessária para reproduzir o processo: clique, duplo clique, digitação, seleção, tecla/atalho, scroll, arrastar, espera, abertura/navegação, upload/download, copiar/colar, validação ou envio.
+Capture sistema, tela/janela, elemento alvo, texto visível, controle, coordenadas aproximadas quando visualmente determináveis, coordenadas normalizadas de 0 a 1 quando possível, candidatos a seletores/identificadores visíveis, valor informado, pré-condição, pós-condição e resultado.
+Separe ações observáveis de inferências. Não invente coordenadas, seletores, valores ou identificadores; use null ou lista vazia quando não forem observáveis. Marque dados potencialmente sensíveis sem reproduzir credenciais.
+Identifique repetições, decisões, esperas, erros e pontos que exigiriam confirmação humana. Produza também uma sequência de passos neutra para implementação de automação, sem afirmar que um seletor é confiável quando ele não foi confirmado.
 Retorne SOMENTE JSON válido no schema:
-{{"objetivo":"","resumo":"","etapas":[{{"ordem":1,"timestamp":"00:00","acao":"","detalhes":"","elementos":[],"resultado":"","confianca":0.0}}],"decisoes":[],"erros":[],"observacoes":[]}}
+{{"objetivo":"","resumo":"","etapas":[{{"ordem":1,"timestamp":"00:00","acao":"","tipo_acao":"click|double_click|type|select|hotkey|keypress|scroll|drag|wait|open|navigate|download|upload|copy|paste|check|submit|other","sistema":"","tela":"","detalhes":"","elementos":[],"alvo":{{"descricao":"","texto":"","controle":"","x":null,"y":null,"x_normalizado":null,"y_normalizado":null,"largura_normalizada":null,"altura_normalizada":null,"seletores":[],"atalho":null}},"dados":{{"valor":"","campo":"","sensivel":false}},"precondicao":"","poscondicao":"","espera_segundos":0,"resultado":"","evidencia_frame":"","confianca":0.0}}],"decisoes":[],"erros":[],"observacoes":[],"automacao":{{"plataforma_sugerida":"pyautogui|playwright|selenium|rpa_desktop|indefinida","observacoes":"","passos":[]}}}}
 Transcrição disponível:
 {transcript[:20000]}
 Instrução adicional:
