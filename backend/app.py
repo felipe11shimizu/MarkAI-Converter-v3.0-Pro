@@ -122,31 +122,57 @@ def _fetch_remote_url(url: str):
     for _ in range(URL_MAX_REDIRECTS + 1):
         _validate_url(current)
         try:
-            with httpx.Client(timeout=URL_TIMEOUT_SECONDS, follow_redirects=False, headers={"User-Agent": "MarkAI-Converter/3.3"}) as client:
-                response = client.get(current)
+            with httpx.Client(
+                timeout=URL_TIMEOUT_SECONDS,
+                follow_redirects=False,
+                headers={"User-Agent": "MarkAI-Converter/3.3"},
+            ) as client:
+                with client.stream("GET", current) as response:
+                    if response.status_code in {301, 302, 303, 307, 308}:
+                        location = response.headers.get("location")
+                        if not location:
+                            raise HTTPException(status_code=422, detail="Redirecionamento sem destino válido.")
+                        from urllib.parse import urljoin
+                        current = urljoin(current, location)
+                        continue
+
+                    if response.status_code >= 400:
+                        raise HTTPException(
+                            status_code=422,
+                            detail=f"O servidor remoto respondeu HTTP {response.status_code}.",
+                        )
+
+                    content_length = response.headers.get("content-length")
+                    if content_length:
+                        try:
+                            if int(content_length) > MAX_URL_BYTES:
+                                raise HTTPException(
+                                    status_code=413,
+                                    detail=f"Conteúdo remoto excede o limite de {MAX_URL_MB} MB.",
+                                )
+                        except ValueError:
+                            pass
+
+                    chunks = []
+                    total = 0
+                    for chunk in response.iter_bytes():
+                        total += len(chunk)
+                        if total > MAX_URL_BYTES:
+                            raise HTTPException(
+                                status_code=413,
+                                detail=f"Conteúdo remoto excede o limite de {MAX_URL_MB} MB.",
+                            )
+                        chunks.append(chunk)
+
+                    data = b"".join(chunks)
+                    content_type = response.headers.get("content-type", "text/html")
+                    return current, data, content_type
         except httpx.TimeoutException as exc:
             raise HTTPException(status_code=504, detail="Tempo limite excedido ao acessar a URL.") from exc
         except httpx.HTTPError as exc:
             raise HTTPException(status_code=422, detail="Não foi possível acessar a URL informada.") from exc
 
-        if response.status_code in {301, 302, 303, 307, 308}:
-            location = response.headers.get("location")
-            if not location:
-                raise HTTPException(status_code=422, detail="Redirecionamento sem destino válido.")
-            from urllib.parse import urljoin
-            current = urljoin(current, location)
-            continue
-        if response.status_code >= 400:
-            raise HTTPException(status_code=422, detail=f"O servidor remoto respondeu HTTP {response.status_code}.")
-
-        data = response.content
-        if len(data) > MAX_URL_BYTES:
-            raise HTTPException(status_code=413, detail=f"Conteúdo remoto excede o limite de {MAX_URL_MB} MB.")
-        content_type = response.headers.get("content-type", "text/html")
-        return current, data, content_type
-
     raise HTTPException(status_code=310, detail=f"Quantidade máxima de redirecionamentos excedida ({URL_MAX_REDIRECTS}).")
-
 
 def _convert_remote_url(url: str):
     final_url, data, content_type = _fetch_remote_url(url)
