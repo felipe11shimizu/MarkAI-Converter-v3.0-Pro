@@ -14,6 +14,7 @@ def test_health():
     assert "ocr" in body
     assert body["url_engine"]["enabled"] is True
     assert body["url_engine"]["youtube"] is True
+    assert "visual_analysis" in body["youtube"]
 
 
 def test_missing_extension():
@@ -127,6 +128,79 @@ def test_youtube_transcribe_endpoint(monkeypatch):
     assert body["engine"] == "youtube-transcript-api"
     assert body["video_id"] == "dQw4w9WgXcQ"
     assert body["language_code"] == "pt"
+
+
+
+def test_youtube_analyze_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        api._youtube_service,
+        "transcribe_url",
+        lambda url, **kwargs: {
+            "provider": "youtube-transcript-api",
+            "video_id": "dQw4w9WgXcQ",
+            "url": url,
+            "canonical_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "source_type": "video",
+            "language": "Português",
+            "language_code": "pt",
+            "is_generated": True,
+            "translated": False,
+            "segments": [
+                {"index": 1, "start": 0, "duration": 2, "end": 2, "text": "Abra o sistema."}
+            ],
+            "quality": {"segments": 1, "characters": 18, "words": 3},
+        },
+    )
+    monkeypatch.setattr(
+        api._youtube_video_service,
+        "download",
+        lambda url: {
+            "video_id": "dQw4w9WgXcQ",
+            "url": url,
+            "canonical_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "source_type": "video",
+            "title": "Processo",
+            "channel": "Canal",
+            "duration_seconds": 120,
+            "filesize_bytes": 10,
+            "filename": "dQw4w9WgXcQ.mp4",
+            "data": b"video",
+        },
+    )
+    monkeypatch.setattr(
+        api,
+        "_analyze_video_file",
+        lambda filename, data, task_prompt="", transcript_override=None, transcript_segments=None, source=None: {
+            "ok": True,
+            "engine": "video-task-analyzer",
+            "filename": filename,
+            "analysis": {
+                "objetivo": "Processo",
+                "timeline": [{"frame_index": 1, "timestamp": 0, "transcript_segment_indices": [1]}],
+            },
+            "transcript": transcript_override or "",
+            "transcript_segments": transcript_segments or [],
+            "timeline": [{"frame_index": 1, "timestamp": 0, "transcript_segment_indices": [1]}],
+            "frames_analyzed": 1,
+            "frame_interval_seconds": 5,
+        },
+    )
+
+    response = client.post(
+        "/api/youtube/analyze",
+        json={
+            "url": "https://youtu.be/dQw4w9WgXcQ",
+            "languages": ["pt"],
+            "task_prompt": "Identifique as ações de tela.",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["engine"] == "video-task-analyzer"
+    assert body["source"]["type"] == "youtube"
+    assert body["transcript_metadata"]["language_code"] == "pt"
+    assert body["timeline"][0]["transcript_segment_indices"] == [1]
 
 
 def test_youtube_transcripts_endpoint(monkeypatch):
