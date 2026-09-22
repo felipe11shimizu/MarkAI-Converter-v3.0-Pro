@@ -1301,12 +1301,44 @@ const UIManager = (() => {
     return (bytes/1048576).toFixed(1) + ' MB';
   }
 
+  // ── HTML / MARKDOWN SAFETY ──
+  function _sanitizeMarkdownHtml(markdown) {
+    const source = String(markdown || '');
+    const rendered = marked.parse(source);
+    if (window.DOMPurify) {
+      return DOMPurify.sanitize(rendered, {
+        USE_PROFILES: { html: true },
+        ADD_ATTR: ['target', 'rel']
+      });
+    }
+    // Fail closed if the sanitizer CDN is unavailable: render Markdown as literal text.
+    const pre = document.createElement('pre');
+    const code = document.createElement('code');
+    code.textContent = source;
+    pre.appendChild(code);
+    return pre.outerHTML;
+  }
+
+  function _escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
   // ── TOAST ──
   function toast(msg, type = 'info', duration = 3500) {
     const icons = { success: 'check-circle', error: 'alert-circle', info: 'info', warning: 'alert-triangle' };
     const el = document.createElement('div');
     el.className = `toast ${type}`;
-    el.innerHTML = `<i data-lucide="${icons[type] || 'info'}"></i><span>${msg}</span>`;
+    const icon = document.createElement('i');
+    icon.dataset.lucide = icons[type] || 'info';
+    const text = document.createElement('span');
+    text.textContent = String(msg ?? '');
+    el.append(icon, text);
     els.toastContainer.appendChild(el);
     lucide.createIcons({ el });
     setTimeout(() => {
@@ -1373,7 +1405,7 @@ const UIManager = (() => {
         <input type="checkbox" class="qi-check" data-id="${item.id}" title="Selecionar" />
         <div class="qi-icon ${_extClass(item.ext)}">${EXT_LABELS[item.ext] || item.ext.toUpperCase()}</div>
         <div class="qi-info">
-          <div class="qi-name" title="${item.name}">${item.name}</div>
+          <div class="qi-name" title="${_escapeHtml(item.name)}">${_escapeHtml(item.name)}</div>
           <div class="qi-size">${_formatSize(item.size)}</div>
         </div>
         <div class="qi-actions">
@@ -1442,10 +1474,7 @@ const UIManager = (() => {
 
   function _renderPreview(md) {
     const settings = AppState.get('settings');
-    const rendered = marked.parse(md || '');
-    const html = window.DOMPurify
-      ? DOMPurify.sanitize(rendered, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] })
-      : rendered;
+    const html = _sanitizeMarkdownHtml(md);
     [els.markdownPreview, els.markdownPreviewSplit].forEach(el => {
       el.innerHTML = html;
       if (settings.syntaxHL) {
@@ -1980,10 +2009,14 @@ const UIManager = (() => {
       const item = id ? QueueManager.getById(id) : null;
       if (item && item.result) {
         if (_previewRawMode) {
-          els.previewContent.innerHTML = `<pre><code>${item.result.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</code></pre>`;
+          const pre = document.createElement('pre');
+          const code = document.createElement('code');
+          code.textContent = item.result;
+          pre.appendChild(code);
+          els.previewContent.replaceChildren(pre);
           els.btnPreviewRaw.textContent = 'Ver Preview';
         } else {
-          els.previewContent.innerHTML = marked.parse(item.result);
+          els.previewContent.innerHTML = _sanitizeMarkdownHtml(item.result);
           els.btnPreviewRaw.textContent = 'Ver Raw';
         }
       }
@@ -2092,10 +2125,7 @@ const UIManager = (() => {
       hideProcessing();
     }
 
-    const renderedPreview = marked.parse(result);
-    els.previewContent.innerHTML = window.DOMPurify
-      ? DOMPurify.sanitize(renderedPreview, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] })
-      : renderedPreview;
+    els.previewContent.innerHTML = _sanitizeMarkdownHtml(result);
     if (AppState.get('settings').syntaxHL) {
       els.previewContent.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
     }
