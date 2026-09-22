@@ -992,3 +992,118 @@ body::before {
 @media (max-width: 600px) {
   .youtube-controls-grid { grid-template-columns:1fr; }
 }
+
+
+/* ─── VIDEO ASSISTED REVIEW ─── */
+.video-review-toolbar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:.8rem;
+  margin-bottom:.8rem;
+  padding:.65rem .75rem;
+  border:1px solid var(--border);
+  border-radius:var(--radius-sm);
+  background:rgba(34,211,238,.035);
+}
+.video-review-toolbar-info {
+  display:flex;
+  flex-direction:column;
+  gap:.15rem;
+}
+.video-review-toolbar-info strong {
+  font-size:.76rem;
+  color:var(--text-1);
+}
+.video-review-toolbar-info span {
+  font-size:.66rem;
+  color:var(--text-3);
+}
+.video-review-toolbar-actions {
+  display:flex;
+  gap:.4rem;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.video-review-toolbar-actions .input-field { min-width:130px; }
+.video-review-required-note {
+  align-self:center;
+  font-size:.62rem;
+  color:var(--text-3);
+  margin-right:.2rem;
+}
+.video-step-card.review-pending {
+  border-color:rgba(245,158,11,.3);
+}
+.video-step-card.review-approved {
+  border-color:rgba(34,197,94,.3);
+}
+.video-step-card.review-ignored {
+  opacity:.62;
+  border-color:rgba(148,163,184,.2);
+}
+.video-review-status {
+  display:flex;
+  align-items:center;
+  gap:.4rem;
+}
+.video-review-badge {
+  border-radius:999px;
+  padding:.18rem .45rem;
+  font-size:.58rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.video-review-badge.pending {
+  background:rgba(245,158,11,.12);
+  color:#fbbf24;
+}
+.video-review-badge.approved {
+  background:rgba(34,197,94,.12);
+  color:#86efac;
+}
+.video-review-badge.ignored {
+  background:rgba(148,163,184,.1);
+  color:#94a3b8;
+}
+.video-review-editor {
+  margin-top:.6rem;
+  padding:.65rem;
+  border:1px dashed var(--border);
+  border-radius:.5rem;
+  display:grid;
+  grid-template-columns:1.1fr .9fr;
+  gap:.45rem;
+}
+.video-review-editor .form-group { gap:.22rem; }
+.video-review-editor .full { grid-column:1 / -1; }
+.video-review-editor .form-label {
+  font-size:.61rem;
+  margin:0;
+}
+.video-review-actions {
+  display:flex;
+  gap:.35rem;
+  margin-top:.55rem;
+  flex-wrap:wrap;
+}
+.video-review-actions .btn { min-height:28px; }
+.video-confidence {
+  font:600 .62rem var(--font-mono);
+  color:var(--text-3);
+}
+.video-automation-controls {
+  align-items:flex-end;
+}
+@media (max-width:900px) {
+  .video-review-toolbar {
+    flex-direction:column;
+    align-items:stretch;
+  }
+  .video-review-editor {
+    grid-template-columns:1fr;
+  }
+  .video-review-editor .full { grid-column:auto; }
+  .video-review-required-note { align-self:flex-start; }
+}
