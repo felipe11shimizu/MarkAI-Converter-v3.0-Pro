@@ -798,3 +798,40 @@ body::before {
 
 
 .qi-check { margin: 0 0.5rem; cursor: pointer; accent-color: var(--primary); width: 1.1rem; height: 1.1rem; border-radius: 4px; }
+
+
+/* ─── WORKSPACE ─── */
+.workspace-panel-body { padding: .75rem; }
+.input-field-sm { min-height: 34px; padding: .4rem .55rem; font-size: .78rem; }
+.workspace-quick-actions { display: flex; gap: .35rem; margin-top: .5rem; }
+.workspace-quick-actions .btn { flex: 1; }
+.workspace-status { margin-top: .5rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.workspace-modal-body { min-height: 55vh; }
+.workspace-project-create { display:flex; gap:.5rem; margin-bottom:1rem; }
+.workspace-project-create .input-field { flex:1; }
+.workspace-grid { display:grid; grid-template-columns: .9fr 1.1fr; gap:1rem; }
+.workspace-section { min-width:0; border:1px solid var(--border); border-radius:var(--radius); background:rgba(255,255,255,.015); padding:.75rem; }
+.workspace-section-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
+.workspace-section-head h3 { font-size:.85rem; color:var(--text-1); }
+.workspace-project-list,.workspace-history-list { display:flex; flex-direction:column; gap:.4rem; max-height:42vh; overflow:auto; }
+.workspace-project-item,.workspace-history-item {
+  padding:.65rem .7rem; border:1px solid var(--border); border-radius:var(--radius-sm);
+  background:var(--bg-input); cursor:pointer; transition:all var(--duration) var(--ease);
+}
+.workspace-project-item:hover,.workspace-history-item:hover { border-color:var(--border-bright); background:var(--bg-input-focus); }
+.workspace-project-item.active { border-color:var(--indigo); background:var(--indigo-dim); }
+.workspace-project-name { font-size:.8rem; font-weight:600; color:var(--text-1); }
+.workspace-project-meta,.workspace-history-meta { font-size:.68rem; color:var(--text-3); margin-top:.2rem; }
+.workspace-project-actions { display:flex; flex-wrap:wrap; gap:.35rem; margin-top:.75rem; }
+.workspace-tabs { display:flex; gap:.25rem; margin-bottom:.5rem; border-bottom:1px solid var(--border); }
+.workspace-tab { border:0; background:none; color:var(--text-3); padding:.45rem .65rem; font-size:.75rem; cursor:pointer; border-bottom:2px solid transparent; }
+.workspace-tab.active { color:var(--text-1); border-bottom-color:var(--indigo); }
+.workspace-history-title { font-size:.75rem; font-weight:600; color:var(--text-1); }
+.workspace-history-preview { font-size:.7rem; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:.2rem; }
+.workspace-empty { color:var(--text-3); font-size:.75rem; padding:1rem; text-align:center; border:1px dashed var(--border); border-radius:var(--radius-sm); }
+
+@media (max-width: 900px) {
+  .workspace-grid { grid-template-columns: 1fr; }
+  .workspace-project-list,.workspace-history-list { max-height:30vh; }
+}
