@@ -183,6 +183,7 @@ def test_youtube_analyze_endpoint(monkeypatch):
             "timeline": [{"frame_index": 1, "timestamp": 0, "transcript_segment_indices": [1]}],
             "frames_analyzed": 1,
             "frame_interval_seconds": 5,
+            "source": {"type": "youtube"},
         },
     )
 
@@ -431,7 +432,7 @@ def test_video_analysis_endpoint_accepts_supported_video(monkeypatch):
     monkeypatch.setattr(
         api,
         "_analyze_video_file",
-        lambda filename, data, task_prompt="": {
+        lambda filename, data, task_prompt="", **kwargs: {
             "ok": True,
             "engine": "video-task-analyzer",
             "filename": filename,
