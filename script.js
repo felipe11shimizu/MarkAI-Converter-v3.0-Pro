@@ -1439,6 +1439,8 @@ const UIManager = (() => {
     els.aiProvider.value = s.aiProvider || 'gemini';
     els.aiModel.value = s.aiModel || 'gemini-1.5-flash';
     els.aiApiKey.value = s.apiKey || '';
+    els.toggleMarkItDown.checked = s.markitdownEnabled !== false;
+    els.markitdownEndpoint.value = s.markitdownEndpoint || 'http://localhost:8000';
     els.toggleSyntaxHL.checked = s.syntaxHL !== false;
     els.toggleAutoPreview.checked = s.autoPreview !== false;
     _filterModels();
