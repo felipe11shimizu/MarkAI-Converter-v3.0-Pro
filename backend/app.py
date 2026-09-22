@@ -14,8 +14,11 @@ from __future__ import annotations
 import ipaddress
 import os
 import socket
+import subprocess
 import tempfile
 import time
+import base64
+import json
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -30,6 +33,13 @@ MAX_UPLOAD_MB = max(1, int(os.getenv("MARKAI_MAX_UPLOAD_MB", "100")))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_URL_MB = max(1, int(os.getenv("MARKAI_MAX_URL_MB", "20")))
 MAX_URL_BYTES = MAX_URL_MB * 1024 * 1024
+VIDEO_MAX_MB = max(10, int(os.getenv("MARKAI_VIDEO_MAX_MB", "200")))
+VIDEO_MAX_BYTES = VIDEO_MAX_MB * 1024 * 1024
+VIDEO_MODEL = os.getenv("MARKAI_VIDEO_MODEL", "gpt-5.6-luna")
+VIDEO_TRANSCRIBE_MODEL = os.getenv("MARKAI_VIDEO_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
+VIDEO_API_KEY = os.getenv("MARKAI_VIDEO_API_KEY") or os.getenv("OPENAI_API_KEY")
+VIDEO_FRAME_INTERVAL = max(1, int(os.getenv("MARKAI_VIDEO_FRAME_INTERVAL", "5")))
+VIDEO_MAX_FRAMES = max(4, int(os.getenv("MARKAI_VIDEO_MAX_FRAMES", "24")))
 URL_TIMEOUT_SECONDS = max(5, int(os.getenv("MARKAI_URL_TIMEOUT_SECONDS", "30")))
 URL_MAX_REDIRECTS = max(0, int(os.getenv("MARKAI_URL_MAX_REDIRECTS", "3")))
 OCR_ENABLED = os.getenv("MARKAI_OCR_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
@@ -49,7 +59,7 @@ REMOTE_CONTENT_TYPES = {
     "text/xml": ".xml",
 }
 
-ALLOWED_EXTENSIONS = {".pdf", ".docx", ".doc", ".pptx", ".xlsx", ".xls", ".csv", ".json", ".xml", ".html", ".htm", ".txt", ".md", ".epub", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".wav", ".mp3", ".m4a", ".py", ".js", ".ts", ".jsx", ".tsx", ".css", ".scss", ".sql", ".sh", ".rb", ".go", ".rs", ".java", ".cpp", ".c", ".cs", ".php", ".yaml", ".yml", ".toml", ".ini", ".r", ".lua", ".pl", ".kt", ".swift", ".vue", ".svelte"}
+ALLOWED_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".avi", ".pdf", ".docx", ".doc", ".pptx", ".xlsx", ".xls", ".csv", ".json", ".xml", ".html", ".htm", ".txt", ".md", ".epub", ".zip", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".wav", ".mp3", ".m4a", ".py", ".js", ".ts", ".jsx", ".tsx", ".css", ".scss", ".sql", ".sh", ".rb", ".go", ".rs", ".java", ".cpp", ".c", ".cs", ".php", ".yaml", ".yml", ".toml", ".ini", ".r", ".lua", ".pl", ".kt", ".swift", ".vue", ".svelte"}
 
 
 app = FastAPI(
@@ -202,6 +212,93 @@ def _convert_remote_url(url: str):
             temp_path.unlink(missing_ok=True)
 
 
+
+def _video_toolchain():
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Análise de vídeo requer o runtime FFmpeg.") from exc
+
+
+def _run_ffmpeg(ffmpeg: str, args: list[str], timeout: int = 120):
+    try:
+        proc = subprocess.run([ffmpeg, *args], capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="Tempo limite excedido durante o processamento do vídeo.") from exc
+    if proc.returncode != 0:
+        raise HTTPException(status_code=422, detail="Não foi possível processar o vídeo.")
+    return proc
+
+
+def _analyze_video_file(filename: str, data: bytes, task_prompt: str = ""):
+    if len(data) > VIDEO_MAX_BYTES:
+        raise HTTPException(status_code=413, detail=f"Vídeo excede o limite de {VIDEO_MAX_MB} MB.")
+    if not VIDEO_API_KEY:
+        raise HTTPException(status_code=503, detail="Análise de vídeo por IA não está configurada. Defina MARKAI_VIDEO_API_KEY ou OPENAI_API_KEY.")
+
+    from openai import OpenAI
+    ffmpeg = _video_toolchain()
+    root = Path(tempfile.mkdtemp(prefix="markai_video_"))
+    video_path = root / Path(filename).name
+    frames_dir = root / "frames"
+    frames_dir.mkdir()
+    audio_path = root / "audio.mp3"
+    video_path.write_bytes(data)
+    try:
+        _run_ffmpeg(ffmpeg, ["-y", "-i", str(video_path), "-vf", f"fps=1/{VIDEO_FRAME_INTERVAL}", "-frames:v", str(VIDEO_MAX_FRAMES), str(frames_dir / "frame_%03d.jpg")])
+        audio_result = subprocess.run([ffmpeg, "-y", "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k", str(audio_path)], capture_output=True, text=True, timeout=180)
+        transcript = ""
+        if audio_result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size > 0:
+            client = OpenAI(api_key=VIDEO_API_KEY)
+            with audio_path.open("rb") as audio_file:
+                transcription = client.audio.transcriptions.create(model=VIDEO_TRANSCRIBE_MODEL, file=audio_file)
+            transcript = getattr(transcription, "text", "") or ""
+
+        frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+        if not frame_files:
+            raise HTTPException(status_code=422, detail="Não foi possível extrair quadros do vídeo.")
+        client = OpenAI(api_key=VIDEO_API_KEY)
+        prompt = f"""
+Analise esta gravação de tela/vídeo para engenharia reversa de processo.
+Identifique as tarefas realmente executadas, em ordem temporal, sem inventar ações que não estejam visíveis ou na transcrição.
+Para cada etapa, informe timestamp aproximado, ação, sistema/tela, elementos acionados, dados informados e resultado observado quando possível.
+Separe ações observáveis de inferências. Identifique repetições, decisões, esperas, erros e pontos que exigiriam confirmação humana.
+Retorne SOMENTE JSON válido no schema:
+{{"objetivo":"","resumo":"","etapas":[{{"ordem":1,"timestamp":"00:00","acao":"","detalhes":"","elementos":[],"resultado":"","confianca":0.0}}],"decisoes":[],"erros":[],"observacoes":[]}}
+Transcrição disponível:
+{transcript[:20000]}
+Instrução adicional:
+{task_prompt or "Descreva o processo completo executado no vídeo."}
+"""
+        content = [{"type": "input_text", "text": prompt}]
+        for idx, frame in enumerate(frame_files):
+            encoded = base64.b64encode(frame.read_bytes()).decode("ascii")
+            timestamp = idx * VIDEO_FRAME_INTERVAL
+            content.append({"type": "input_text", "text": f"Frame {idx + 1} — aproximadamente {timestamp}s"})
+            content.append({"type": "input_image", "image_url": f"data:image/jpeg;base64,{encoded}"})
+        response = client.responses.create(model=VIDEO_MODEL, input=[{"role": "user", "content": content}])
+        raw = getattr(response, "output_text", "") or ""
+        try:
+            analysis = json.loads(raw)
+        except json.JSONDecodeError:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start < 0 or end <= start:
+                raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.")
+            try:
+                analysis = json.loads(raw[start:end + 1])
+            except json.JSONDecodeError as exc:
+                raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.") from exc
+        return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "frames_analyzed": len(frame_files), "frame_interval_seconds": VIDEO_FRAME_INTERVAL}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Falha na análise de vídeo: {type(exc).__name__}") from exc
+    finally:
+        import shutil
+        shutil.rmtree(root, ignore_errors=True)
+
 def _quality(markdown: str) -> dict:
     lines = markdown.splitlines()
     return {
@@ -271,6 +368,7 @@ def health():
         "max_upload_mb": MAX_UPLOAD_MB,
         "url_engine": {"enabled": True, "max_mb": MAX_URL_MB, "timeout_seconds": URL_TIMEOUT_SECONDS, "max_redirects": URL_MAX_REDIRECTS, "youtube": True},
         "ocr": {"enabled": OCR_ENABLED, "configured": bool(OCR_API_KEY), "model": OCR_MODEL if OCR_ENABLED and OCR_API_KEY else None},
+        "video_analysis": {"enabled": bool(VIDEO_API_KEY), "max_mb": VIDEO_MAX_MB, "model": VIDEO_MODEL if VIDEO_API_KEY else None, "frame_interval_seconds": VIDEO_FRAME_INTERVAL},
     }
 
 
@@ -303,6 +401,16 @@ async def convert_url(payload: dict):
         except Exception as exc:
             raise HTTPException(status_code=422, detail=f"Falha ao processar YouTube: {type(exc).__name__}") from exc
     return _convert_remote_url(url)
+
+
+@app.post("/api/analyze-video")
+async def analyze_video(file: UploadFile = File(...), task_prompt: str = ""):
+    filename = Path(file.filename or "video.mp4").name
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".mp4", ".mov", ".webm", ".mkv", ".avi"}:
+        raise HTTPException(status_code=415, detail="Formato de vídeo não habilitado.")
+    data = await file.read(VIDEO_MAX_BYTES + 1)
+    return _analyze_video_file(filename, data, task_prompt)
 
 
 @app.post("/api/convert-batch")
