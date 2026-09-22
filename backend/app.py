@@ -279,6 +279,60 @@ def _build_video_timeline(
     return timeline
 
 
+def _enrich_analysis_evidence(
+    analysis: dict,
+    *,
+    transcript_segments: list[dict] | None,
+    frame_count: int,
+    interval_seconds: int,
+) -> dict:
+    etapas = analysis.get("etapas")
+    if not isinstance(etapas, list):
+        return analysis
+
+    segment_list = transcript_segments or []
+    for index, step in enumerate(etapas, start=1):
+        if not isinstance(step, dict):
+            continue
+
+        raw_timestamp = step.get("timestamp")
+        timestamp_seconds = None
+        if isinstance(raw_timestamp, (int, float)):
+            timestamp_seconds = float(raw_timestamp)
+        elif isinstance(raw_timestamp, str):
+            parts = [int(part) for part in raw_timestamp.strip().split(":") if part.isdigit()]
+            if len(parts) == 3:
+                timestamp_seconds = parts[0] * 3600 + parts[1] * 60 + parts[2]
+            elif len(parts) == 2:
+                timestamp_seconds = parts[0] * 60 + parts[1]
+
+        if timestamp_seconds is None:
+            frame_index = min(max(index, 1), max(frame_count, 1))
+            timestamp_seconds = (frame_index - 1) * interval_seconds
+        else:
+            frame_index = int(round(timestamp_seconds / max(interval_seconds, 1))) + 1
+            frame_index = min(max(frame_index, 1), max(frame_count, 1))
+
+        nearby = _nearest_transcript_segments(segment_list, timestamp_seconds)
+        step["evidencia"] = {
+            "timestamp_seconds": round(timestamp_seconds, 3),
+            "frame_indices": [frame_index] if frame_count else [],
+            "transcript_segment_indices": [item.get("index") for item in nearby],
+        }
+        # Keep a stable reference list for downstream automation/exporters.
+        step["segmentos_transcricao"] = [item.get("index") for item in nearby]
+        step["evidencia_frame"] = f"frame_{frame_index:03d}" if frame_count else None
+
+    analysis["evidencia_resumo"] = {
+        "etapas_total": len(etapas),
+        "etapas_com_frame": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("frame_indices")),
+        "etapas_com_transcricao": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("transcript_segment_indices")),
+        "frames_total": frame_count,
+        "segmentos_transcricao_total": len(segment_list),
+    }
+    return analysis
+
+
 def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", transcript_override: str | None = None, transcript_segments: list[dict] | None = None, source: dict | None = None):
     if len(data) > VIDEO_MAX_BYTES:
         raise HTTPException(status_code=413, detail=f"Vídeo excede o limite de {VIDEO_MAX_MB} MB.")
@@ -362,6 +416,12 @@ Instrução adicional:
                 analysis = json.loads(raw[start:end + 1])
             except json.JSONDecodeError as exc:
                 raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.") from exc
+        analysis = _enrich_analysis_evidence(
+            analysis,
+            transcript_segments=transcript_segments,
+            frame_count=len(frame_files),
+            interval_seconds=VIDEO_FRAME_INTERVAL,
+        )
         analysis.setdefault("timeline", timeline)
         analysis.setdefault("fonte_video", source or {"type": "local_file", "filename": filename})
         return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "transcript_segments": transcript_segments or [], "timeline": timeline, "frames_analyzed": len(frame_files), "frame_interval_seconds": VIDEO_FRAME_INTERVAL, "source": source or {"type": "local_file", "filename": filename}}
