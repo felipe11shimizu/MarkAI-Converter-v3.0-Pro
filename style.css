@@ -835,3 +835,43 @@ body::before {
   .workspace-grid { grid-template-columns: 1fr; }
   .workspace-project-list,.workspace-history-list { max-height:30vh; }
 }
+
+
+/* ─── VIDEO TASK ANALYZER ─── */
+.video-panel .video-badge { background: var(--indigo-dim); color: var(--cyan); }
+.video-prompt { margin-top: .55rem; }
+.video-analysis-body { min-height: 55vh; }
+.video-analysis-summary {
+  padding: .85rem 1rem; border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--bg-input); margin-bottom: 1rem;
+}
+.video-analysis-summary strong { display:block; color:var(--text-1); font-size:.95rem; }
+.video-analysis-summary p { margin:.35rem 0 0; color:var(--text-2); font-size:.78rem; }
+.video-analysis-grid { display:grid; grid-template-columns: 1.2fr .8fr; gap:1rem; }
+.video-analysis-grid section { min-width:0; }
+.video-analysis-grid h3 { font-size:.8rem; color:var(--text-1); margin:0 0 .55rem; }
+.video-steps { display:flex; flex-direction:column; gap:.5rem; max-height:48vh; overflow:auto; }
+.video-step-card {
+  border:1px solid var(--border); border-radius:var(--radius-sm); padding:.7rem;
+  background:var(--bg-input);
+}
+.video-step-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:.3rem; }
+.video-step-order {
+  width:1.45rem; height:1.45rem; border-radius:50%; display:grid; place-items:center;
+  background:var(--indigo-dim); color:var(--cyan); font-size:.7rem; font-weight:700;
+}
+.video-step-time { font: .68rem var(--font-mono); color:var(--text-3); }
+.video-step-card h4 { margin:.15rem 0 .25rem; font-size:.78rem; color:var(--text-1); }
+.video-step-card p { margin:0; font-size:.72rem; line-height:1.45; color:var(--text-2); }
+.video-step-card small { display:block; margin-top:.35rem; color:var(--text-3); font-size:.65rem; }
+.video-transcript,.video-json {
+  margin:0; max-height:48vh; overflow:auto; white-space:pre-wrap; word-break:break-word;
+  border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--bg-input);
+  color:var(--text-2); padding:.75rem; font: .7rem/1.5 var(--font-mono);
+}
+.video-json-details { margin-top:1rem; }
+.video-json-details summary { cursor:pointer; color:var(--text-2); font-size:.75rem; margin-bottom:.5rem; }
+@media (max-width: 900px) {
+  .video-analysis-grid { grid-template-columns: 1fr; }
+  .video-steps,.video-transcript { max-height:30vh; }
+}
