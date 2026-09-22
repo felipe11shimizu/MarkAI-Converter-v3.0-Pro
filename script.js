@@ -2631,6 +2631,50 @@ const VideoTaskAnalyzer = (() => {
     openModal();
   }
 
+  async function analyzeYoutube(url) {
+    const normalized = String(url || '').trim();
+    if (!normalized) return;
+    const overlay = $('procOverlay');
+    const label = $('procLabel');
+    const sub = $('procSub');
+    if (overlay) overlay.style.display = 'flex';
+    if (label) label.textContent = 'Analisando YouTube…';
+    if (sub) sub.textContent = 'Obtendo transcrição, vídeo, quadros e eventos de tela.';
+    try {
+      const endpointUrl = endpoint();
+      const languages = $('youtubeLanguage')?.value;
+      const languageList = languages && languages !== 'auto'
+        ? [languages, 'pt-BR', 'pt', 'en', 'es']
+        : ['pt-BR', 'pt', 'en', 'es'];
+      const payload = {
+        url: normalized,
+        languages: [...new Set(languageList)],
+        translate_to: $('youtubeTranslate')?.value || null,
+        task_prompt: $('videoPrompt')?.value || ''
+      };
+      const response = await fetch(endpointUrl + '/api/youtube/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(600000)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const detail = typeof data.detail === 'object'
+          ? (data.detail.message || data.detail.code)
+          : data.detail;
+        throw new Error(detail || ('Falha HTTP ' + response.status));
+      }
+      render(data);
+      if (typeof toast === 'function') toast('Análise multimodal do YouTube concluída.', 'success');
+    } catch (error) {
+      if (typeof toast === 'function') toast('Falha no YouTube: ' + error.message, 'error');
+      else alert('Falha no YouTube: ' + error.message);
+    } finally {
+      if (overlay) overlay.style.display = 'none';
+    }
+  }
+
   async function analyze(file) {
     if (!file) return;
     const form = new FormData();
@@ -2688,6 +2732,15 @@ const VideoTaskAnalyzer = (() => {
       analyze(Array.from(files).find(isVideo));
     }, true);
 
+    $('btnYoutubeAnalyze')?.addEventListener('click', () => {
+      const url = $('urlInput')?.value?.trim();
+      if (!URLFetcher.isYouTubeUrl(url)) {
+        toast('Informe uma URL do YouTube antes de analisar o processo.', 'warning');
+        return;
+      }
+      analyzeYoutube(url);
+    });
+
     $('btnGenerateVideoAutomation')?.addEventListener('click', () => {
       renderAutomation($('videoAutomationTarget')?.value || 'pyautogui');
     });
@@ -2734,7 +2787,7 @@ const VideoTaskAnalyzer = (() => {
     });
   }
 
-  return { bind, analyze };
+  return { bind, analyze, analyzeYoutube, render };
 })();
 
 document.addEventListener('DOMContentLoaded', () => VideoTaskAnalyzer.bind());
