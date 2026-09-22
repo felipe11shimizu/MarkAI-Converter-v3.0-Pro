@@ -82,7 +82,7 @@ async def convert(file: UploadFile = File(...)):
             tmp.write(data)
             temp_path = Path(tmp.name)
 
-        result = _engine.convert(str(temp_path))
+        result = _engine.convert_local(str(temp_path))
         markdown = result.markdown or ""
 
         if not markdown.strip():
