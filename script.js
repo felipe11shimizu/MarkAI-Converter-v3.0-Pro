@@ -2175,3 +2175,163 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+
+
+// ══════════════════════════════════════════════
+// VIDEO TASK ANALYZER — screen recording → process steps
+// ══════════════════════════════════════════════
+const VideoTaskAnalyzer = (() => {
+  let lastAnalysis = null;
+  const $ = id => document.getElementById(id);
+  const endpoint = () => {
+    const s = AppState.get('settings');
+    return (s.markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
+  };
+
+  function openModal() {
+    const modal = $('modalVideoAnalysis');
+    if (modal && !modal.open) modal.showModal();
+  }
+
+  function render(data) {
+    lastAnalysis = data;
+    const analysis = data.analysis || {};
+    const steps = Array.isArray(analysis.etapas) ? analysis.etapas : [];
+    const summary = $('videoAnalysisSummary');
+    const list = $('videoSteps');
+    const transcript = $('videoTranscript');
+    const json = $('videoJson');
+
+    if (summary) {
+      summary.replaceChildren();
+      const title = document.createElement('strong');
+      title.textContent = analysis.objetivo || data.filename || 'Análise do vídeo';
+      const desc = document.createElement('p');
+      desc.textContent = analysis.resumo || ((data.frames_analyzed || 0) + ' quadros analisados.');
+      summary.append(title, desc);
+    }
+
+    if (list) {
+      list.replaceChildren();
+      if (!steps.length) {
+        const empty = document.createElement('div');
+        empty.className = 'workspace-empty';
+        empty.textContent = 'Nenhuma etapa estruturada foi identificada.';
+        list.appendChild(empty);
+      }
+      steps.forEach((step, index) => {
+        const card = document.createElement('article');
+        card.className = 'video-step-card';
+        const head = document.createElement('div');
+        head.className = 'video-step-head';
+        const order = document.createElement('span');
+        order.className = 'video-step-order';
+        order.textContent = String(step.ordem || index + 1);
+        const time = document.createElement('span');
+        time.className = 'video-step-time';
+        time.textContent = step.timestamp || '';
+        head.append(order, time);
+        const action = document.createElement('h4');
+        action.textContent = step.acao || 'Ação não identificada';
+        const details = document.createElement('p');
+        details.textContent = step.detalhes || '';
+        card.append(head, action, details);
+        if (Array.isArray(step.elementos) && step.elementos.length) {
+          const elements = document.createElement('small');
+          elements.textContent = 'Elementos: ' + step.elementos.join(', ');
+          card.appendChild(elements);
+        }
+        if (step.resultado) {
+          const result = document.createElement('small');
+          result.textContent = 'Resultado: ' + step.resultado;
+          card.appendChild(result);
+        }
+        list.appendChild(card);
+      });
+    }
+
+    if (transcript) transcript.textContent = data.transcript || 'Nenhuma fala identificada.';
+    if (json) json.textContent = JSON.stringify({ ...data, analysis }, null, 2);
+    openModal();
+  }
+
+  async function analyze(file) {
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file, file.name);
+    form.append('task_prompt', $('videoPrompt')?.value || '');
+    const overlay = $('procOverlay');
+    const label = $('procLabel');
+    const sub = $('procSub');
+    if (overlay) overlay.style.display = 'flex';
+    if (label) label.textContent = 'Analisando vídeo…';
+    if (sub) sub.textContent = 'Extraindo áudio, quadros e tarefas realizadas.';
+    try {
+      const response = await fetch(endpoint() + '/api/analyze-video', {
+        method: 'POST',
+        body: form,
+        signal: AbortSignal.timeout(300000)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || ('Falha HTTP ' + response.status));
+      render(data);
+      if (typeof toast === 'function') toast('Análise de vídeo concluída.', 'success');
+    } catch (error) {
+      if (typeof toast === 'function') toast('Falha na análise: ' + error.message, 'error');
+      else alert('Falha na análise: ' + error.message);
+    } finally {
+      if (overlay) overlay.style.display = 'none';
+    }
+  }
+
+  function isVideo(file) {
+    return !!file && (
+      String(file.type || '').startsWith('video/') ||
+      /\.(mp4|mov|webm|mkv|avi)$/i.test(file.name || '')
+    );
+  }
+
+  function bind() {
+    const input = $('videoInput');
+    const button = $('btnVideoAnalyze');
+    const drop = $('dropZone');
+
+    button?.addEventListener('click', () => input?.click());
+    input?.addEventListener('change', () => {
+      const file = input.files?.[0];
+      if (isVideo(file)) analyze(file);
+      input.value = '';
+    });
+
+    // Capture only video drops; ordinary document drops continue to the existing queue.
+    drop?.addEventListener('drop', event => {
+      const files = event.dataTransfer?.files;
+      if (!Array.from(files || []).some(isVideo)) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      analyze(Array.from(files).find(isVideo));
+    }, true);
+
+    $('btnCloseVideoAnalysis')?.addEventListener('click', () => $('modalVideoAnalysis')?.close());
+    $('btnCloseVideoAnalysis2')?.addEventListener('click', () => $('modalVideoAnalysis')?.close());
+    $('btnCopyVideoJson')?.addEventListener('click', async () => {
+      if (!lastAnalysis) return;
+      await navigator.clipboard.writeText(JSON.stringify(lastAnalysis, null, 2));
+      if (typeof toast === 'function') toast('JSON copiado.', 'success');
+    });
+    $('btnDownloadVideoJson')?.addEventListener('click', () => {
+      if (!lastAnalysis) return;
+      const blob = new Blob([JSON.stringify(lastAnalysis, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (lastAnalysis.filename || 'video').replace(/\.[^.]+$/, '') + '-analise.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  return { bind, analyze };
+})();
+
+document.addEventListener('DOMContentLoaded', () => VideoTaskAnalyzer.bind());
