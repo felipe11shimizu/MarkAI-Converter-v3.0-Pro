@@ -249,12 +249,19 @@ def _nearest_transcript_segments(
 ) -> list[dict]:
     if not segments:
         return []
-    matching = [
-        segment
-        for segment in segments
-        if float(segment.get("start", 0)) <= timestamp <= float(segment.get("end", 0))
-        or abs(float(segment.get("start", 0)) - timestamp) <= window_seconds
-    ]
+    def _number(value: Any, default: float = 0.0) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    matching = []
+    for segment in segments:
+        start = _number(segment.get("start"), 0.0)
+        duration = max(0.0, _number(segment.get("duration"), 0.0))
+        end = _number(segment.get("end"), start + duration)
+        if start <= timestamp <= end or abs(start - timestamp) <= window_seconds:
+            matching.append(segment)
     matching.sort(key=lambda segment: abs(float(segment.get("start", 0)) - timestamp))
     return matching[:4]
 
