@@ -17,6 +17,19 @@ Fluxo:
 
 O projeto, portanto, continua funcionando como aplicação estática mesmo sem Python/MarkItDown.
 
+## Motor de URLs
+
+A partir da v3.3, a ingestão de URLs também passa pelo backend MarkItDown. O frontend não depende mais de proxies CORS públicos para esse fluxo.
+
+- `POST /api/convert-url` aceita YouTube diretamente pelo conversor de transcrição do MarkItDown.
+- Para páginas e documentos públicos, o backend baixa o conteúdo com `httpx`, valida DNS/endereço IP e bloqueia destinos privados ou reservados.
+- Redirecionamentos são controlados e limitados por `MARKAI_URL_MAX_REDIRECTS`.
+- O conteúdo remoto possui limite de tamanho (`MARKAI_MAX_URL_MB`) e timeout (`MARKAI_URL_TIMEOUT_SECONDS`).
+- HTML, PDF, TXT, Markdown, JSON, CSV e XML são identificados por `Content-Type` ou extensão antes de serem entregues ao MarkItDown.
+- URLs com usuário/senha embutidos são rejeitadas.
+
+Essa camada reduz a dependência de proxies públicos e concentra a política de acesso a URLs no backend. Para exposição pública, autenticação, rate limiting e isolamento do processo continuam recomendados.
+
 ## O que o MarkItDown acrescenta
 
 O MarkItDown é uma biblioteca Python da Microsoft voltada à conversão de arquivos para Markdown para uso em LLMs e análise de conteúdo. A documentação oficial informa suporte a PDF, PowerPoint, Word, Excel, imagens, áudio, HTML, CSV, JSON, XML, ZIP, EPUB e outros formatos. 
@@ -78,6 +91,9 @@ Variáveis disponíveis:
 
 - `MARKAI_MAX_UPLOAD_MB`: limite de upload. Padrão: 100 MB.
 - `MARKAI_CORS_ORIGINS`: origens permitidas separadas por vírgula.
+- `MARKAI_MAX_URL_MB`: limite para conteúdo remoto. Padrão: 20 MB.
+- `MARKAI_URL_TIMEOUT_SECONDS`: timeout de acesso remoto. Padrão: 30 segundos.
+- `MARKAI_URL_MAX_REDIRECTS`: máximo de redirecionamentos. Padrão: 3.
 
 Exemplo:
 
@@ -149,6 +165,12 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - Exibir divergência aproximada entre os resultados.
 - Permitir selecionar e aplicar o resultado desejado.
 - Identificar o motor utilizado na conversão da fila.
+
+### Fase 3.5 — URL Engine — IMPLANTADA
+- YouTube integrado ao MarkItDown pelo backend.
+- Conversão de páginas/documentos remotos pelo backend, sem proxies CORS públicos.
+- Validação de esquema, DNS/IP público, credenciais embutidas, tamanho, timeout e redirecionamentos.
+- Testes automatizados para URL remota e bloqueio de destinos privados.
 
 ### Fase 4 — Workspace — PRÓXIMA
 - Projetos persistentes.
