@@ -154,3 +154,136 @@ def test_remote_url_rejects_private_host(monkeypatch):
     )
 
     assert response.status_code == 403
+
+
+def test_remote_url_rejects_embedded_credentials():
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://user:pass@example.com/article"},
+    )
+    assert response.status_code == 400
+
+
+def test_remote_url_rejects_private_redirect(monkeypatch):
+    monkeypatch.setattr(api, "_validate_public_host", lambda hostname: None)
+    calls = []
+
+    class FakeResponse:
+        status_code = 302
+        headers = {"location": "http://127.0.0.1/private"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def stream(self, *args, **kwargs):
+            calls.append(args[1] if len(args) > 1 else kwargs.get("url"))
+            return FakeResponse()
+
+    monkeypatch.setattr(api.httpx, "Client", lambda *args, **kwargs: FakeClient())
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://example.com/redirect"},
+    )
+    assert response.status_code == 403
+
+
+def test_remote_url_stream_limit(monkeypatch):
+    monkeypatch.setattr(api, "MAX_URL_BYTES", 3)
+    monkeypatch.setattr(api, "_validate_public_host", lambda hostname: None)
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "text/plain"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def iter_bytes(self):
+            yield b"ab"
+            yield b"cd"
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(api.httpx, "Client", lambda *args, **kwargs: FakeClient())
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://example.com/large"},
+    )
+    assert response.status_code == 413
+
+
+def test_remote_url_content_length_limit(monkeypatch):
+    monkeypatch.setattr(api, "MAX_URL_BYTES", 3)
+    monkeypatch.setattr(api, "_validate_public_host", lambda hostname: None)
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "text/plain", "content-length": "4"}
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def iter_bytes(self):
+            raise AssertionError("body must not be consumed when Content-Length exceeds the limit")
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def stream(self, *args, **kwargs):
+            return FakeResponse()
+
+    monkeypatch.setattr(api.httpx, "Client", lambda *args, **kwargs: FakeClient())
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://example.com/large"},
+    )
+    assert response.status_code == 413
+
+
+def test_batch_reports_invalid_file_without_aborting(monkeypatch):
+    class FakeResult:
+        markdown = "# Documento"
+
+    monkeypatch.setattr(api._engine, "convert_local", lambda path: FakeResult())
+    response = client.post(
+        "/api/convert-batch",
+        files=[
+            ("files", ("ok.txt", b"ok", "text/plain")),
+            ("files", ("bad.exe", b"MZ", "application/octet-stream")),
+        ],
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["successful"] == 1
+    assert body["failed"] == 1
+    assert body["results"][1]["status_code"] == 415
