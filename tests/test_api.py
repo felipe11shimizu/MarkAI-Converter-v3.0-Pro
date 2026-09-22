@@ -64,3 +64,56 @@ def test_upload_limit(monkeypatch):
     )
 
     assert response.status_code == 413
+
+
+
+def test_youtube_url_uses_markitdown(monkeypatch):
+    class FakeResult:
+        markdown = "# Vídeo\n\nTranscrição de teste."
+
+    calls = []
+
+    def fake_convert(url):
+        calls.append(url)
+        return FakeResult()
+
+    monkeypatch.setattr(api._engine, "convert", fake_convert)
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://www.youtube.com/watch?v=abc123"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["engine"] == "markitdown-youtube"
+    assert "Transcrição de teste" in body["markdown"]
+    assert calls == ["https://www.youtube.com/watch?v=abc123"]
+
+
+def test_convert_url_rejects_non_youtube():
+    response = client.post(
+        "/api/convert-url",
+        json={"url": "https://example.com/video"},
+    )
+    assert response.status_code == 403
+
+
+def test_convert_batch(monkeypatch):
+    class FakeResult:
+        markdown = "# Documento\n\nConteúdo"
+
+    monkeypatch.setattr(api._engine, "convert_local", lambda path: FakeResult())
+    response = client.post(
+        "/api/convert-batch",
+        files=[
+            ("files", ("a.txt", b"a", "text/plain")),
+            ("files", ("b.txt", b"b", "text/plain")),
+        ],
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 2
+    assert body["successful"] == 2
+    assert body["failed"] == 0
