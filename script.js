@@ -2231,11 +2231,11 @@ const VideoTaskAnalyzer = (() => {
         time.className = 'video-step-time';
         time.textContent = step.timestamp || '';
         head.append(order, time);
-        const action = document.createElement('h4');
-        action.textContent = step.acao || 'Ação não identificada';
+        const actionHeading = document.createElement('h4');
+        actionHeading.textContent = step.acao || 'Ação não identificada';
         const details = document.createElement('p');
         details.textContent = step.detalhes || '';
-        card.append(head, action, details);
+        card.append(head, actionHeading, details);
         if (Array.isArray(step.elementos) && step.elementos.length) {
           const elements = document.createElement('small');
           elements.textContent = 'Elementos: ' + step.elementos.join(', ');
