@@ -2193,6 +2193,213 @@ const VideoTaskAnalyzer = (() => {
     if (modal && !modal.open) modal.showModal();
   }
 
+  function _automationValue(step) {
+    const data = step?.dados || {};
+    if (data.sensivel) return '{{DADO_SENSIVEL}}';
+    return data.valor || '';
+  }
+
+  function _automationTarget(step) {
+    const target = step?.alvo || {};
+    const selectors = Array.isArray(target.seletores) ? target.seletores.filter(Boolean) : [];
+    const selector = selectors[0] || '';
+    const text = target.texto || '';
+    const x = Number.isFinite(Number(target.x)) ? Number(target.x) : null;
+    const y = Number.isFinite(Number(target.y)) ? Number(target.y) : null;
+    return { selector, text, x, y };
+  }
+
+  function _pyString(value) {
+    return JSON.stringify(String(value ?? ''));
+  }
+
+  function _seleniumLocator(target) {
+    const selector = target.selector;
+    if (selector) {
+      const match = selector.match(/^(css|xpath|id|name|class|link_text|partial_link_text)=(.*)$/i);
+      if (match) {
+        const map = {
+          css: 'CSS_SELECTOR', xpath: 'XPATH', id: 'ID', name: 'NAME',
+          class: 'CLASS_NAME', link_text: 'LINK_TEXT', partial_link_text: 'PARTIAL_LINK_TEXT'
+        };
+        return { by: map[match[1].toLowerCase()], value: match[2] };
+      }
+      return { by: 'CSS_SELECTOR', value: selector };
+    }
+    if (target.text) return { by: 'XPATH', value: '//*[contains(normalize-space(.), ' + _pyString(target.text) + ')]' };
+    return null;
+  }
+
+  function _playwrightTarget(target) {
+    if (target.selector) return `page.locator(${_pyString(target.selector)})`;
+    if (target.text) return `page.get_by_text(${_pyString(target.text)})`;
+    return null;
+  }
+
+  function _pyautoguiStep(step, index) {
+    const action = step.tipo_acao || 'other';
+    const target = _automationTarget(step);
+    const value = _automationValue(step);
+    const comment = `# Etapa ${step.ordem || index + 1}: ${String(step.acao || step.detalhes || '').replace(/\\n/g, ' ')}`;
+    const lines = [comment];
+    const hasPoint = target.x !== null && target.y !== null;
+    if (step.espera_segundos) lines.push(`time.sleep(${Number(step.espera_segundos) || 0})`);
+    switch (action) {
+      case 'click':
+        lines.push(hasPoint ? `pyautogui.click(${target.x}, ${target.y})` : '# TODO: confirmar coordenadas do alvo e usar pyautogui.click(x, y)');
+        break;
+      case 'double_click':
+        lines.push(hasPoint ? `pyautogui.doubleClick(${target.x}, ${target.y})` : '# TODO: confirmar coordenadas do alvo e usar pyautogui.doubleClick(x, y)');
+        break;
+      case 'type':
+        if (hasPoint) lines.push(`pyautogui.click(${target.x}, ${target.y})`);
+        lines.push(value ? `pyautogui.write(${_pyString(value)})` : `pyautogui.write(${_pyString('{{VALOR_DO_CAMPO}}')})`);
+        break;
+      case 'select':
+        if (hasPoint) lines.push(`pyautogui.click(${target.x}, ${target.y})`);
+        lines.push(value ? `pyautogui.write(${_pyString(value)})` : `# TODO: selecionar a opção observada`);
+        lines.push('pyautogui.press("enter")');
+        break;
+      case 'hotkey':
+        lines.push(`pyautogui.hotkey(${(step.alvo?.atalho || 'ctrl+s').split(/[+\\s]+/).filter(Boolean).map(k => _pyString(k.lowerCase ? k.lowerCase() : k.toLowerCase())).join(', ')})`);
+        break;
+      case 'keypress':
+        lines.push(`pyautogui.press(${_pyString(step.alvo?.atalho || target.text || 'enter')})`);
+        break;
+      case 'scroll':
+        lines.push(`pyautogui.scroll(${Number(step.detalhes?.match?.(/-?\\d+/)?.[0]) || -1})`);
+        break;
+      case 'drag':
+        lines.push(hasPoint ? `pyautogui.moveTo(${target.x}, ${target.y}); pyautogui.dragRel(100, 0, duration=0.5)  # TODO: confirmar destino` : '# TODO: confirmar origem e destino do arraste');
+        break;
+      case 'wait':
+        lines.push(`time.sleep(${Number(step.espera_segundos) || 1})`);
+        break;
+      default:
+        lines.push(`# TODO: implementar ação "${action}" observada: ${String(step.detalhes || '').replace(/\\n/g, ' ')}`);
+    }
+    if (step.poscondicao) lines.push(`# Pós-condição observada: ${String(step.poscondicao).replace(/\\n/g, ' ')}`);
+    return lines.join('\\n');
+  }
+
+  function _playwrightStep(step, index) {
+    const action = step.tipo_acao || 'other';
+    const target = _automationTarget(step);
+    const locator = _playwrightTarget(target);
+    const value = _automationValue(step);
+    const comment = `# Etapa ${step.ordem || index + 1}: ${String(step.acao || step.detalhes || '').replace(/\\n/g, ' ')}`;
+    const lines = [comment];
+    if (step.espera_segundos) lines.push(`page.wait_for_timeout(${Math.round((Number(step.espera_segundos) || 0) * 1000)})`);
+    switch (action) {
+      case 'click': lines.push(locator ? `${locator}.click()` : '# TODO: confirmar locator do elemento'); break;
+      case 'double_click': lines.push(locator ? `${locator}.dblclick()` : '# TODO: confirmar locator do elemento'); break;
+      case 'type': lines.push(locator ? `${locator}.fill(${_pyString(value || '{{VALOR_DO_CAMPO}}')})` : '# TODO: confirmar locator do campo'); break;
+      case 'select': lines.push(locator ? `${locator}.select_option(label=${_pyString(value || '{{OPCAO}}')})` : '# TODO: confirmar locator do select'); break;
+      case 'hotkey':
+      case 'keypress': lines.push(locator ? `${locator}.press(${_pyString(step.alvo?.atalho || 'Enter')})` : `page.keyboard.press(${_pyString(step.alvo?.atalho || 'Enter')})`); break;
+      case 'scroll': lines.push(`page.mouse.wheel(0, ${Number(step.detalhes?.match?.(/-?\\d+/)?.[0]) || 500})`); break;
+      case 'upload': lines.push(locator ? `${locator}.set_input_files(${_pyString('{{ARQUIVO}}')})` : '# TODO: confirmar locator do input[type=file]'); break;
+      case 'navigate':
+      case 'open': lines.push(`page.goto(${_pyString(target.text || '{{URL}}')})`); break;
+      case 'check': lines.push(locator ? `# TODO: validar estado de ${locator}` : '# TODO: implementar validação observada'); break;
+      case 'submit': lines.push(locator ? `${locator}.click()` : '# TODO: localizar botão de envio'); break;
+      default: lines.push(`# TODO: implementar ação "${action}" observada`);
+    }
+    if (step.poscondicao) lines.push(`# Pós-condição observada: ${String(step.poscondicao).replace(/\\n/g, ' ')}`);
+    return lines.join('\\n');
+  }
+
+  function _seleniumStep(step, index) {
+    const action = step.tipo_acao || 'other';
+    const target = _automationTarget(step);
+    const loc = _seleniumLocator(target);
+    const value = _automationValue(step);
+    const comment = `# Etapa ${step.ordem || index + 1}: ${String(step.acao || step.detalhes || '').replace(/\\n/g, ' ')}`;
+    const lines = [comment];
+    if (step.espera_segundos) lines.push(`time.sleep(${Number(step.espera_segundos) || 0})`);
+    const find = loc ? `driver.find_element(By.${loc.by}, ${_pyString(loc.value)})` : null;
+    switch (action) {
+      case 'click': lines.push(find ? `${find}.click()` : '# TODO: confirmar locator do elemento'); break;
+      case 'double_click': lines.push(find ? `ActionChains(driver).double_click(${find}).perform()` : '# TODO: confirmar locator do elemento'); break;
+      case 'type': lines.push(find ? `${find}.clear(); ${find}.send_keys(${_pyString(value || '{{VALOR_DO_CAMPO}}')})` : '# TODO: confirmar locator do campo'); break;
+      case 'select': lines.push(find ? `Select(${find}).select_by_visible_text(${_pyString(value || '{{OPCAO}}')})` : '# TODO: confirmar locator do select'); break;
+      case 'hotkey': lines.push(find ? `${find}.send_keys(${_pyString(step.alvo?.atalho || 'CTRL+S')})` : `ActionChains(driver).key_down(Keys.CONTROL).send_keys('s').key_up(Keys.CONTROL).perform()  # TODO: confirmar atalho`); break;
+      case 'keypress': lines.push(find ? `${find}.send_keys(${_pyString(step.alvo?.atalho || 'ENTER')})` : `ActionChains(driver).send_keys(Keys.ENTER).perform()`); break;
+      case 'scroll': lines.push(`driver.execute_script("window.scrollBy(0, ${Number(step.detalhes?.match?.(/-?\\d+/)?.[0]) || 500})")`); break;
+      case 'navigate':
+      case 'open': lines.push(`driver.get(${_pyString(target.text || '{{URL}}')})`); break;
+      case 'upload': lines.push(find ? `${find}.send_keys(${_pyString('{{ARQUIVO_ABSOLUTO}}')})` : '# TODO: confirmar locator do input[type=file]'); break;
+      case 'submit': lines.push(find ? `${find}.click()` : '# TODO: localizar botão de envio'); break;
+      case 'check': lines.push(`# TODO: assert/validação: ${String(step.poscondicao || step.resultado || 'condição observada').replace(/\\n/g, ' ')}`); break;
+      default: lines.push(`# TODO: implementar ação "${action}" observada`);
+    }
+    if (step.poscondicao) lines.push(`# Pós-condição observada: ${String(step.poscondicao).replace(/\\n/g, ' ')}`);
+    return lines.join('\\n');
+  }
+
+  function _rpaStep(step, index) {
+    const action = step.tipo_acao || 'other';
+    const target = _automationTarget(step);
+    const value = _automationValue(step);
+    const comment = `    # Etapa ${step.ordem || index + 1}: ${String(step.acao || step.detalhes || '').replace(/\\n/g, ' ')}`;
+    const locator = target.x !== null && target.y !== null
+      ? `point:${target.x},${target.y}`
+      : target.text ? `ocr:${JSON.stringify(target.text)}` : '';
+    const lines = [comment];
+    switch (action) {
+      case 'click': lines.push(locator ? `    Click    ${locator}` : '    # TODO: definir locator (point:, ocr: ou image:)'); break;
+      case 'double_click': lines.push(locator ? `    Double Click    ${locator}` : '    # TODO: definir locator'); break;
+      case 'type': lines.push(`    Type Text    ${_pyString(value || '{{VALOR_DO_CAMPO}}')`); break;
+      case 'select': lines.push(value ? `    Type Text    ${_pyString(value)}` : '    # TODO: selecionar a opção observada'); break;
+      case 'hotkey':
+      case 'keypress': lines.push(`    Press Keys    ${(step.alvo?.atalho || 'enter').split(/[+\\s]+/).filter(Boolean).join('    ')}`); break;
+      case 'wait': lines.push(`    Sleep    ${Number(step.espera_segundos) || 1}s`); break;
+      case 'scroll': lines.push('    Scroll Down'); break;
+      case 'open':
+      case 'navigate': lines.push('    # TODO: abrir/navegar para a aplicação ou URL observada'); break;
+      case 'upload': lines.push('    # TODO: selecionar o arquivo observado no diálogo de upload'); break;
+      case 'download': lines.push('    # TODO: validar/aguardar o download observado'); break;
+      case 'check': lines.push(`    # TODO: validar: ${String(step.poscondicao || step.resultado || '').replace(/\\n/g, ' ')}`); break;
+      default: lines.push(`    # TODO: implementar ação "${action}" observada`);
+    }
+    return lines.join('\\n');
+  }
+
+  function _generateAutomation(platform, data) {
+    const analysis = data?.analysis || {};
+    const steps = Array.isArray(analysis.etapas) ? analysis.etapas : [];
+    const header = [
+      '# Roteiro gerado pelo MarkAI Converter — revisão humana obrigatória.',
+      '# As ações abaixo foram derivadas da análise observacional do vídeo.',
+      '# Não execute em produção sem validar locators, coordenadas, waits e dados.',
+      ''
+    ];
+    if (platform === 'pyautogui') {
+      return [...header, 'import time', 'import pyautogui', '', `# Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map(_pyautoguiStep)].join('\\n');
+    }
+    if (platform === 'playwright') {
+      return [...header, 'import time', 'from playwright.sync_api import sync_playwright', '', 'with sync_playwright() as p:', '    browser = p.chromium.launch(headless=False)', '    page = browser.new_page()', `    # Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map((s,i) => _playwrightStep(s,i).split('\\n').map(line => '    ' + line).join('\\n')), '', '    # browser.close()  # habilite quando a validação estiver concluída'].join('\\n');
+    }
+    if (platform === 'selenium') {
+      return [...header, 'import time', 'from selenium import webdriver', 'from selenium.webdriver.common.by import By', 'from selenium.webdriver.common.keys import Keys', 'from selenium.webdriver.common.action_chains import ActionChains', 'from selenium.webdriver.support.ui import Select', '', 'driver = webdriver.Chrome()', `# Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map((s,i) => _seleniumStep(s,i)), '', '# driver.quit()  # habilite quando a validação estiver concluída'].join('\\n');
+    }
+    return [...header, '*** Settings ***', 'Library    RPA.Desktop', '', '*** Tasks ***', `Executar processo observado`, ...steps.map(_rpaStep), ''].join('\\n');
+  }
+
+  function _automationFilename(platform, data) {
+    const base = String(data?.filename || 'video').replace(/\\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+    return base + '-automacao-' + platform + (platform === 'rpa' ? '.robot' : '.py');
+  }
+
+  function renderAutomation(platform = 'pyautogui') {
+    const code = _generateAutomation(platform, lastAnalysis);
+    const output = $('videoAutomationCode');
+    const status = $('videoAutomationStatus');
+    if (output) output.textContent = code;
+    if (status) status.textContent = `Roteiro ${platform} gerado com ${lastAnalysis?.analysis?.etapas?.length || 0} etapa(s). Revise antes de executar.`;
+    return code;
+  }
+
   function render(data) {
     lastAnalysis = data;
     const analysis = data.analysis || {};
@@ -2303,6 +2510,11 @@ const VideoTaskAnalyzer = (() => {
 
     if (transcript) transcript.textContent = data.transcript || 'Nenhuma fala identificada.';
     if (json) json.textContent = JSON.stringify({ ...data, analysis }, null, 2);
+    const automationTarget = $('videoAutomationTarget');
+    if (automationTarget) automationTarget.value = analysis?.automacao?.plataforma_sugerida && ['pyautogui','playwright','selenium','rpa'].includes(analysis.automacao.plataforma_sugerida)
+      ? analysis.automacao.plataforma_sugerida
+      : 'pyautogui';
+    renderAutomation(automationTarget?.value || 'pyautogui');
     openModal();
   }
 
@@ -2362,6 +2574,33 @@ const VideoTaskAnalyzer = (() => {
       event.stopImmediatePropagation();
       analyze(Array.from(files).find(isVideo));
     }, true);
+
+    $('btnGenerateVideoAutomation')?.addEventListener('click', () => {
+      renderAutomation($('videoAutomationTarget')?.value || 'pyautogui');
+    });
+    $('videoAutomationTarget')?.addEventListener('change', event => {
+      if (lastAnalysis) renderAutomation(event.target.value);
+    });
+    $('btnCopyVideoAutomation')?.addEventListener('click', async () => {
+      if (!lastAnalysis) return;
+      const code = renderAutomation($('videoAutomationTarget')?.value || 'pyautogui');
+      await navigator.clipboard.writeText(code);
+      if (typeof UIManager !== 'undefined' && UIManager.toast) UIManager.toast('Roteiro de automação copiado.', 'success');
+    });
+    $('btnDownloadVideoAutomation')?.addEventListener('click', () => {
+      if (!lastAnalysis) return;
+      const platform = $('videoAutomationTarget')?.value || 'pyautogui';
+      const code = renderAutomation(platform);
+      const blob = new Blob([code], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = _automationFilename(platform, lastAnalysis);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
 
     $('btnCloseVideoAnalysis')?.addEventListener('click', () => $('modalVideoAnalysis')?.close());
     $('btnCloseVideoAnalysis2')?.addEventListener('click', () => $('modalVideoAnalysis')?.close());
