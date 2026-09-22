@@ -165,8 +165,14 @@ def test_remote_url_rejects_embedded_credentials():
 
 
 def test_remote_url_rejects_private_redirect(monkeypatch):
-    monkeypatch.setattr(api, "_validate_public_host", lambda hostname: None)
-    calls = []
+    def fake_validate(hostname):
+        if hostname == "127.0.0.1":
+            raise api.HTTPException(
+                status_code=403,
+                detail="private host blocked",
+            )
+
+    monkeypatch.setattr(api, "_validate_public_host", fake_validate)
 
     class FakeResponse:
         status_code = 302
@@ -186,7 +192,6 @@ def test_remote_url_rejects_private_redirect(monkeypatch):
             return False
 
         def stream(self, *args, **kwargs):
-            calls.append(args[1] if len(args) > 1 else kwargs.get("url"))
             return FakeResponse()
 
     monkeypatch.setattr(api.httpx, "Client", lambda *args, **kwargs: FakeClient())
