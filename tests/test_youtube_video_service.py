@@ -83,3 +83,37 @@ def test_visual_service_rejects_long_video(monkeypatch):
         service.download("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
     assert exc.value.code == "YOUTUBE_VIDEO_TOO_LONG"
+
+
+def test_visual_service_maps_download_size_guard(monkeypatch):
+    service = YouTubeVideoService(enabled=True, max_mb=20)
+
+    class FakeDownloadError(Exception):
+        pass
+
+    class FakeYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def extract_info(self, url, download=False):
+            return {"duration": 120}
+
+        def download(self, urls):
+            raise FakeDownloadError("MarkAI_YOUTUBE_VISUAL_MAX_MB exceeded: 20")
+
+    fake_module = SimpleNamespace(
+        YoutubeDL=FakeYoutubeDL,
+        utils=SimpleNamespace(DownloadError=FakeDownloadError),
+    )
+    monkeypatch.setattr(service, "_import_yt_dlp", lambda: fake_module)
+
+    with pytest.raises(YouTubeVideoServiceError) as exc:
+        service.download("https://youtu.be/dQw4w9WgXcQ")
+
+    assert exc.value.code == "YOUTUBE_VIDEO_TOO_LARGE"
