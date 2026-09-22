@@ -172,9 +172,15 @@ class YouTubeTranscriptService:
         return values or list(DEFAULT_LANGUAGES)
 
     @staticmethod
-    def _cache_key(video_id: str, languages: list[str], translate_to: str | None) -> str:
+    def _cache_key(
+        video_id: str,
+        languages: list[str],
+        translate_to: str | None,
+        preserve_formatting: bool = False,
+    ) -> str:
         translated = (translate_to or "").strip().lower()
-        return f"{video_id}|{','.join(languages)}|{translated}"
+        formatting = "1" if preserve_formatting else "0"
+        return f"{video_id}|{','.join(languages)}|{translated}|fmt={formatting}"
 
     def _get_cached(self, key: str) -> dict[str, Any] | None:
         if self.cache_ttl_seconds <= 0:
@@ -260,7 +266,12 @@ class YouTubeTranscriptService:
             raise YouTubeServiceError("YOUTUBE_VIDEO_ID_INVALID", "Video ID inválido.")
 
         language_priority = self._language_priority(languages)
-        cache_key = self._cache_key(video_id, language_priority, translate_to)
+        cache_key = self._cache_key(
+            video_id,
+            language_priority,
+            translate_to,
+            preserve_formatting,
+        )
         cached = self._get_cached(cache_key)
         if cached:
             result = dict(cached)
