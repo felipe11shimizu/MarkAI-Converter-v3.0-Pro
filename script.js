@@ -27,6 +27,7 @@ const AppState = (() => {
     },
     previewItemId: null,
     compareState: null,
+    currentProjectId: null,
   };
 
   const proxy = new Proxy(_state, {
@@ -1084,6 +1085,15 @@ const UIManager = (() => {
     btnSettings: $('btnSettings'), modalSettings: $('modalSettings'),
     btnCloseSettings: $('btnCloseSettings'), btnSaveSettings: $('btnSaveSettings'),
     btnClearApiKey: $('btnClearApiKey'), btnToggleKey: $('btnToggleKey'),
+    btnWorkspace: $('btnWorkspace'), btnWorkspaceToolbar: $('btnWorkspaceToolbar'),
+    workspaceProjectSelect: $('workspaceProjectSelect'), btnWorkspaceSave: $('btnWorkspaceSave'),
+    btnWorkspaceVersion: $('btnWorkspaceVersion'), btnWorkspaceExport: $('btnWorkspaceExport'), workspaceStatus: $('workspaceStatus'),
+    modalWorkspace: $('modalWorkspace'), btnCloseWorkspace: $('btnCloseWorkspace'), btnWorkspaceDone: $('btnWorkspaceDone'),
+    workspaceProjectName: $('workspaceProjectName'), btnCreateWorkspaceProject: $('btnCreateWorkspaceProject'),
+    workspaceProjectList: $('workspaceProjectList'), btnRenameWorkspaceProject: $('btnRenameWorkspaceProject'),
+    btnDeleteWorkspaceProject: $('btnDeleteWorkspaceProject'), btnExportWorkspaceJson: $('btnExportWorkspaceJson'),
+    btnExportWorkspaceZip: $('btnExportWorkspaceZip'), workspaceHistoryCount: $('workspaceHistoryCount'),
+    workspaceHistoryList: $('workspaceHistoryList'), workspaceTabVersions: $('workspaceTabVersions'), workspaceTabAI: $('workspaceTabAI'),
     aiProvider: $('aiProvider'), aiModel: $('aiModel'), aiApiKey: $('aiApiKey'),
     toggleSyntaxHL: $('toggleSyntaxHL'), toggleAutoPreview: $('toggleAutoPreview'),
     modalPreview: $('modalPreview'), btnClosePreview: $('btnClosePreview'),
@@ -1095,6 +1105,166 @@ const UIManager = (() => {
     btnUseMarkItDown: $('btnUseMarkItDown'), btnUseBrowser: $('btnUseBrowser'),
     toastContainer: $('toastContainer'),
   };
+
+  // ── WORKSPACE UI ──
+  let _workspaceHistoryMode = 'versions';
+  let _workspaceSaveTimer = null;
+
+  async function _workspaceSyncQueue() {
+    const projectId = AppState.get('currentProjectId');
+    if (!projectId) return;
+    try {
+      await WorkspaceStore.saveQueue(projectId, AppState.get('queue'));
+      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Salvo localmente · ' + new Date().toLocaleTimeString('pt-BR');
+    } catch (e) {
+      console.warn('[MarkAI] Workspace save failed:', e);
+      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Erro ao salvar workspace';
+    }
+  }
+
+  function _scheduleWorkspaceSave() {
+    clearTimeout(_workspaceSaveTimer);
+    _workspaceSaveTimer = setTimeout(_workspaceSyncQueue, 600);
+  }
+
+  async function _refreshWorkspaceProjects() {
+    const projects = await WorkspaceStore.listProjects();
+    const activeId = AppState.get('currentProjectId');
+    els.workspaceProjectSelect.innerHTML = projects.map(p =>
+      '<option value="' + p.id + '"' + (p.id === activeId ? ' selected' : '') + '>' +
+      p.name.replace(/</g, '&lt;') + '</option>'
+    ).join('');
+    els.workspaceProjectList.innerHTML = projects.length ? projects.map(p => {
+      const countLabel = p.id === activeId ? ' · ativo' : '';
+      return '<div class="workspace-project-item' + (p.id === activeId ? ' active' : '') + '" data-project-id="' + p.id + '">' +
+        '<div class="workspace-project-name">' + p.name.replace(/</g, '&lt;') + '</div>' +
+        '<div class="workspace-project-meta">Atualizado ' + new Date(p.updatedAt || p.createdAt).toLocaleString('pt-BR') + countLabel + '</div>' +
+      '</div>';
+    }).join('') : '<div class="workspace-empty">Nenhum projeto.</div>';
+  }
+
+  async function _renderWorkspaceHistory() {
+    const projectId = AppState.get('currentProjectId');
+    if (!projectId) return;
+    const records = _workspaceHistoryMode === 'versions'
+      ? await WorkspaceStore.listVersions(projectId)
+      : await WorkspaceStore.listAIHistory(projectId);
+    els.workspaceHistoryCount.textContent = records.length;
+    if (!records.length) {
+      els.workspaceHistoryList.innerHTML = '<div class="workspace-empty">Nenhum registro neste projeto.</div>';
+      return;
+    }
+    els.workspaceHistoryList.innerHTML = records.slice(0, 100).map(item => {
+      const title = _workspaceHistoryMode === 'versions'
+        ? (item.name || 'documento.md')
+        : ((item.documentName || 'documento.md') + ' · ' + (item.model || item.provider || 'IA'));
+      const preview = _workspaceHistoryMode === 'versions'
+        ? (item.source || 'editor') + ' · ' + String(item.markdown || '').slice(0, 140)
+        : String(item.prompt || 'Prompt padrão do sistema').slice(0, 140);
+      return '<div class="workspace-history-item" data-history-id="' + item.id + '">' +
+        '<div class="workspace-history-title">' + title.replace(/</g, '&lt;') + '</div>' +
+        '<div class="workspace-history-meta">' + new Date(item.createdAt).toLocaleString('pt-BR') + '</div>' +
+        '<div class="workspace-history-preview">' + preview.replace(/</g, '&lt;') + '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  async function _openWorkspace() {
+    try {
+      await _refreshWorkspaceProjects();
+      await _renderWorkspaceHistory();
+      els.modalWorkspace.showModal();
+    } catch (e) {
+      toast('Erro ao abrir workspace: ' + e.message, 'error');
+    }
+  }
+
+  async function _selectProject(projectId) {
+    if (!projectId || projectId === AppState.get('currentProjectId')) return;
+    await _workspaceSyncQueue();
+    const queue = await WorkspaceStore.loadQueue(projectId);
+    AppState.set('currentProjectId', projectId);
+    AppState.set('queue', queue);
+    renderQueue();
+    const current = queue.find(i => i.status === 'done' && i.result);
+    if (current) {
+      loadMarkdown(current.result, current.name.replace(/\.[^.]+$/, '') + '.md');
+    } else {
+      AppState.set('currentMd', '');
+      els.workspaceContent.style.display = 'none';
+      els.emptyState.style.display = 'flex';
+    }
+    await _refreshWorkspaceProjects();
+    await _renderWorkspaceHistory();
+    if (els.workspaceStatus) els.workspaceStatus.textContent = 'Projeto: ' + (els.workspaceProjectSelect.selectedOptions[0]?.textContent || '');
+    toast('Projeto carregado.', 'success');
+  }
+
+  async function _createProject() {
+    const name = els.workspaceProjectName.value.trim();
+    if (!name) { toast('Informe o nome do projeto.', 'warning'); return; }
+    const project = await WorkspaceStore.createProject(name);
+    els.workspaceProjectName.value = '';
+    AppState.set('currentProjectId', project.id);
+    AppState.set('queue', []);
+    AppState.set('currentMd', '');
+    renderQueue();
+    els.workspaceContent.style.display = 'none';
+    els.emptyState.style.display = 'flex';
+    await _refreshWorkspaceProjects();
+    await _renderWorkspaceHistory();
+    toast('Projeto criado e ativado.', 'success');
+  }
+
+  async function _saveWorkspaceVersion(source = 'manual') {
+    const projectId = AppState.get('currentProjectId');
+    const md = AppState.get('currentMd');
+    if (!projectId || !md) { toast('Não há conteúdo para versionar.', 'warning'); return; }
+    const version = await WorkspaceStore.saveVersion(
+      projectId, null, AppState.get('currentFileName'), md, source,
+      ''
+    );
+    await WorkspaceStore.updateProject({ ...(await WorkspaceStore.listProjects()).find(p => p.id === projectId) });
+    await _renderWorkspaceHistory();
+    if (els.workspaceStatus) els.workspaceStatus.textContent = 'Versão salva · ' + new Date(version.createdAt).toLocaleTimeString('pt-BR');
+    toast('Versão do Markdown salva.', 'success');
+  }
+
+  async function _exportWorkspaceJson() {
+    const projectId = AppState.get('currentProjectId');
+    if (!projectId) return;
+    const payload = await WorkspaceStore.exportProject(projectId);
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+    _downloadBlob(blob, (payload.project?.name || 'markai-workspace') + '.json');
+    toast('Workspace exportado em JSON.', 'success');
+  }
+
+  async function _exportWorkspaceZip() {
+    const projectId = AppState.get('currentProjectId');
+    if (!projectId) return;
+    if (!window.JSZip) { toast('Biblioteca ZIP ainda não carregou.', 'warning'); return; }
+    const payload = await WorkspaceStore.exportProject(projectId);
+    const zip = new JSZip();
+    const safe = String(payload.project?.name || 'workspace').replace(/[^a-z0-9_-]+/gi, '_');
+    zip.file('workspace.json', JSON.stringify(payload, null, 2));
+    payload.documents.forEach((d, i) => {
+      if (d.result) zip.file('markdown/' + String(i + 1).padStart(3, '0') + '_' + String(d.name || 'documento').replace(/[^a-z0-9_.-]+/gi, '_') + '.md', d.result);
+    });
+    const versions = payload.versions || [];
+    versions.forEach((v, i) => {
+      if (v.markdown) zip.file('versions/' + String(i + 1).padStart(3, '0') + '_' + String(v.name || 'versao').replace(/[^a-z0-9_.-]+/gi, '_') + '.md', v.markdown);
+    });
+    const content = await zip.generateAsync({ type: 'blob' });
+    _downloadBlob(content, safe + '.zip');
+    toast('Workspace exportado em ZIP.', 'success');
+  }
+
+  function _downloadBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   // ── FILE TYPE ICON LABELS ──
   const EXT_LABELS = {
@@ -1327,6 +1497,7 @@ const UIManager = (() => {
       }
       if (!result) result = await FileParserStrategy.parseBrowser(item, p => setProgress(p));
       QueueManager.update(id, { status: 'done', result, engine, conversionMeta });
+      _scheduleWorkspaceSave();
       renderQueue();
       setProgress(1);
       loadMarkdown(result, item.name.replace(/\.[^.]+$/, '') + '.md');
@@ -1382,10 +1553,89 @@ const UIManager = (() => {
   }
 
   // ── INIT EVENT LISTENERS ──
+  async function _initWorkspace() {
+    if (!window.indexedDB) {
+      if (els.workspaceStatus) els.workspaceStatus.textContent = 'IndexedDB indisponível';
+      return;
+    }
+    try {
+      const project = await WorkspaceStore.init();
+      AppState.set('currentProjectId', project.id);
+      const queue = await WorkspaceStore.loadQueue(project.id);
+      AppState.set('queue', queue);
+      renderQueue();
+      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Projeto: ' + project.name;
+      const current = queue.find(i => i.status === 'done' && i.result);
+      if (current) loadMarkdown(current.result, current.name.replace(/\.[^.]+$/, '') + '.md');
+      await _refreshWorkspaceProjects();
+    } catch (e) {
+      console.warn('[MarkAI] Workspace init failed:', e);
+      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Workspace offline';
+    }
+  }
+
   function init() {
     AppState.loadSettings();
     _applySettings();
     _setupMarkdown();
+    _initWorkspace();
+
+    // Workspace
+    els.btnWorkspace?.addEventListener('click', _openWorkspace);
+    els.btnWorkspaceToolbar?.addEventListener('click', _openWorkspace);
+    els.btnCloseWorkspace?.addEventListener('click', () => els.modalWorkspace.close());
+    els.btnWorkspaceDone?.addEventListener('click', () => els.modalWorkspace.close());
+    els.modalWorkspace?.addEventListener('click', e => { if (e.target === els.modalWorkspace) els.modalWorkspace.close(); });
+    els.workspaceProjectSelect?.addEventListener('change', e => _selectProject(e.target.value));
+    els.btnWorkspaceSave?.addEventListener('click', async () => { await _workspaceSyncQueue(); toast('Workspace salvo.', 'success'); });
+    els.btnWorkspaceVersion?.addEventListener('click', () => _saveWorkspaceVersion('manual'));
+    els.btnWorkspaceExport?.addEventListener('click', _exportWorkspaceZip);
+    els.btnCreateWorkspaceProject?.addEventListener('click', _createProject);
+    els.workspaceProjectName?.addEventListener('keydown', e => { if (e.key === 'Enter') _createProject(); });
+    els.workspaceProjectList?.addEventListener('click', e => {
+      const item = e.target.closest('[data-project-id]');
+      if (item) _selectProject(item.dataset.projectId);
+    });
+    els.btnRenameWorkspaceProject?.addEventListener('click', async () => {
+      const projectId = AppState.get('currentProjectId');
+      const project = (await WorkspaceStore.listProjects()).find(p => p.id === projectId);
+      if (!project) return;
+      const name = window.prompt('Novo nome do projeto:', project.name);
+      if (!name?.trim()) return;
+      project.name = name.trim();
+      await WorkspaceStore.updateProject(project);
+      await _refreshWorkspaceProjects();
+      toast('Projeto renomeado.', 'success');
+    });
+    els.btnDeleteWorkspaceProject?.addEventListener('click', async () => {
+      const projects = await WorkspaceStore.listProjects();
+      if (projects.length <= 1) { toast('Mantenha pelo menos um projeto.', 'warning'); return; }
+      const projectId = AppState.get('currentProjectId');
+      const project = projects.find(p => p.id === projectId);
+      if (!project || !window.confirm('Excluir o projeto "' + project.name + '" e todo o histórico local?')) return;
+      await WorkspaceStore.deleteProject(projectId);
+      const next = (await WorkspaceStore.listProjects())[0];
+      AppState.set('currentProjectId', next.id);
+      AppState.set('queue', await WorkspaceStore.loadQueue(next.id));
+      renderQueue();
+      await _refreshWorkspaceProjects();
+      await _renderWorkspaceHistory();
+      toast('Projeto excluído.', 'success');
+    });
+    els.btnExportWorkspaceJson?.addEventListener('click', _exportWorkspaceJson);
+    els.btnExportWorkspaceZip?.addEventListener('click', _exportWorkspaceZip);
+    els.workspaceTabVersions?.addEventListener('click', async () => {
+      _workspaceHistoryMode = 'versions';
+      els.workspaceTabVersions.classList.add('active');
+      els.workspaceTabAI.classList.remove('active');
+      await _renderWorkspaceHistory();
+    });
+    els.workspaceTabAI?.addEventListener('click', async () => {
+      _workspaceHistoryMode = 'ai';
+      els.workspaceTabAI.classList.add('active');
+      els.workspaceTabVersions.classList.remove('active');
+      await _renderWorkspaceHistory();
+    });
 
     // Drop zone
     els.dropZone.addEventListener('dragover', e => {
@@ -1548,9 +1798,8 @@ const UIManager = (() => {
       }
       if (AppState.get('activePanel') === 'panelSplit') _renderPreview(md);
     }
-    els.markdownEditor.addEventListener('input', e => _onEditorInput(els.markdownEditor, e));
-    els.markdownEditorSplit.addEventListener('input', e => _onEditorInput(els.markdownEditorSplit, e));
-
+    els.markdownEditor.addEventListener('input', e => { _onEditorInput(els.markdownEditor, e); _scheduleWorkspaceSave(); });
+    els.markdownEditorSplit.addEventListener('input', e => { _onEditorInput(els.markdownEditorSplit, e); _scheduleWorkspaceSave(); });
     // Copy
     els.btnCopy.addEventListener('click', async () => {
       try {
@@ -1581,7 +1830,7 @@ const UIManager = (() => {
     });
 
     // Reset
-    els.btnReset.addEventListener('click', () => {
+    els.btnReset.addEventListener('click', async () => {
       AppState.set('currentMd', '');
       els.markdownEditor.value = '';
       els.markdownEditorSplit.value = '';
@@ -1592,6 +1841,7 @@ const UIManager = (() => {
       _updateStats('');
       setProgress(0, false);
       setStatus('Pronto', 'idle');
+      _scheduleWorkspaceSave();
     });
 
     // AI Enhance
@@ -1609,7 +1859,10 @@ const UIManager = (() => {
       setStatus('IA processando…', 'busy');
       try {
         const improved = await AIEngine.enhance(md);
+        const projectId = AppState.get('currentProjectId');
+        if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
         loadMarkdown(improved, AppState.get('currentFileName'));
+        await _saveWorkspaceVersion('ai');
         toast('✓ Markdown melhorado pela IA!', 'success');
         setStatus('IA concluída', 'idle');
       } catch(e) {
@@ -1764,6 +2017,7 @@ const UIManager = (() => {
   // ── FILE SELECTION ──
   function _onFilesSelected(files) {
     const added = QueueManager.add(files);
+      _scheduleWorkspaceSave();
     renderQueue();
     toast(`${added.length} arquivo(s) adicionado(s) à fila.`, 'success');
 
