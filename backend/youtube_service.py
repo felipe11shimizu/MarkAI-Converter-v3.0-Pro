@@ -321,7 +321,7 @@ class YouTubeTranscriptService:
         )
         result = []
         for index, item in enumerate(raw_segments, start=1):
-            text = re.sub(r"\\s+", " ", str(item.get("text") or "")).strip()
+            text = re.sub(r"\s+", " ", str(item.get("text") or "")).strip()
             if not text:
                 continue
             start = max(0.0, float(item.get("start") or 0.0))
@@ -340,7 +340,7 @@ class YouTubeTranscriptService:
     @staticmethod
     def quality_metrics(segments: list[dict[str, Any]]) -> dict[str, Any]:
         text = " ".join(item["text"] for item in segments).strip()
-        words = re.findall(r"\\S+", text, flags=re.UNICODE)
+        words = re.findall(r"\S+", text, flags=re.UNICODE)
         duration = max((float(item["end"]) for item in segments), default=0.0)
         non_empty = sum(1 for item in segments if item["text"])
         overlaps = sum(
