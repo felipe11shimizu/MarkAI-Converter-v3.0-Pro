@@ -1136,6 +1136,18 @@ body::before {
   font-size: .72rem;
   font-weight: 700;
 }
+.video-review-badge.validation-ready {
+  background: rgba(34,197,94,.12);
+  color: #86efac;
+}
+.video-review-badge.validation-warning {
+  background: rgba(245,158,11,.12);
+  color: #fcd34d;
+}
+.video-review-badge.validation-blocked {
+  background: rgba(239,68,68,.12);
+  color: #fca5a5;
+}
 .video-validation-badge.ready {
   background: rgba(34,197,94,.12);
   color: #86efac;
