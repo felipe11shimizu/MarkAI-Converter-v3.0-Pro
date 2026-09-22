@@ -23,7 +23,7 @@
   const PLATFORM_ACTIONS = {
     pyautogui: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'wait']),
     playwright: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'upload', 'open', 'navigate', 'check', 'submit']),
-    selenium: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'upload', 'open', 'navigate', 'submit']),
+    selenium: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'upload', 'open', 'navigate', 'check', 'submit']),
     rpa: new Set(['click', 'double_click', 'type', 'select', 'hotkey', 'keypress', 'scroll', 'wait']),
   };
 
