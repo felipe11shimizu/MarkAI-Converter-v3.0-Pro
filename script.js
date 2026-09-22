@@ -255,7 +255,8 @@ const WorkspaceStore = (() => {
   async function saveQueue(projectId, queue) {
     const oldDocs = await byIndex('documents', 'projectId', projectId);
     await Promise.all(oldDocs.map(x => remove('documents', x.id)));
-    for (const item of queue) {
+    for (let index = 0; index < queue.length; index++) {
+      const item = queue[index];
       await put('documents', {
         id: item.id,
         projectId,
@@ -1664,6 +1665,7 @@ const UIManager = (() => {
     els.btnClearQueue.addEventListener('click', () => {
       QueueManager.clear();
       renderQueue();
+      _scheduleWorkspaceSave();
       toast('Fila limpa.', 'info');
     });
 
@@ -1743,6 +1745,7 @@ const UIManager = (() => {
       if (btn.classList.contains('qi-btn-remove')) {
         QueueManager.remove(id);
         renderQueue();
+        _scheduleWorkspaceSave();
         if (!AppState.get('queue').length) {
           els.emptyState.style.display = 'flex';
           els.workspaceContent.style.display = 'none';
