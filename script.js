@@ -2722,7 +2722,11 @@ const VideoTaskAnalyzer = (() => {
         String(step.tipo_acao || 'other') + (step.acao ? ' · ' + step.acao : ''),
         Array.isArray(evidence.frame_indices) ? evidence.frame_indices.join(', ') : '',
         Array.isArray(evidence.transcript_segment_indices) ? evidence.transcript_segment_indices.join(', ') : '',
-        String(step.precondicao || step.poscondicao || step.resultado || '—'),
+        [
+          step.precondicao ? 'pré: ' + step.precondicao : '',
+          step.poscondicao ? 'pós: ' + step.poscondicao : '',
+          step.resultado ? 'resultado: ' + step.resultado : ''
+        ].filter(Boolean).join(' · ') || '—',
         step.confianca == null ? '—' : Math.round(Number(step.confianca) * 100) + '%'
       ];
       cells.forEach((value, cellIndex) => {
