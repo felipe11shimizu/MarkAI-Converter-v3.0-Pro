@@ -126,7 +126,7 @@ def test_remote_url_uses_markitdown_local_conversion(monkeypatch):
         markdown = "# Página\n\nConteúdo remoto"
 
     def fake_fetch(url):
-        return url, b"<html><body><h1>Página</h1><p>Conteúdo remoto</p></body></html>", "text/html"
+        return url, "<html><body><h1>Página</h1><p>Conteúdo remoto</p></body></html>".encode("utf-8"), "text/html"
 
     monkeypatch.setattr(api, "_fetch_remote_url", fake_fetch)
     monkeypatch.setattr(api._engine, "convert_local", lambda path: FakeResult())
