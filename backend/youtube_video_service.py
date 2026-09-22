@@ -177,6 +177,11 @@ class YouTubeVideoService:
             raise
         except Exception as exc:
             message = str(exc)
+            if "MARKAI_YOUTUBE_VISUAL_MAX_MB exceeded" in message:
+                raise YouTubeVideoServiceError(
+                    "YOUTUBE_VIDEO_TOO_LARGE",
+                    f"O vídeo excede o limite visual de {self.max_mb} MB.",
+                ) from exc
             if "PO Token" in message or "po_token" in message.lower():
                 raise YouTubeVideoServiceError(
                     "YOUTUBE_VIDEO_PO_TOKEN_REQUIRED",
