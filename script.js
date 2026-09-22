@@ -2997,6 +2997,15 @@ const VideoTaskAnalyzer = (() => {
     _ensureReviewState(data);
 
     const analysis = data.analysis || {};
+    const automationTarget = $('videoAutomationTarget');
+    const suggestedPlatform = MarkAIAutomationValidator.normalizePlatform(
+      analysis?.automacao?.plataforma_sugerida || 'pyautogui'
+    );
+    if (automationTarget && ['pyautogui', 'playwright', 'selenium', 'rpa'].includes(suggestedPlatform) && !automationTarget.value) {
+      automationTarget.value = suggestedPlatform;
+    }
+    const platform = automationTarget?.value || suggestedPlatform;
+    _validateAnalysis(data, platform);
     const allSteps = Array.isArray(analysis.etapas) ? analysis.etapas : [];
     const visible = _visibleReviewedSteps(data);
     const summary = $('videoAnalysisSummary');
@@ -3025,7 +3034,8 @@ const VideoTaskAnalyzer = (() => {
       summary.append(title, desc, evidenceText);
     }
 
-    _updateReviewSummary();
+    _updateReviewSummary(platform);
+    _renderEvidenceMatrix(data);
 
     if (list) {
       list.replaceChildren();
@@ -3040,6 +3050,7 @@ const VideoTaskAnalyzer = (() => {
 
       visible.forEach(({ step, index }) => {
         const status = REVIEW_STATUSES[step.review_status] || REVIEW_STATUSES.pending;
+        const validation = step.validacao_automacao || _validateStepForPlatform(step, platform);
         const card = document.createElement('article');
         card.className = 'video-step-card review-' + status.className;
 
@@ -3057,6 +3068,9 @@ const VideoTaskAnalyzer = (() => {
         const badge = document.createElement('span');
         badge.className = 'video-review-badge ' + status.className;
         badge.textContent = status.label;
+        const validationBadge = document.createElement('span');
+        validationBadge.className = 'video-review-badge ' + ({ ready: 'approved', warning: 'pending', blocked: 'ignored' }[validation.status] || 'pending');
+        validationBadge.textContent = 'Validação: ' + ({ ready: 'Pronta', warning: 'Revisar', blocked: 'Bloqueada' }[validation.status] || 'Revisar');
         const statusSelect = document.createElement('select');
         statusSelect.className = 'input-field input-field-sm';
         Object.entries(REVIEW_STATUSES).forEach(([value, info]) => {
@@ -3066,8 +3080,8 @@ const VideoTaskAnalyzer = (() => {
           statusSelect.appendChild(option);
         });
         statusSelect.value = step.review_status;
-        statusSelect.addEventListener('change', event => _setReviewStatus(index, event.target.value));
-        reviewStatus.append(badge, statusSelect);
+        statusSelect.addEventListener('change', event => _setReviewStatus(index, event.target.value, { explicit: event.target.value === 'approved' }));
+        reviewStatus.append(badge, validationBadge, statusSelect);
 
         head.append(order, time, reviewStatus);
 
@@ -3121,9 +3135,10 @@ const VideoTaskAnalyzer = (() => {
 
         if (step.dados && (step.dados.campo || step.dados.valor)) {
           const dataEl = document.createElement('small');
+          const safeValue = step.dados.sensivel ? '{{DADO_SENSIVEL}}' : (step.dados.valor || '');
           dataEl.textContent =
             'Dados: ' + (step.dados.campo || '') +
-            (step.dados.valor ? ' = ' + step.dados.valor : '') +
+            (safeValue ? ' = ' + safeValue : '') +
             (step.dados.sensivel ? ' [sensível]' : '');
           automation.appendChild(dataEl);
         }
@@ -3165,6 +3180,7 @@ const VideoTaskAnalyzer = (() => {
         }
 
         card.appendChild(automation);
+        card.appendChild(_renderValidationDetails(step, platform));
 
         const editor = _reviewStepEditor(step, index);
         card.appendChild(editor);
@@ -3174,18 +3190,9 @@ const VideoTaskAnalyzer = (() => {
     }
 
     if (transcript) transcript.textContent = data.transcript || 'Nenhuma fala identificada.';
-    if (json) json.textContent = JSON.stringify({ ...data, analysis }, null, 2);
+    if (json) json.textContent = JSON.stringify(_safeJsonData({ ...data, analysis }), null, 2);
 
-    const automationTarget = $('videoAutomationTarget');
-    if (automationTarget) {
-      automationTarget.value =
-        analysis?.automacao?.plataforma_sugerida &&
-        ['pyautogui', 'playwright', 'selenium', 'rpa'].includes(analysis.automacao.plataforma_sugerida)
-          ? analysis.automacao.plataforma_sugerida
-          : 'pyautogui';
-    }
-
-    renderAutomation(automationTarget?.value || 'pyautogui');
+    renderAutomation(platform);
     if (window.lucide?.createIcons) window.lucide.createIcons();
     if (options.open !== false) openModal();
   }
