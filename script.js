@@ -1699,10 +1699,9 @@ document.addEventListener('DOMContentLoaded', () => {
       UIManager.renderQueue();
       UIManager.toast(`${added.length} arquivo(s) adicionado(s)!`, 'success');
       if (AppState.get('queue').length === 1 && added.length === 1) {
-        const el = document.getElementById('queueList');
-        const id = el?.querySelector('.queue-item')?.dataset?.id;
-        if (id) {
-          const btn = el.querySelector(`[data-id="${id}"].qi-btn-convert`);
+        const item = AppState.get('queue')[0];
+        if (item) {
+          UIManager.toast('Arquivo adicionado à fila. Clique em Converter para iniciar.', 'info');
         }
       }
     }
