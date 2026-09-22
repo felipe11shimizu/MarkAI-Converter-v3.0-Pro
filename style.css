@@ -1239,10 +1239,9 @@ body::before {
   color: var(--text-primary, #e2e8f0);
 }
 .video-evidence-chip {
-  display: inline-flex;
   margin: .08rem .18rem .08rem 0;
   padding: .14rem .38rem;
-  border-radius: 999px;
+  border-radius: .35rem;
   background: rgba(99,102,241,.10);
 }
 @media (max-width: 760px) {
