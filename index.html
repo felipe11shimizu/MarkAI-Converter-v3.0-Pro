@@ -288,7 +288,11 @@
               <option value="pending">Para revisar</option>
               <option value="approved">Aprovadas</option>
               <option value="ignored">Ignoradas</option>
+              <option value="validation_ready">Validação pronta</option>
+              <option value="validation_warning">Validação com alertas</option>
+              <option value="validation_blocked">Validação bloqueada</option>
             </select>
+            <button class="btn btn-secondary btn-sm" id="btnValidateVideoAutomation"><i data-lucide="shield-check"></i>Validar automação</button>
             <button class="btn btn-secondary btn-sm" id="btnApproveAllVideoSteps"><i data-lucide="check-check"></i>Aprovar todas</button>
           </div>
         </section>
@@ -319,6 +323,7 @@
           </div>
           <pre class="video-automation-code" id="videoAutomationCode">A análise do vídeo será convertida em um roteiro de automação aqui.</pre>
         </section>
+        <section class="video-evidence-matrix" id="videoEvidenceMatrix" aria-live="polite"></section>
         <div class="video-analysis-grid">
           <section>
             <h3>Etapas identificadas</h3>
@@ -461,6 +466,7 @@
   </dialog>
 
   <div class="toast-container" id="toastContainer"></div>
+  <script src="video_automation_validator.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
