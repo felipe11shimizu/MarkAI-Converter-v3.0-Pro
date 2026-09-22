@@ -277,6 +277,21 @@
       </div>
       <div class="modal-body video-analysis-body">
         <div class="video-analysis-summary" id="videoAnalysisSummary"></div>
+        <section class="video-review-toolbar" id="videoReviewToolbar">
+          <div class="video-review-toolbar-info">
+            <strong>Revisão assistida</strong>
+            <span id="videoReviewSummary">0 aprovadas · 0 para revisar · 0 ignoradas</span>
+          </div>
+          <div class="video-review-toolbar-actions">
+            <select class="input-field input-field-sm" id="videoReviewFilter" aria-label="Filtrar etapas">
+              <option value="all">Todas</option>
+              <option value="pending">Para revisar</option>
+              <option value="approved">Aprovadas</option>
+              <option value="ignored">Ignoradas</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btnApproveAllVideoSteps"><i data-lucide="check-check"></i>Aprovar todas</button>
+          </div>
+        </section>
         <section class="video-automation-generator">
           <div class="video-automation-generator-head">
             <div>
@@ -284,6 +299,7 @@
               <p class="form-hint">Transforma as etapas observadas em um roteiro inicial para cada tecnologia. Revise seletores, coordenadas, waits e dados antes de executar.</p>
             </div>
             <div class="video-automation-controls">
+              <span class="video-review-required-note">Somente etapas aprovadas entram no código.</span>
               <label class="form-label" for="videoAutomationTarget">Tecnologia</label>
               <select class="input-field input-field-sm" id="videoAutomationTarget">
                 <option value="pyautogui">PyAutoGUI</option>
