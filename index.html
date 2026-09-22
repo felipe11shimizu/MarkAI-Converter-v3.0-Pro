@@ -112,6 +112,36 @@
             <input type="url" class="input-field" id="urlInput" placeholder="https://exemplo.com/artigo..." />
             <button class="btn btn-accent" id="btnFetchUrl"><i data-lucide="arrow-right"></i></button>
           </div>
+          <div class="youtube-controls" id="youtubeControls" hidden>
+            <div class="youtube-controls-title"><i data-lucide="youtube"></i><span>YouTube</span></div>
+            <div class="youtube-controls-grid">
+              <label class="form-group">
+                <span class="form-label">Idioma da legenda</span>
+                <select class="input-field input-field-sm" id="youtubeLanguage">
+                  <option value="auto">Automático (PT → EN → ES)</option>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="pt">Português</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                </select>
+              </label>
+              <label class="form-group">
+                <span class="form-label">Traduzir</span>
+                <select class="input-field input-field-sm" id="youtubeTranslate">
+                  <option value="">Não traduzir</option>
+                  <option value="pt">Português</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                </select>
+              </label>
+            </div>
+            <div class="youtube-actions">
+              <button class="btn btn-primary btn-sm" id="btnYoutubeTranscribe"><i data-lucide="text"></i>Transcrever</button>
+              <button class="btn btn-ghost btn-sm" id="btnYoutubeLanguages"><i data-lucide="list"></i>Idiomas</button>
+            </div>
+            <p class="form-hint" id="youtubeStatus">Detectado como YouTube. A transcrição será obtida com timestamps.</p>
+          </div>
         </div>
         <div class="panel" id="chatPanel">
           <div class="panel-header"><span class="panel-title"><i data-lucide="message-square-text"></i>Formatar Conversa IA</span></div>
