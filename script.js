@@ -3361,12 +3361,12 @@ const VideoTaskAnalyzer = (() => {
     $('btnCloseVideoAnalysis2')?.addEventListener('click', () => $('modalVideoAnalysis')?.close());
     $('btnCopyVideoJson')?.addEventListener('click', async () => {
       if (!lastAnalysis) return;
-      await navigator.clipboard.writeText(JSON.stringify(lastAnalysis, null, 2));
+      await navigator.clipboard.writeText(JSON.stringify(_safeJsonData(lastAnalysis), null, 2));
       if (typeof toast === 'function') toast('JSON copiado.', 'success');
     });
     $('btnDownloadVideoJson')?.addEventListener('click', () => {
       if (!lastAnalysis) return;
-      const blob = new Blob([JSON.stringify(lastAnalysis, null, 2)], { type: 'application/json;charset=utf-8' });
+      const blob = new Blob([JSON.stringify(_safeJsonData(lastAnalysis), null, 2)], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
