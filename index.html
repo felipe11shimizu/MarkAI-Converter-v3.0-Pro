@@ -128,6 +128,7 @@
             </div>
             <div class="toolbar-right">
               <button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
+              <button class="btn btn-ghost btn-sm" id="btnCompare" title="Comparar MarkItDown x conversor local"><i data-lucide="columns-2"></i><span>Comparar</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
               <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
               <button class="btn btn-ghost btn-icon-sm" id="btnReset"><i data-lucide="x"></i></button>
@@ -255,6 +256,35 @@
       <div class="modal-footer">
         <button class="btn btn-secondary" id="btnPreviewRaw">Ver Raw</button>
         <button class="btn btn-primary" id="btnUsePreview"><i data-lucide="check"></i> Usar este resultado</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal modal-xl" id="modalCompare">
+    <div class="modal-card" style="max-width:1400px;width:96vw">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="columns-2"></i> Comparação de motores — <span id="compareFileName">arquivo</span></h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseCompare"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <section>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem">
+            <strong>Microsoft MarkItDown</strong>
+            <small id="compareMarkitdownStats" class="form-hint"></small>
+          </div>
+          <textarea id="compareMarkitdown" class="code-editor" readonly style="width:100%;min-height:55vh;resize:vertical"></textarea>
+        </section>
+        <section>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem">
+            <strong>Conversor local</strong>
+            <small id="compareBrowserStats" class="form-hint"></small>
+          </div>
+          <textarea id="compareBrowser" class="code-editor" readonly style="width:100%;min-height:55vh;resize:vertical"></textarea>
+        </section>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnUseBrowser"><i data-lucide="check"></i> Usar conversor local</button>
+        <button class="btn btn-primary" id="btnUseMarkItDown"><i data-lucide="check"></i> Usar MarkItDown</button>
       </div>
     </div>
   </dialog>
