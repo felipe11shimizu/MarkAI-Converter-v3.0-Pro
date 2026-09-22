@@ -2527,8 +2527,19 @@ const VideoTaskAnalyzer = (() => {
       const title = document.createElement('strong');
       title.textContent = analysis.objetivo || data.filename || 'Análise do vídeo';
       const desc = document.createElement('p');
+      const evidenceSummary = analysis.evidencia_resumo;
       desc.textContent = analysis.resumo || ((data.frames_analyzed || 0) + ' quadros analisados.');
-      summary.append(title, desc);
+      if (evidenceSummary) {
+        const evidenceText = document.createElement('small');
+        evidenceText.textContent =
+          'Evidência vinculada: ' + (evidenceSummary.etapas_com_frame || 0) + '/' +
+          (evidenceSummary.etapas_total || 0) + ' etapas com frame · ' +
+          (evidenceSummary.etapas_com_transcricao || 0) + '/' +
+          (evidenceSummary.etapas_total || 0) + ' com fala';
+        summary.append(title, desc, evidenceText);
+      } else {
+        summary.append(title, desc);
+      }
     }
 
     if (list) {
@@ -2614,6 +2625,17 @@ const VideoTaskAnalyzer = (() => {
             step.poscondicao ? 'Pós: ' + step.poscondicao : ''
           ].filter(Boolean).join(' · ');
           automation.appendChild(verifyEl);
+        }
+
+        const evidence = step.evidencia || {};
+        if ((evidence.frame_indices && evidence.frame_indices.length) || (evidence.transcript_segment_indices && evidence.transcript_segment_indices.length)) {
+          const evidenceEl = document.createElement('small');
+          const frameLabel = evidence.frame_indices?.length ? 'frames: ' + evidence.frame_indices.join(', ') : '';
+          const transcriptLabel = evidence.transcript_segment_indices?.length
+            ? 'fala: ' + evidence.transcript_segment_indices.join(', ')
+            : '';
+          evidenceEl.textContent = 'Evidência: ' + [frameLabel, transcriptLabel].filter(Boolean).join(' · ');
+          automation.appendChild(evidenceEl);
         }
 
         card.appendChild(automation);
