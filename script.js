@@ -1522,6 +1522,14 @@ const UIManager = (() => {
       els.modalCompare.close();
     });
 
+    els.btnCompare.addEventListener('click', () => {
+      const current = AppState.get('currentFileName') || '';
+      const base = current.replace(/\.[^.]+$/, '');
+      const item = QueueManager.getOrdered().find(i => i.name.replace(/\.[^.]+$/, '') === base) || QueueManager.getOrdered().find(i => i.result);
+      if (!item) { toast('Nenhum arquivo disponível para comparação.', 'warning'); return; }
+      compareItem(item.id);
+    });
+
     // Preview Modal
     els.btnClosePreview.addEventListener('click', () => els.modalPreview.close());
     els.modalPreview.addEventListener('click', e => { if (e.target === els.modalPreview) els.modalPreview.close(); });
