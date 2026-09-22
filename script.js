@@ -1206,6 +1206,7 @@ const UIManager = (() => {
   }
 
   async function _createProject() {
+    await _workspaceSyncQueue();
     const name = els.workspaceProjectName.value.trim();
     if (!name) { toast('Informe o nome do projeto.', 'warning'); return; }
     const project = await WorkspaceStore.createProject(name);
