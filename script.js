@@ -2246,6 +2246,57 @@ const VideoTaskAnalyzer = (() => {
           result.textContent = 'Resultado: ' + step.resultado;
           card.appendChild(result);
         }
+
+        // Automation-ready screen action metadata.
+        const action = step.tipo_acao || 'other';
+        const actionLabel = {
+          click: 'Clique', double_click: 'Duplo clique', type: 'Digitação',
+          select: 'Seleção', hotkey: 'Atalho', keypress: 'Tecla',
+          scroll: 'Scroll', drag: 'Arrastar', wait: 'Espera',
+          open: 'Abrir', navigate: 'Navegar', download: 'Download',
+          upload: 'Upload', copy: 'Copiar', paste: 'Colar',
+          check: 'Validar', submit: 'Enviar', other: 'Ação'
+        }[action] || action;
+        const automation = document.createElement('div');
+        automation.className = 'video-automation-action';
+        const actionTitle = document.createElement('strong');
+        actionTitle.textContent = 'Automação: ' + actionLabel;
+        automation.appendChild(actionTitle);
+
+        const target = step.alvo || {};
+        const targetText = [
+          target.descricao || target.texto || target.controle || '',
+          target.x != null && target.y != null ? `posição (${target.x}, ${target.y})` : '',
+          Array.isArray(target.seletores) && target.seletores.length ? 'seletores: ' + target.seletores.join(', ') : ''
+        ].filter(Boolean).join(' · ');
+        if (targetText) {
+          const targetEl = document.createElement('small');
+          targetEl.textContent = 'Alvo: ' + targetText;
+          automation.appendChild(targetEl);
+        }
+
+        if (step.dados && (step.dados.campo || step.dados.valor)) {
+          const dataEl = document.createElement('small');
+          dataEl.textContent = 'Dados: ' + (step.dados.campo || '') + (step.dados.valor ? ' = ' + step.dados.valor : '');
+          automation.appendChild(dataEl);
+        }
+
+        if (step.espera_segundos) {
+          const waitEl = document.createElement('small');
+          waitEl.textContent = 'Espera: ' + step.espera_segundos + 's';
+          automation.appendChild(waitEl);
+        }
+
+        if (step.precondicao || step.poscondicao) {
+          const verifyEl = document.createElement('small');
+          verifyEl.textContent = [
+            step.precondicao ? 'Pré: ' + step.precondicao : '',
+            step.poscondicao ? 'Pós: ' + step.poscondicao : ''
+          ].filter(Boolean).join(' · ');
+          automation.appendChild(verifyEl);
+        }
+
+        card.appendChild(automation);
         list.appendChild(card);
       });
     }
