@@ -100,7 +100,7 @@ Variáveis disponíveis:
 - `MARKAI_YOUTUBE_VISUAL_ENABLED`: habilita a obtenção do vídeo do YouTube para análise visual. Padrão: `false`.
 - `MARKAI_YOUTUBE_VISUAL_MAX_MB`: limite do arquivo de vídeo visual. Padrão: 150 MB.
 - `MARKAI_YOUTUBE_VISUAL_MAX_DURATION_SECONDS`: duração máxima para análise visual. Padrão: 2700 segundos.
-- `MARKAI_YOUTUBE_VISUAL_MAX_HEIGHT`: altura máxima do vídeo baixado para análise visual. Padrão: 480 px. Padrão: 3.
+- `MARKAI_YOUTUBE_VISUAL_MAX_HEIGHT`: altura máxima do vídeo baixado para análise visual. Padrão: 480 px.
 
 Exemplo:
 
