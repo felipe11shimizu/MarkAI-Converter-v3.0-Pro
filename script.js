@@ -20,6 +20,8 @@ const AppState = (() => {
       aiProvider: 'gemini',
       aiModel: 'gemini-1.5-flash',
       apiKey: '',
+      markitdownEnabled: true,
+      markitdownEndpoint: 'http://localhost:8000',
       syntaxHL: true,
       autoPreview: true,
     },
@@ -63,6 +65,7 @@ const QueueManager = (() => {
   let _sortable = null;
 
   function _genId() {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
     return Math.random().toString(36).slice(2, 9);
   }
 
@@ -118,6 +121,62 @@ const QueueManager = (() => {
   }
 
   return { add, remove, update, getById, getOrdered, clear, initSortable };
+})();
+
+// ══════════════════════════════════════════════
+// 3. MARKITDOWN ENGINE — server-side document conversion
+// ══════════════════════════════════════════════
+const MarkItDownEngine = (() => {
+  let healthCache = { ok: false, at: 0 };
+
+  function _endpoint() {
+    const s = AppState.get('settings');
+    return (s.markitdownEndpoint || 'http://localhost:8000').replace(/\\/$/, '');
+  }
+
+  async function isAvailable(force = false) {
+    const s = AppState.get('settings');
+    if (s.markitdownEnabled === false) return false;
+    if (!force && Date.now() - healthCache.at < 30000) return healthCache.ok;
+
+    try {
+      const resp = await window.fetch(_endpoint() + '/api/health', {
+        method: 'GET',
+        cache: 'no-store',
+        signal: AbortSignal.timeout(1200),
+      });
+      healthCache = { ok: resp.ok, at: Date.now() };
+    } catch (_) {
+      healthCache = { ok: false, at: Date.now() };
+    }
+    return healthCache.ok;
+  }
+
+  async function convert(file, onProgress) {
+    if (!(await isAvailable())) return null;
+
+    if (onProgress) onProgress(0.15);
+    const form = new FormData();
+    form.append('file', file, file.name);
+
+    const resp = await window.fetch(_endpoint() + '/api/convert', {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(120000),
+    });
+
+    if (!resp.ok) {
+      const body = await resp.json().catch(() => ({}));
+      throw new Error(body?.detail || `MarkItDown API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    if (!data?.markdown) throw new Error('MarkItDown retornou conteúdo vazio.');
+    if (onProgress) onProgress(1);
+    return data.markdown;
+  }
+
+  return { isAvailable, convert };
 })();
 
 // ══════════════════════════════════════════════
@@ -473,6 +532,16 @@ const FileParserStrategy = (() => {
   // ── DISPATCH ──
   async function parse(item, onProgress) {
     const { file, ext } = item;
+
+    // Prefer Microsoft MarkItDown when the optional backend is running.
+    // Browser parsers remain the automatic fallback for offline/static usage.
+    try {
+      const remote = await MarkItDownEngine.convert(file, onProgress);
+      if (remote) return remote;
+    } catch (e) {
+      console.warn('[MarkAI] MarkItDown conversion failed; using browser fallback:', e);
+    }
+
     if (ext === 'pdf') return parsePdf(file, onProgress);
     if (ext === 'docx' || ext === 'doc') return parseDocx(file);
     if (ext === 'xlsx' || ext === 'xls') return parseXlsx(file);
@@ -480,7 +549,6 @@ const FileParserStrategy = (() => {
     if (ext === 'json') return parseJson(file);
     if (ext === 'txt' || ext === 'md') return parseTxt(file);
     if (CODE_LANGS[ext]) return parseCode(file);
-    // Default: treat as text
     return parseTxt(file);
   }
 
@@ -796,6 +864,7 @@ Rules:
 // 8. UI MANAGER — DOM, events, toasts, modals
 // ══════════════════════════════════════════════
 const UIManager = (() => {
+  let _previewRawMode = false;
 
   // ── DOM REFS ──
   const $ = id => document.getElementById(id);
@@ -848,7 +917,7 @@ const UIManager = (() => {
 
   function _extClass(ext) {
     if (['xlsx','xls'].includes(ext)) return 'ext-xlsx';
-    if (CODE_EXTS.has(ext)) return `ext-${ext}` in document.documentElement.style ? `ext-${ext}` : 'ext-code';
+    if (CODE_EXTS.has(ext)) return `ext-${ext}`;
     return `ext-${ext}`;
   }
 
@@ -996,7 +1065,10 @@ const UIManager = (() => {
 
   function _renderPreview(md) {
     const settings = AppState.get('settings');
-    const html = marked.parse(md || '');
+    const rendered = marked.parse(md || '');
+    const html = window.DOMPurify
+      ? DOMPurify.sanitize(rendered, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] })
+      : rendered;
     [els.markdownPreview, els.markdownPreviewSplit].forEach(el => {
       el.innerHTML = html;
       if (settings.syntaxHL) {
@@ -1306,6 +1378,8 @@ const UIManager = (() => {
       s.aiProvider = els.aiProvider.value;
       s.aiModel = els.aiModel.value;
       s.apiKey = els.aiApiKey.value;
+      s.markitdownEnabled = els.toggleMarkItDown.checked;
+      s.markitdownEndpoint = els.markitdownEndpoint.value.trim() || 'http://localhost:8000';
       s.syntaxHL = els.toggleSyntaxHL.checked;
       s.autoPreview = els.toggleAutoPreview.checked;
       AppState.set('settings', s);
@@ -1343,7 +1417,6 @@ const UIManager = (() => {
       }
       els.modalPreview.close();
     });
-    let _previewRawMode = false;
     els.btnPreviewRaw.addEventListener('click', () => {
       _previewRawMode = !_previewRawMode;
       const id = AppState.get('previewItemId');
@@ -1459,7 +1532,10 @@ const UIManager = (() => {
       hideProcessing();
     }
 
-    els.previewContent.innerHTML = marked.parse(result);
+    const renderedPreview = marked.parse(result);
+    els.previewContent.innerHTML = window.DOMPurify
+      ? DOMPurify.sanitize(renderedPreview, { USE_PROFILES: { html: true }, ADD_ATTR: ['target', 'rel'] })
+      : renderedPreview;
     if (AppState.get('settings').syntaxHL) {
       els.previewContent.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
     }
