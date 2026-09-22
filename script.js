@@ -2432,7 +2432,7 @@ const VideoTaskAnalyzer = (() => {
     const approve = document.createElement('button');
     approve.className = 'btn btn-primary btn-sm';
     approve.type = 'button';
-    approve.innerHTML = '<i data-lucide="check"></i>Aprovar';
+    approve.textContent = 'Aprovar';
     approve.addEventListener('click', () => _persistStepEdit(index, {
       acao: action.input.value.trim(),
       detalhes: details.input.value.trim(),
@@ -2448,13 +2448,13 @@ const VideoTaskAnalyzer = (() => {
     const pending = document.createElement('button');
     pending.className = 'btn btn-ghost btn-sm';
     pending.type = 'button';
-    pending.innerHTML = '<i data-lucide="eye"></i>Manter para revisar';
+    pending.textContent = 'Manter para revisar';
     pending.addEventListener('click', () => _setReviewStatus(index, 'pending'));
 
     const ignore = document.createElement('button');
     ignore.className = 'btn btn-ghost btn-sm';
     ignore.type = 'button';
-    ignore.innerHTML = '<i data-lucide="eye-off"></i>Ignorar';
+    ignore.textContent = 'Ignorar';
     ignore.addEventListener('click', () => _setReviewStatus(index, 'ignored'));
 
     actions.append(approve, pending, ignore);
@@ -2798,7 +2798,7 @@ const VideoTaskAnalyzer = (() => {
         const target = step.alvo || {};
         const targetText = [
           target.descricao || target.texto || target.controle || '',
-          target.x != null && target.y != null ? \`posição (\${target.x}, \${target.y})\` : '',
+          target.x != null && target.y != null ? 'posição (' + target.x + ', ' + target.y + ')' : '',
           Array.isArray(target.seletores) && target.seletores.length
             ? 'seletores: ' + target.seletores.join(', ')
             : ''
