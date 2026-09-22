@@ -183,6 +183,10 @@ const MarkItDownEngine = (() => {
 // 3. FILE PARSER STRATEGY
 // ══════════════════════════════════════════════
 const FileParserStrategy = (() => {
+  const MARKITDOWN_ONLY_EXTS = new Set([
+    'pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'
+  ]);
+
   const CODE_LANGS = {
     py: 'python', js: 'javascript', ts: 'typescript', jsx: 'javascript', tsx: 'typescript',
     html: 'html', htm: 'html', css: 'css', scss: 'scss', less: 'less',
@@ -547,6 +551,9 @@ const FileParserStrategy = (() => {
     if (ext === 'xlsx' || ext === 'xls') return parseXlsx(file);
     if (ext === 'csv') return parseCsv(file);
     if (ext === 'json') return parseJson(file);
+    if (MARKITDOWN_ONLY_EXTS.has(ext)) {
+      throw new Error(`O formato .${ext} requer o backend Microsoft MarkItDown ativo.`);
+    }
     if (ext === 'txt' || ext === 'md') return parseTxt(file);
     if (CODE_LANGS[ext]) return parseCode(file);
     return parseTxt(file);
@@ -901,8 +908,9 @@ const UIManager = (() => {
 
   // ── FILE TYPE ICON LABELS ──
   const EXT_LABELS = {
-    pdf:'PDF', docx:'DOCX', doc:'DOC', xlsx:'XLSX', xls:'XLS',
-    csv:'CSV', json:'JSON', txt:'TXT', md:'MD',
+    pdf:'PDF', docx:'DOCX', doc:'DOC', pptx:'PPTX', xlsx:'XLSX', xls:'XLS',
+    csv:'CSV', json:'JSON', xml:'XML', txt:'TXT', md:'MD', epub:'EPUB', zip:'ZIP',
+    png:'IMG', jpg:'IMG', jpeg:'IMG', gif:'IMG', webp:'IMG', wav:'AUDIO', mp3:'AUDIO', m4a:'AUDIO',
     py:'PY', js:'JS', ts:'TS', jsx:'JSX', tsx:'TSX',
     html:'HTML', css:'CSS', scss:'SCSS', sql:'SQL',
     sh:'SH', rb:'RB', go:'GO', rs:'RS', java:'JAVA',
