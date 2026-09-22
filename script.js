@@ -2321,6 +2321,42 @@ const VideoTaskAnalyzer = (() => {
     ['check', 'Validar'], ['submit', 'Enviar'], ['other', 'Outra']
   ];
 
+  function _currentAutomationPlatform(data = lastAnalysis) {
+    const select = $('videoAutomationTarget');
+    const selected = select?.value || '';
+    if (selected) return MarkAIAutomationValidator.normalizePlatform(selected);
+    return MarkAIAutomationValidator.normalizePlatform(data?.analysis?.automacao?.plataforma_sugerida || 'pyautogui');
+  }
+
+  function _validateStepForPlatform(step, platform = _currentAutomationPlatform()) {
+    const context = {
+      transcriptAvailable: Array.isArray(lastAnalysis?.transcript_segments)
+        ? lastAnalysis.transcript_segments.length > 0
+        : !!String(lastAnalysis?.transcript || '').trim()
+    };
+    const result = MarkAIAutomationValidator.validateStep(step, platform, context);
+    step.validacao_automacao = result;
+    return result;
+  }
+
+  function _validateAnalysis(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
+    const analysis = data?.analysis || {};
+    const context = {
+      transcriptAvailable: Array.isArray(data?.transcript_segments)
+        ? data.transcript_segments.length > 0
+        : !!String(data?.transcript || '').trim()
+    };
+    const validation = MarkAIAutomationValidator.validateAnalysis(analysis, platform, context);
+    if (Array.isArray(analysis.etapas)) {
+      analysis.etapas.forEach((step, index) => {
+        if (step && validation.steps[index]) step.validacao_automacao = validation.steps[index];
+      });
+    }
+    analysis.validacao_resumo = validation.summary;
+    analysis.validacao_plataforma = platform;
+    return validation;
+  }
+
   function _ensureReviewState(data) {
     const analysis = data?.analysis;
     if (!analysis || !Array.isArray(analysis.etapas)) return;
@@ -2328,6 +2364,9 @@ const VideoTaskAnalyzer = (() => {
       if (!step || typeof step !== 'object') return;
       if (!REVIEW_STATUSES[step.review_status]) step.review_status = 'pending';
       if (typeof step.review_note !== 'string') step.review_note = '';
+      if (!step.validation_overrides || typeof step.validation_overrides !== 'object' || Array.isArray(step.validation_overrides)) {
+        step.validation_overrides = {};
+      }
     });
   }
 
@@ -2341,24 +2380,61 @@ const VideoTaskAnalyzer = (() => {
     }, { pending: 0, approved: 0, ignored: 0, total: 0 });
   }
 
+  function _validationCounts(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
+    const validation = _validateAnalysis(data, platform);
+    const approvedSteps = Array.isArray(data?.analysis?.etapas)
+      ? data.analysis.etapas.filter(step => step.review_status === 'approved')
+      : [];
+    const approvedBlocked = approvedSteps.filter(step => step.validacao_automacao?.status === 'blocked').length;
+    const approvedWarningsPendingOverride = approvedSteps.filter(step =>
+      step.validacao_automacao?.status === 'warning' && !step.validation_overrides?.[platform]
+    ).length;
+    return {
+      ...validation.summary,
+      approvedBlocked,
+      approvedWarningsPendingOverride,
+      generationEligible: approvedSteps.filter(step =>
+        step.validacao_automacao?.status === 'ready' ||
+        (step.validacao_automacao?.status === 'warning' && step.validation_overrides?.[platform])
+      ).length
+    };
+  }
+
   function _visibleReviewedSteps(data = lastAnalysis) {
     const steps = Array.isArray(data?.analysis?.etapas) ? data.analysis.etapas : [];
     const filter = $('videoReviewFilter')?.value || 'all';
     return steps
       .map((step, index) => ({ step, index }))
-      .filter(item => filter === 'all' || item.step.review_status === filter);
+      .filter(item => {
+        if (filter === 'all') return true;
+        if (filter === 'validation_ready') return item.step.validacao_automacao?.status === 'ready';
+        if (filter === 'validation_warning') return item.step.validacao_automacao?.status === 'warning';
+        if (filter === 'validation_blocked') return item.step.validacao_automacao?.status === 'blocked';
+        return item.step.review_status === filter;
+      });
   }
 
-  function _setReviewStatus(index, status) {
+  function _setReviewStatus(index, status, options = {}) {
     const step = lastAnalysis?.analysis?.etapas?.[index];
     if (!step || !REVIEW_STATUSES[status]) return;
+    const platform = _currentAutomationPlatform();
     step.review_status = status;
+    step.validation_overrides = step.validation_overrides || {};
+    if (status === 'approved' && options.explicit) {
+      const validation = _validateStepForPlatform(step, platform);
+      step.validation_overrides[platform] = validation.status === 'warning';
+    } else if (status !== 'approved') {
+      step.validation_overrides[platform] = false;
+    }
     render(lastAnalysis, { open: false });
   }
 
   function _approveAllVideoSteps() {
     if (!lastAnalysis?.analysis?.etapas) return;
-    lastAnalysis.analysis.etapas.forEach(step => { step.review_status = 'approved'; });
+    lastAnalysis.analysis.etapas.forEach(step => {
+      step.review_status = 'approved';
+      step.validation_overrides = {};
+    });
     render(lastAnalysis, { open: false });
   }
 
@@ -2370,12 +2446,27 @@ const VideoTaskAnalyzer = (() => {
     step.tipo_acao = values.tipo_acao;
     step.alvo = step.alvo || {};
     step.alvo.texto = values.alvoTexto;
+    step.alvo.descricao = values.alvoDescricao;
+    step.alvo.controle = values.alvoControle;
     step.alvo.seletores = values.seletor ? [values.seletor] : [];
     step.alvo.x = values.x === '' ? null : Number(values.x);
     step.alvo.y = values.y === '' ? null : Number(values.y);
+    step.alvo.atalho = values.atalho || null;
+    step.dados = step.dados || {};
+    step.dados.campo = values.dataCampo || '';
+    step.dados.sensivel = values.dadosSensivel === 'sim';
+    step.dados.valor = step.dados.sensivel ? '{{DADO_SENSIVEL}}' : (values.dataValor || '');
+    step.precondicao = values.precondicao || '';
+    step.poscondicao = values.poscondicao || '';
     step.confianca = values.confianca === '' ? null : Math.max(0, Math.min(1, Number(values.confianca)));
     step.review_note = values.review_note || '';
     step.review_status = 'approved';
+
+    const platform = _currentAutomationPlatform();
+    const validation = _validateStepForPlatform(step, platform);
+    step.validation_overrides = {};
+    if (validation.status === 'warning') step.validation_overrides[platform] = true;
+
     render(lastAnalysis, { open: false });
   }
 
@@ -2393,6 +2484,8 @@ const VideoTaskAnalyzer = (() => {
       if (options.step) input.step = options.step;
       if (options.min !== undefined) input.min = options.min;
       if (options.max !== undefined) input.max = options.max;
+      if (options.placeholder) input.placeholder = options.placeholder;
+      if (options.readOnly) input.readOnly = true;
     }
     if (options.type === 'select') {
       (options.options || []).forEach(([optionValue, optionLabel]) => {
@@ -2415,15 +2508,35 @@ const VideoTaskAnalyzer = (() => {
     const details = _createInput('Detalhes', step.detalhes || '', { full: true });
     const type = _createInput('Tipo de ação', step.tipo_acao || 'other', { type: 'select', options: ACTION_OPTIONS });
     const targetText = _createInput('Texto / alvo', step.alvo?.texto || '', {});
+    const targetDescription = _createInput('Descrição do alvo', step.alvo?.descricao || '', {});
+    const targetControl = _createInput('Controle', step.alvo?.controle || '', {});
     const selector = _createInput('Seletor', step.alvo?.seletores?.[0] || '', {});
     const x = _createInput('X', step.alvo?.x ?? '', { type: 'number', step: '1' });
     const y = _createInput('Y', step.alvo?.y ?? '', { type: 'number', step: '1' });
+    const shortcut = _createInput('Atalho / tecla', step.alvo?.atalho || '', {});
+    const dataField = _createInput('Campo de dados', step.dados?.campo || '', {});
+    const sensitive = Boolean(step.dados?.sensivel);
+    const dataValue = _createInput(
+      'Valor de entrada',
+      sensitive ? '{{DADO_SENSIVEL}}' : (step.dados?.valor || ''),
+      { readOnly: sensitive, placeholder: sensitive ? 'Valor sensível não é exibido' : '' }
+    );
+    const sensitiveSelect = _createInput(
+      'Dado sensível',
+      sensitive ? 'sim' : 'nao',
+      { type: 'select', options: [['nao', 'Não'], ['sim', 'Sim']] }
+    );
+    const precondition = _createInput('Pré-condição', step.precondicao || '', { full: true });
+    const postcondition = _createInput('Pós-condição', step.poscondicao || '', { full: true });
     const confidence = _createInput('Confiança', step.confianca ?? '', { type: 'number', step: '0.01', min: '0', max: '1' });
     const note = _createInput('Observação da revisão', step.review_note || '', { full: true });
 
     editor.append(
       action.group, details.group, type.group, targetText.group,
-      selector.group, x.group, y.group, confidence.group, note.group
+      targetDescription.group, targetControl.group, selector.group,
+      x.group, y.group, shortcut.group, dataField.group, dataValue.group,
+      sensitiveSelect.group, precondition.group, postcondition.group,
+      confidence.group, note.group
     );
 
     const actions = document.createElement('div');
@@ -2432,15 +2545,23 @@ const VideoTaskAnalyzer = (() => {
     const approve = document.createElement('button');
     approve.className = 'btn btn-primary btn-sm';
     approve.type = 'button';
-    approve.textContent = 'Aprovar';
+    approve.textContent = 'Aprovar revisão';
     approve.addEventListener('click', () => _persistStepEdit(index, {
       acao: action.input.value.trim(),
       detalhes: details.input.value.trim(),
       tipo_acao: type.input.value,
       alvoTexto: targetText.input.value.trim(),
+      alvoDescricao: targetDescription.input.value.trim(),
+      alvoControle: targetControl.input.value.trim(),
       seletor: selector.input.value.trim(),
       x: x.input.value,
       y: y.input.value,
+      atalho: shortcut.input.value.trim(),
+      dataCampo: dataField.input.value.trim(),
+      dataValor: dataValue.input.readOnly ? '' : dataValue.input.value.trim(),
+      dadosSensivel: sensitiveSelect.input.value,
+      precondicao: precondition.input.value.trim(),
+      poscondicao: postcondition.input.value.trim(),
       confianca: confidence.input.value,
       review_note: note.input.value.trim()
     }));
@@ -2462,14 +2583,175 @@ const VideoTaskAnalyzer = (() => {
     return editor;
   }
 
-  function _updateReviewSummary() {
+  function _updateReviewSummary(platform = _currentAutomationPlatform()) {
     const summary = $('videoReviewSummary');
     if (!summary) return;
     const counts = _reviewCounts();
+    const validation = _validationCounts(lastAnalysis, platform);
     summary.textContent =
       counts.approved + ' aprovadas · ' +
       counts.pending + ' para revisar · ' +
-      counts.ignored + ' ignoradas';
+      counts.ignored + ' ignoradas · ' +
+      validation.ready + ' prontas · ' +
+      validation.warning + ' com alertas · ' +
+      validation.blocked + ' bloqueadas';
+  }
+
+  function _safeJsonData(data) {
+    try {
+      const clone = JSON.parse(JSON.stringify(data));
+      const steps = clone?.analysis?.etapas;
+      if (Array.isArray(steps)) {
+        steps.forEach(step => {
+          if (step?.dados?.sensivel) step.dados.valor = '{{DADO_SENSIVEL}}';
+        });
+      }
+      return clone;
+    } catch (_) {
+      return data;
+    }
+  }
+
+  function _renderValidationDetails(step, platform) {
+    const validation = step.validacao_automacao || _validateStepForPlatform(step, platform);
+    const meta = {
+      ready: { label: 'Pronta', className: 'ready' },
+      warning: { label: 'Revisar', className: 'warning' },
+      blocked: { label: 'Bloqueada', className: 'blocked' }
+    }[validation.status] || { label: 'Revisar', className: 'warning' };
+
+    const panel = document.createElement('div');
+    panel.className = 'video-validation';
+
+    const head = document.createElement('div');
+    head.className = 'video-validation-head';
+    const badge = document.createElement('span');
+    badge.className = 'video-validation-badge ' + meta.className;
+    badge.textContent = 'Validação: ' + meta.label;
+    const score = document.createElement('span');
+    score.className = 'video-validation-score';
+    score.textContent = 'Score operacional: ' + Math.round(Number(validation.score || 0) * 100) + '%';
+    head.append(badge, score);
+    panel.appendChild(head);
+
+    if (!validation.issues.length) {
+      const ok = document.createElement('small');
+      ok.textContent = 'Nenhum alerta identificado para a plataforma ' + platform + '.';
+      panel.appendChild(ok);
+      return panel;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'video-validation-list';
+    validation.issues.forEach(issue => {
+      const item = document.createElement('li');
+      item.className = 'video-validation-item ' + (issue.severity === 'error' ? 'error' : 'warning');
+      item.textContent = '[' + issue.code + '] ' + issue.message;
+      if (issue.suggestion) {
+        const suggestion = document.createElement('span');
+        suggestion.className = 'video-validation-suggestion';
+        suggestion.textContent = 'Sugestão: ' + issue.suggestion;
+        item.appendChild(suggestion);
+      }
+      list.appendChild(item);
+    });
+    panel.appendChild(list);
+
+    const override = step.validation_overrides?.[platform] === true;
+    if (validation.status === 'warning' && override) {
+      const note = document.createElement('small');
+      note.textContent = 'Alertas revisados explicitamente; a etapa pode entrar na geração desta plataforma.';
+      panel.appendChild(note);
+    } else if (validation.status !== 'ready') {
+      const note = document.createElement('small');
+      note.textContent = 'A geração não incluirá esta etapa enquanto os bloqueios/alertas não forem resolvidos ou explicitamente revisados.';
+      panel.appendChild(note);
+    }
+    return panel;
+  }
+
+  function _renderEvidenceMatrix(data) {
+    const root = $('videoEvidenceMatrix');
+    if (!root) return;
+    root.replaceChildren();
+
+    const analysis = data?.analysis || {};
+    const steps = Array.isArray(analysis.etapas) ? analysis.etapas : [];
+    const title = document.createElement('h3');
+    title.textContent = 'Matriz de evidência · fala × frame × ação × decisão';
+    root.appendChild(title);
+
+    const summary = document.createElement('div');
+    summary.className = 'video-evidence-matrix-summary';
+    const evidenceSummary = analysis.evidencia_resumo || {};
+    summary.textContent =
+      'Etapas: ' + steps.length +
+      ' · frames correlacionados: ' + (evidenceSummary.etapas_com_frame || 0) +
+      ' · fala correlacionada: ' + (evidenceSummary.etapas_com_transcricao || 0) +
+      ' · segmentos de transcrição: ' + (evidenceSummary.segmentos_transcricao_total || 0);
+    root.appendChild(summary);
+
+    if (!steps.length) {
+      const empty = document.createElement('small');
+      empty.textContent = 'Nenhuma etapa estruturada disponível para correlação.';
+      root.appendChild(empty);
+      return;
+    }
+
+    const wrap = document.createElement('div');
+    wrap.className = 'video-evidence-table-wrap';
+    const table = document.createElement('table');
+    table.className = 'video-evidence-table';
+    const thead = document.createElement('thead');
+    const headerRow = document.createElement('tr');
+    ['Etapa', 'Tempo', 'Ação', 'Frame', 'Fala', 'Decisão / resultado', 'Confiança'].forEach(label => {
+      const th = document.createElement('th');
+      th.textContent = label;
+      headerRow.appendChild(th);
+    });
+    thead.appendChild(headerRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
+    steps.forEach((step, index) => {
+      const row = document.createElement('tr');
+      const evidence = step.evidencia || {};
+      const cells = [
+        String(step.ordem || index + 1),
+        String(step.timestamp || evidence.timestamp_seconds || ''),
+        String(step.tipo_acao || 'other') + (step.acao ? ' · ' + step.acao : ''),
+        Array.isArray(evidence.frame_indices) ? evidence.frame_indices.join(', ') : '',
+        Array.isArray(evidence.transcript_segment_indices) ? evidence.transcript_segment_indices.join(', ') : '',
+        String(step.precondicao || step.poscondicao || step.resultado || '—'),
+        step.confianca == null ? '—' : Math.round(Number(step.confianca) * 100) + '%'
+      ];
+      cells.forEach((value, cellIndex) => {
+        const td = document.createElement('td');
+        td.textContent = value;
+        if (cellIndex === 3 || cellIndex === 4) td.className = 'video-evidence-chip';
+        row.appendChild(td);
+      });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    root.appendChild(wrap);
+  }
+
+  function _automationValue(step) {
+    const data = step?.dados || {};
+    if (data.sensivel) return '{{DADO_SENSIVEL}}';
+    return data.valor || '';
+  }
+
+  function _automationTarget(step) {
+    const target = step?.alvo || {};
+    const selectors = Array.isArray(target.seletores) ? target.seletores.filter(Boolean) : [];
+    const selector = selectors[0] || '';
+    const text = target.texto || '';
+    const x = Number.isFinite(Number(target.x)) ? Number(target.x) : null;
+    const y = Number.isFinite(Number(target.y)) ? Number(target.y) : null;
+    return { selector, text, x, y };
   }
 
   function _automationValue(step) {
@@ -2647,24 +2929,42 @@ const VideoTaskAnalyzer = (() => {
   function _generateAutomation(platform, data) {
     const analysis = data?.analysis || {};
     _ensureReviewState(data);
+    const normalizedPlatform = MarkAIAutomationValidator.normalizePlatform(platform);
+    _validateAnalysis(data, normalizedPlatform);
     const steps = (Array.isArray(analysis.etapas) ? analysis.etapas : [])
-      .filter(step => step.review_status === 'approved');
+      .filter(step => {
+        if (step.review_status !== 'approved') return false;
+        const status = step.validacao_automacao?.status;
+        if (status === 'ready') return true;
+        return status === 'warning' && step.validation_overrides?.[normalizedPlatform] === true;
+      });
+
     const header = [
       '# Roteiro gerado pelo MarkAI Converter — revisão humana obrigatória.',
       '# As ações abaixo foram derivadas da análise observacional do vídeo.',
-      '# Não execute em produção sem validar locators, coordenadas, waits e dados.',
+      '# Etapas com bloqueios de validação ou sem revisão explícita foram excluídas.',
+      '# Dados sensíveis são substituídos por placeholders e nunca devem ser embutidos no código.',
       ''
     ];
-    if (platform === 'pyautogui') {
-      return [...header, 'import time', 'import pyautogui', '', `# Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map(_pyautoguiStep)].join('\\n');
+
+    if (!steps.length) {
+      return [
+        ...header,
+        '# Nenhuma etapa aprovada e validada está pronta para geração.',
+        '# Execute "Validar automação", corrija bloqueios/alertas e aprove explicitamente as etapas.'
+      ].join('\n');
     }
-    if (platform === 'playwright') {
-      return [...header, 'import time', 'from playwright.sync_api import sync_playwright', '', 'with sync_playwright() as p:', '    browser = p.chromium.launch(headless=False)', '    page = browser.new_page()', `    # Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map((s,i) => _playwrightStep(s,i).split('\\n').map(line => '    ' + line).join('\\n')), '', '    # browser.close()  # habilite quando a validação estiver concluída'].join('\\n');
+
+    if (normalizedPlatform === 'pyautogui') {
+      return [...header, 'import time', 'import pyautogui', '', '# Objetivo: ' + (analysis.objetivo || 'processo observado'), '', ...steps.map(_pyautoguiStep)].join('\n');
     }
-    if (platform === 'selenium') {
-      return [...header, 'import time', 'from selenium import webdriver', 'from selenium.webdriver.common.by import By', 'from selenium.webdriver.common.keys import Keys', 'from selenium.webdriver.common.action_chains import ActionChains', 'from selenium.webdriver.support.ui import Select', '', 'driver = webdriver.Chrome()', `# Objetivo: ${analysis.objetivo || 'processo observado'}`, '', ...steps.map((s,i) => _seleniumStep(s,i)), '', '# driver.quit()  # habilite quando a validação estiver concluída'].join('\\n');
+    if (normalizedPlatform === 'playwright') {
+      return [...header, 'import time', 'from playwright.sync_api import sync_playwright', '', 'with sync_playwright() as p:', '    browser = p.chromium.launch(headless=False)', '    page = browser.new_page()', '    # Objetivo: ' + (analysis.objetivo || 'processo observado'), '', ...steps.map((s,i) => _playwrightStep(s,i).split('\n').map(line => '    ' + line).join('\n')), '', '    # browser.close()  # habilite quando a validação estiver concluída'].join('\n');
     }
-    return [...header, '*** Settings ***', 'Library    RPA.Desktop', '', '*** Tasks ***', `Executar processo observado`, ...steps.map(_rpaStep), ''].join('\\n');
+    if (normalizedPlatform === 'selenium') {
+      return [...header, 'import time', 'from selenium import webdriver', 'from selenium.webdriver.common.by import By', 'from selenium.webdriver.common.keys import Keys', 'from selenium.webdriver.common.action_chains import ActionChains', 'from selenium.webdriver.support.ui import Select', '', 'driver = webdriver.Chrome()', '# Objetivo: ' + (analysis.objetivo || 'processo observado'), '', ...steps.map((s,i) => _seleniumStep(s,i)), '', '# driver.quit()  # habilite quando a validação estiver concluída'].join('\n');
+    }
+    return [...header, '*** Settings ***', 'Library    RPA.Desktop', '', '*** Tasks ***', 'Executar processo observado', ...steps.map(_rpaStep), ''].join('\n');
   }
 
   function _automationFilename(platform, data) {
@@ -2673,12 +2973,22 @@ const VideoTaskAnalyzer = (() => {
   }
 
   function renderAutomation(platform = 'pyautogui') {
-    const code = _generateAutomation(platform, lastAnalysis);
+    const normalizedPlatform = MarkAIAutomationValidator.normalizePlatform(platform);
+    const code = _generateAutomation(normalizedPlatform, lastAnalysis);
     const output = $('videoAutomationCode');
     const status = $('videoAutomationStatus');
     if (output) output.textContent = code;
-    const counts = _reviewCounts(lastAnalysis);
-    if (status) status.textContent = `Roteiro ${platform}: ${counts.approved} etapa(s) aprovadas incluídas. ${counts.pending} pendente(s) e ${counts.ignored} ignorada(s).`;
+
+    const review = _reviewCounts(lastAnalysis);
+    const validation = _validationCounts(lastAnalysis, normalizedPlatform);
+    const eligible = validation.generationEligible;
+    if (status) {
+      status.textContent =
+        'Roteiro ' + normalizedPlatform + ': ' + eligible + ' etapa(s) elegíveis. ' +
+        review.pending + ' pendente(s), ' +
+        validation.warning + ' com alerta(s) e ' +
+        validation.blocked + ' bloqueada(s).';
+    }
     return code;
   }
 
