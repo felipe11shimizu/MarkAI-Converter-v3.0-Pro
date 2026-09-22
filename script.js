@@ -2349,7 +2349,7 @@ const VideoTaskAnalyzer = (() => {
     switch (action) {
       case 'click': lines.push(locator ? `    Click    ${locator}` : '    # TODO: definir locator (point:, ocr: ou image:)'); break;
       case 'double_click': lines.push(locator ? `    Double Click    ${locator}` : '    # TODO: definir locator'); break;
-      case 'type': lines.push(`    Type Text    ${_pyString(value || '{{VALOR_DO_CAMPO}}')`); break;
+      case 'type': lines.push(`    Type Text    ${_pyString(value || '{{VALOR_DO_CAMPO}}')}`); break;
       case 'select': lines.push(value ? `    Type Text    ${_pyString(value)}` : '    # TODO: selecionar a opção observada'); break;
       case 'hotkey':
       case 'keypress': lines.push(`    Press Keys    ${(step.alvo?.atalho || 'enter').split(/[+\\s]+/).filter(Boolean).join('    ')}`); break;
