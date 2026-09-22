@@ -114,4 +114,31 @@ function step(overrides = {}) {
   assert.equal(result.summary.warning, 1);
 }
 
+
+
+{
+  const result = validator.validateStep(step({
+    tipo_acao: 'click',
+    alvo: { descricao: 'Botão Continuar', seletores: [], x: null, y: null },
+  }), 'playwright', { transcriptAvailable: true });
+  assert.equal(result.status, 'blocked');
+  assert.ok(result.issues.some(x => x.code === 'LOCATOR_MISSING'));
+}
+
+{
+  const result = validator.validateStep(step({
+    tipo_acao: 'drag',
+  }), 'pyautogui', { transcriptAvailable: true });
+  assert.equal(result.status, 'blocked');
+  assert.ok(result.issues.some(x => x.code === 'ACTION_PLATFORM_UNSUPPORTED'));
+}
+
+{
+  const result = validator.validateStep(step({
+    tipo_acao: 'check',
+    alvo: { seletores: ['#status'], texto: '', x: null, y: null },
+  }), 'playwright', { transcriptAvailable: true });
+  assert.equal(result.status, 'ready');
+}
+
 console.log('video automation validator tests passed');
