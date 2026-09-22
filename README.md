@@ -21,14 +21,14 @@ O projeto, portanto, continua funcionando como aplicação estática mesmo sem P
 
 A partir da v3.3, a ingestão de URLs também passa pelo backend MarkItDown. O frontend não depende mais de proxies CORS públicos para esse fluxo.
 
-- `POST /api/convert-url` aceita YouTube diretamente pelo conversor de transcrição do MarkItDown.
-- Para páginas e documentos públicos, o backend baixa o conteúdo com `httpx`, valida DNS/endereço IP e bloqueia destinos privados ou reservados.
-- Redirecionamentos são controlados e limitados por `MARKAI_URL_MAX_REDIRECTS`.
-- O conteúdo remoto possui limite de tamanho (`MARKAI_MAX_URL_MB`) e timeout (`MARKAI_URL_TIMEOUT_SECONDS`).
-- HTML, PDF, TXT, Markdown, JSON, CSV e XML são identificados por `Content-Type` ou extensão antes de serem entregues ao MarkItDown.
-- URLs com usuário/senha embutidos são rejeitadas.
-
-Essa camada reduz a dependência de proxies públicos e concentra a política de acesso a URLs no backend. Para exposição pública, autenticação, rate limiting e isolamento do processo continuam recomendados.
+- \`POST /api/convert-url\` mantém a ingestão genérica e usa o motor dedicado de YouTube como primeira tentativa para URLs do YouTube.
+- \`POST /api/youtube/resolve\` normaliza uma URL e retorna Video ID, URL canônica e tipo.
+- \`POST /api/youtube/transcripts\` lista as faixas de legenda disponíveis, indicando idioma, legenda manual/automática e possibilidade de tradução.
+- \`POST /api/youtube/transcribe\` retorna transcript normalizado com timestamps, qualidade e Markdown.
+- O provider principal é \`youtube-transcript-api\` e existe fallback para o conversor YouTube do MarkItDown no endpoint genérico.
+- O provider separa URL, descoberta de legendas, normalização, qualidade e geração de Markdown para permitir evolução sem acoplamento.
+- Cache em memória é aplicado ao transcript por vídeo/idioma/tradução, controlado por \`MARKAI_YOUTUBE_CACHE_TTL_SECONDS\`.
+- Para ambientes em que o IP de execução sofre bloqueios do YouTube, proxies HTTP/HTTPS podem ser configurados por \`MARKAI_YOUTUBE_HTTP_PROXY\` e \`MARKAI_YOUTUBE_HTTPS_PROXY\`.
 
 ## O que o MarkItDown acrescenta
 
@@ -180,7 +180,20 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - Histórico separado de versões e execuções de IA.
 - Exportação do projeto em JSON ou ZIP, incluindo Markdown e versões.
 
-### Fase 5 — Modularização — PRÓXIMA
+### Fase 5 — YouTube Transcript Engine — IMPLANTADA
+- parser de URL para watch, youtu.be, shorts, live e embed.
+- provider dedicado `youtube-transcript-api` com fallback para MarkItDown no endpoint genérico.
+- seleção de idiomas, tradução opcional, timestamps e normalização de segmentos.
+- métricas de qualidade e cache em memória.
+- endpoints `/api/youtube/resolve`, `/api/youtube/transcripts` e `/api/youtube/transcribe`.
+- controles de YouTube no frontend.
+
+### Fase 6 — Video Intelligence e automação — EM EVOLUÇÃO
+- análise multimodal de vídeos locais com identificação de ações de tela.
+- geração inicial de PyAutoGUI, Playwright, Selenium e RPA.
+- próxima evolução: correlação transcript × frames × eventos × decisões.
+
+### Fase 7 — Modularização — PRÓXIMA
 Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
 
 ### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
