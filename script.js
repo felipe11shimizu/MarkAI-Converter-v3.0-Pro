@@ -177,7 +177,24 @@ const MarkItDownEngine = (() => {
     return { markdown: data.markdown, meta: data };
   }
 
-  return { isAvailable, convert };
+  async function convertUrl(url) {
+    if (!(await isAvailable(true))) {
+      throw new Error('Backend MarkItDown indisponível. Para YouTube, inicie o backend local antes da conversão.');
+    }
+
+    const resp = await window.fetch(_endpoint() + '/api/convert-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(120000),
+    });
+    const body = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(body?.detail || `MarkItDown URL API error ${resp.status}`);
+    if (!body?.markdown) throw new Error('Nenhum conteúdo/transcrição foi retornado pelo MarkItDown.');
+    return { markdown: body.markdown, meta: body };
+  }
+
+  return { isAvailable, convert, convertUrl };
 })();
 
 // ══════════════════════════════════════════════
@@ -615,6 +632,11 @@ const URLFetcher = (() => {
   ];
 
   async function fetch(url) {
+    if (isYouTubeUrl(url)) {
+      const result = await MarkItDownEngine.convertUrl(url);
+      return result.markdown;
+    }
+
     let html = null;
     let err = null;
 
@@ -722,7 +744,14 @@ const URLFetcher = (() => {
     return md;
   }
 
-  return { fetch };
+  function isYouTubeUrl(url) {
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      return ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'www.youtu.be'].includes(host);
+    } catch (_) { return false; }
+  }
+
+  return { fetch, isYouTubeUrl };
 })();
 
 // ══════════════════════════════════════════════
