@@ -572,6 +572,8 @@ async def youtube_analyze(payload: dict):
     task_prompt = str(payload.get("task_prompt") or "").strip()
     translate_to = str(payload.get("translate_to") or "").strip() or None
 
+    transcript = None
+    transcript_error = None
     try:
         transcript = _youtube_service.transcribe_url(
             url,
@@ -579,19 +581,31 @@ async def youtube_analyze(payload: dict):
             translate_to=translate_to,
             preserve_formatting=False,
         )
+    except YouTubeServiceError as exc:
+        transcript_error = {
+            "code": exc.code,
+            "message": exc.message,
+            "retryable": exc.retryable,
+        }
+
+    try:
         video = _youtube_video_service.download(url)
         result = _analyze_video_file(
             video["filename"],
             video["data"],
             task_prompt,
-            transcript_override=" ".join(item.get("text", "") for item in transcript.get("segments", [])),
-            transcript_segments=transcript.get("segments", []),
+            transcript_override=(
+                " ".join(item.get("text", "") for item in transcript.get("segments", []))
+                if transcript
+                else None
+            ),
+            transcript_segments=transcript.get("segments", []) if transcript else [],
             source={
                 "type": "youtube",
-                "video_id": transcript.get("video_id"),
-                "url": transcript.get("url", url),
-                "canonical_url": transcript.get("canonical_url", url),
-                "source_type": transcript.get("source_type"),
+                "video_id": transcript.get("video_id") if transcript else video.get("video_id"),
+                "url": transcript.get("url", url) if transcript else url,
+                "canonical_url": transcript.get("canonical_url", url) if transcript else video.get("canonical_url", url),
+                "source_type": transcript.get("source_type") if transcript else video.get("source_type"),
                 "title": video.get("title"),
                 "channel": video.get("channel"),
                 "duration_seconds": video.get("duration_seconds"),
@@ -600,16 +614,16 @@ async def youtube_analyze(payload: dict):
             },
         )
         result["transcript_metadata"] = {
-            "provider": transcript.get("provider"),
-            "language": transcript.get("language"),
-            "language_code": transcript.get("language_code"),
-            "is_generated": transcript.get("is_generated"),
-            "translated": transcript.get("translated"),
-            "quality": transcript.get("quality"),
+            "available": bool(transcript),
+            "provider": transcript.get("provider") if transcript else None,
+            "language": transcript.get("language") if transcript else None,
+            "language_code": transcript.get("language_code") if transcript else None,
+            "is_generated": transcript.get("is_generated") if transcript else None,
+            "translated": transcript.get("translated") if transcript else False,
+            "quality": transcript.get("quality") if transcript else None,
+            "error": transcript_error,
         }
         return result
-    except YouTubeServiceError as exc:
-        raise _youtube_error(exc) from exc
     except YouTubeVideoServiceError as exc:
         raise _youtube_error(exc) from exc
 
