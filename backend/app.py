@@ -29,8 +29,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
 
 from backend.youtube_service import DEFAULT_LANGUAGES, YouTubeServiceError, YouTubeTranscriptService
+from backend.youtube_video_service import YouTubeVideoService, YouTubeVideoServiceError
 
-APP_VERSION = "3.5.0"
+APP_VERSION = "3.6.0"
 MAX_UPLOAD_MB = max(1, int(os.getenv("MARKAI_MAX_UPLOAD_MB", "100")))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_URL_MB = max(1, int(os.getenv("MARKAI_MAX_URL_MB", "20")))
@@ -47,6 +48,10 @@ URL_MAX_REDIRECTS = max(0, int(os.getenv("MARKAI_URL_MAX_REDIRECTS", "3")))
 YOUTUBE_CACHE_TTL_SECONDS = max(0, int(os.getenv("MARKAI_YOUTUBE_CACHE_TTL_SECONDS", "900")))
 YOUTUBE_HTTP_PROXY = os.getenv("MARKAI_YOUTUBE_HTTP_PROXY", "")
 YOUTUBE_HTTPS_PROXY = os.getenv("MARKAI_YOUTUBE_HTTPS_PROXY", "")
+YOUTUBE_VISUAL_ENABLED = os.getenv("MARKAI_YOUTUBE_VISUAL_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
+YOUTUBE_VISUAL_MAX_MB = max(20, int(os.getenv("MARKAI_YOUTUBE_VISUAL_MAX_MB", "150")))
+YOUTUBE_VISUAL_MAX_DURATION_SECONDS = max(60, int(os.getenv("MARKAI_YOUTUBE_VISUAL_MAX_DURATION_SECONDS", "2700")))
+YOUTUBE_VISUAL_MAX_HEIGHT = max(180, int(os.getenv("MARKAI_YOUTUBE_VISUAL_MAX_HEIGHT", "480")))
 OCR_ENABLED = os.getenv("MARKAI_OCR_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 OCR_MODEL = os.getenv("MARKAI_OCR_MODEL", "gpt-4o")
 OCR_API_KEY = os.getenv("MARKAI_OCR_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -236,7 +241,45 @@ def _run_ffmpeg(ffmpeg: str, args: list[str], timeout: int = 120):
     return proc
 
 
-def _analyze_video_file(filename: str, data: bytes, task_prompt: str = ""):
+
+def _nearest_transcript_segments(
+    segments: list[dict] | None,
+    timestamp: float,
+    window_seconds: float = 5.0,
+) -> list[dict]:
+    if not segments:
+        return []
+    matching = [
+        segment
+        for segment in segments
+        if float(segment.get("start", 0)) <= timestamp <= float(segment.get("end", 0))
+        or abs(float(segment.get("start", 0)) - timestamp) <= window_seconds
+    ]
+    matching.sort(key=lambda segment: abs(float(segment.get("start", 0)) - timestamp))
+    return matching[:4]
+
+
+def _build_video_timeline(
+    frame_count: int,
+    *,
+    interval_seconds: int,
+    transcript_segments: list[dict] | None = None,
+) -> list[dict]:
+    timeline = []
+    for index in range(frame_count):
+        timestamp = round(index * interval_seconds, 3)
+        context = _nearest_transcript_segments(transcript_segments, timestamp)
+        timeline.append(
+            {
+                "frame_index": index + 1,
+                "timestamp": timestamp,
+                "transcript_segment_indices": [item.get("index") for item in context],
+            }
+        )
+    return timeline
+
+
+def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", transcript_override: str | None = None, transcript_segments: list[dict] | None = None, source: dict | None = None):
     if len(data) > VIDEO_MAX_BYTES:
         raise HTTPException(status_code=413, detail=f"Vídeo excede o limite de {VIDEO_MAX_MB} MB.")
     if not VIDEO_API_KEY:
@@ -253,8 +296,8 @@ def _analyze_video_file(filename: str, data: bytes, task_prompt: str = ""):
     try:
         _run_ffmpeg(ffmpeg, ["-y", "-i", str(video_path), "-vf", f"fps=1/{VIDEO_FRAME_INTERVAL}", "-frames:v", str(VIDEO_MAX_FRAMES), str(frames_dir / "frame_%03d.jpg")])
         audio_result = subprocess.run([ffmpeg, "-y", "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k", str(audio_path)], capture_output=True, text=True, timeout=180)
-        transcript = ""
-        if audio_result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size > 0:
+        transcript = transcript_override or ""
+        if transcript_override is None and audio_result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size > 0:
             client = OpenAI(api_key=VIDEO_API_KEY)
             with audio_path.open("rb") as audio_file:
                 transcription = client.audio.transcriptions.create(model=VIDEO_TRANSCRIBE_MODEL, file=audio_file)
@@ -275,14 +318,36 @@ Retorne SOMENTE JSON válido no schema:
 {{"objetivo":"","resumo":"","etapas":[{{"ordem":1,"timestamp":"00:00","acao":"","tipo_acao":"click|double_click|type|select|hotkey|keypress|scroll|drag|wait|open|navigate|download|upload|copy|paste|check|submit|other","sistema":"","tela":"","detalhes":"","elementos":[],"alvo":{{"descricao":"","texto":"","controle":"","x":null,"y":null,"x_normalizado":null,"y_normalizado":null,"largura_normalizada":null,"altura_normalizada":null,"seletores":[],"atalho":null}},"dados":{{"valor":"","campo":"","sensivel":false}},"precondicao":"","poscondicao":"","espera_segundos":0,"resultado":"","evidencia_frame":"","confianca":0.0}}],"decisoes":[],"erros":[],"observacoes":[],"automacao":{{"plataforma_sugerida":"pyautogui|playwright|selenium|rpa_desktop|indefinida","observacoes":"","passos":[]}}}}
 Transcrição disponível:
 {transcript[:20000]}
+Contexto temporal da transcrição:
+{json.dumps(transcript_segments or [], ensure_ascii=False)[:20000]}
+
 Instrução adicional:
 {task_prompt or "Descreva o processo completo executado no vídeo."}
 """
+
         content = [{"type": "input_text", "text": prompt}]
+        timeline = _build_video_timeline(
+            len(frame_files),
+            interval_seconds=VIDEO_FRAME_INTERVAL,
+            transcript_segments=transcript_segments,
+        )
         for idx, frame in enumerate(frame_files):
             encoded = base64.b64encode(frame.read_bytes()).decode("ascii")
             timestamp = idx * VIDEO_FRAME_INTERVAL
-            content.append({"type": "input_text", "text": f"Frame {idx + 1} — aproximadamente {timestamp}s"})
+            nearby = _nearest_transcript_segments(transcript_segments, timestamp)
+            nearby_text = "\n".join(
+                f"[{item.get('index')}] {item.get('text', '')}"
+                for item in nearby
+            ) or "Sem segmento de transcrição próximo."
+            content.append(
+                {
+                    "type": "input_text",
+                    "text": (
+                        f"Frame {idx + 1} — aproximadamente {timestamp}s\n"
+                        f"Fala próxima nesse ponto:\n{nearby_text}"
+                    ),
+                }
+            )
             content.append({"type": "input_image", "image_url": f"data:image/jpeg;base64,{encoded}"})
         response = client.responses.create(model=VIDEO_MODEL, input=[{"role": "user", "content": content}])
         raw = getattr(response, "output_text", "") or ""
@@ -297,7 +362,9 @@ Instrução adicional:
                 analysis = json.loads(raw[start:end + 1])
             except json.JSONDecodeError as exc:
                 raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.") from exc
-        return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "frames_analyzed": len(frame_files), "frame_interval_seconds": VIDEO_FRAME_INTERVAL}
+        analysis.setdefault("timeline", timeline)
+        analysis.setdefault("fonte_video", source or {"type": "local_file", "filename": filename})
+        return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "transcript_segments": transcript_segments or [], "timeline": timeline, "frames_analyzed": len(frame_files), "frame_interval_seconds": VIDEO_FRAME_INTERVAL, "source": source or {"type": "local_file", "filename": filename}}
     except HTTPException:
         raise
     except Exception as exc:
@@ -369,6 +436,14 @@ _youtube_service = YouTubeTranscriptService(
     http_proxy=YOUTUBE_HTTP_PROXY,
     https_proxy=YOUTUBE_HTTPS_PROXY,
 )
+_youtube_video_service = YouTubeVideoService(
+    enabled=YOUTUBE_VISUAL_ENABLED,
+    max_mb=YOUTUBE_VISUAL_MAX_MB,
+    max_duration_seconds=YOUTUBE_VISUAL_MAX_DURATION_SECONDS,
+    max_height=YOUTUBE_VISUAL_MAX_HEIGHT,
+    http_proxy=YOUTUBE_HTTP_PROXY,
+    https_proxy=YOUTUBE_HTTPS_PROXY,
+)
 
 
 def _youtube_error(exc: YouTubeServiceError) -> HTTPException:
@@ -388,6 +463,15 @@ def _youtube_error(exc: YouTubeServiceError) -> HTTPException:
         "YOUTUBE_TRANSLATION_LANGUAGE_UNAVAILABLE": 422,
         "YOUTUBE_REQUEST_BLOCKED": 429,
         "YOUTUBE_IP_BLOCKED": 429,
+        "YOUTUBE_VISUAL_DISABLED": 503,
+        "YOUTUBE_VIDEO_PROVIDER_UNAVAILABLE": 503,
+        "YOUTUBE_PROXY_UNAVAILABLE": 503,
+        "YOUTUBE_VIDEO_TOO_LONG": 413,
+        "YOUTUBE_VIDEO_DOWNLOAD_EMPTY": 422,
+        "YOUTUBE_VIDEO_TOO_LARGE": 413,
+        "YOUTUBE_VIDEO_PO_TOKEN_REQUIRED": 422,
+        "YOUTUBE_VIDEO_ACCESS_RESTRICTED": 403,
+        "YOUTUBE_VIDEO_DOWNLOAD_ERROR": 422,
     }
     return HTTPException(
         status_code=status_by_code.get(exc.code, 422),
@@ -416,7 +500,7 @@ def health():
         "url_engine": {"enabled": True, "max_mb": MAX_URL_MB, "timeout_seconds": URL_TIMEOUT_SECONDS, "max_redirects": URL_MAX_REDIRECTS, "youtube": True},
         "ocr": {"enabled": OCR_ENABLED, "configured": bool(OCR_API_KEY), "model": OCR_MODEL if OCR_ENABLED and OCR_API_KEY else None},
         "video_analysis": {"enabled": bool(VIDEO_API_KEY), "max_mb": VIDEO_MAX_MB, "model": VIDEO_MODEL if VIDEO_API_KEY else None, "frame_interval_seconds": VIDEO_FRAME_INTERVAL},
-        "youtube": {"enabled": True, "provider": "youtube-transcript-api", "cache_ttl_seconds": YOUTUBE_CACHE_TTL_SECONDS, "proxy_configured": bool(YOUTUBE_HTTP_PROXY or YOUTUBE_HTTPS_PROXY), "default_languages": list(DEFAULT_LANGUAGES)},
+        "youtube": {"enabled": True, "provider": "youtube-transcript-api", "cache_ttl_seconds": YOUTUBE_CACHE_TTL_SECONDS, "proxy_configured": bool(YOUTUBE_HTTP_PROXY or YOUTUBE_HTTPS_PROXY), "default_languages": list(DEFAULT_LANGUAGES), "visual_analysis": {"enabled": YOUTUBE_VISUAL_ENABLED, "max_mb": YOUTUBE_VISUAL_MAX_MB, "max_duration_seconds": YOUTUBE_VISUAL_MAX_DURATION_SECONDS, "max_height": YOUTUBE_VISUAL_MAX_HEIGHT, "provider": "yt-dlp"}},
     }
 
 
@@ -482,6 +566,54 @@ async def youtube_transcribe(payload: dict):
         raise _youtube_error(exc) from exc
 
 
+@app.post("/api/youtube/analyze")
+async def youtube_analyze(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    task_prompt = str(payload.get("task_prompt") or "").strip()
+    translate_to = str(payload.get("translate_to") or "").strip() or None
+
+    try:
+        transcript = _youtube_service.transcribe_url(
+            url,
+            languages=_youtube_languages(payload),
+            translate_to=translate_to,
+            preserve_formatting=False,
+        )
+        video = _youtube_video_service.download(url)
+        result = _analyze_video_file(
+            video["filename"],
+            video["data"],
+            task_prompt,
+            transcript_override=" ".join(item.get("text", "") for item in transcript.get("segments", [])),
+            transcript_segments=transcript.get("segments", []),
+            source={
+                "type": "youtube",
+                "video_id": transcript.get("video_id"),
+                "url": transcript.get("url", url),
+                "canonical_url": transcript.get("canonical_url", url),
+                "source_type": transcript.get("source_type"),
+                "title": video.get("title"),
+                "channel": video.get("channel"),
+                "duration_seconds": video.get("duration_seconds"),
+                "filesize_bytes": video.get("filesize_bytes"),
+                "visual_provider": "yt-dlp",
+            },
+        )
+        result["transcript_metadata"] = {
+            "provider": transcript.get("provider"),
+            "language": transcript.get("language"),
+            "language_code": transcript.get("language_code"),
+            "is_generated": transcript.get("is_generated"),
+            "translated": transcript.get("translated"),
+            "quality": transcript.get("quality"),
+        }
+        return result
+    except YouTubeServiceError as exc:
+        raise _youtube_error(exc) from exc
+    except YouTubeVideoServiceError as exc:
+        raise _youtube_error(exc) from exc
+
+
 @app.post("/api/convert-url")
 async def convert_url(payload: dict):
     url = str(payload.get("url") or "").strip()
@@ -541,7 +673,7 @@ async def analyze_video(file: UploadFile = File(...), task_prompt: str = ""):
     if suffix not in {".mp4", ".mov", ".webm", ".mkv", ".avi"}:
         raise HTTPException(status_code=415, detail="Formato de vídeo não habilitado.")
     data = await file.read(VIDEO_MAX_BYTES + 1)
-    return _analyze_video_file(filename, data, task_prompt)
+    return _analyze_video_file(filename, data, task_prompt, source={"type": "local_file", "filename": filename})
 
 
 @app.post("/api/convert-batch")
