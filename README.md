@@ -172,14 +172,16 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - Validação de esquema, DNS/IP público, credenciais embutidas, tamanho, timeout e redirecionamentos.
 - Testes automatizados para URL remota e bloqueio de destinos privados.
 
-### Fase 4 — Workspace — PRÓXIMA
-- Projetos persistentes.
-- arquivos e ordem de processamento.
-- versões do Markdown.
-- prompts e resultados de IA.
-- histórico e exportações.
+### Fase 4 — Workspace — IMPLANTADA
+- Projetos persistentes no navegador via IndexedDB.
+- Seleção, criação, renomeação e exclusão de projetos.
+- Persistência da fila, ordem dos arquivos, resultados e motor utilizado.
+- Versionamento manual do Markdown e versões geradas após IA.
+- Prompt de IA por projeto e histórico de prompts/resultados.
+- Histórico separado de versões e execuções de IA.
+- Exportação do projeto em JSON ou ZIP, incluindo Markdown e versões.
 
-### Fase 5 — Modularização — PLANEJADA
+### Fase 5 — Modularização — PRÓXIMA
 Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
 
 ### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
