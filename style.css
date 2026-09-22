@@ -954,3 +954,41 @@ body::before {
   .video-automation-controls .form-label { margin-bottom:0; }
   .video-automation-controls .input-field { flex:1; }
 }
+
+
+/* ─── YOUTUBE TRANSCRIPTION CONTROLS ─── */
+.youtube-controls {
+  margin-top: .65rem;
+  padding: .7rem;
+  border: 1px solid rgba(244,63,94,.22);
+  border-radius: var(--radius-sm);
+  background: rgba(244,63,94,.04);
+}
+.youtube-controls[hidden] { display: none; }
+.youtube-controls-title {
+  display:flex;
+  align-items:center;
+  gap:.35rem;
+  margin-bottom:.55rem;
+  font-size:.75rem;
+  font-weight:700;
+  color:var(--text-1);
+}
+.youtube-controls-title i { width:14px; height:14px; color:#f43f5e; }
+.youtube-controls-grid {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:.45rem;
+}
+.youtube-controls .form-group { gap:.25rem; }
+.youtube-actions {
+  display:flex;
+  gap:.35rem;
+  margin-top:.55rem;
+}
+#youtubeStatus {
+  margin-top:.45rem;
+}
+@media (max-width: 600px) {
+  .youtube-controls-grid { grid-template-columns:1fr; }
+}
