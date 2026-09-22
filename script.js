@@ -1642,6 +1642,17 @@ const UIManager = (() => {
       await _renderWorkspaceHistory();
     });
 
+    els.workspaceHistoryList?.addEventListener('click', async e => {
+      const item = e.target.closest('[data-history-id]');
+      if (!item || _workspaceHistoryMode !== 'versions') return;
+      const records = await WorkspaceStore.listVersions(AppState.get('currentProjectId'));
+      const version = records.find(v => v.id === item.dataset.historyId);
+      if (!version?.markdown) return;
+      loadMarkdown(version.markdown, version.name || 'documento.md');
+      els.modalWorkspace.close();
+      toast('Versão carregada no editor.', 'success');
+    });
+
     // Drop zone
     els.dropZone.addEventListener('dragover', e => {
       e.preventDefault();
