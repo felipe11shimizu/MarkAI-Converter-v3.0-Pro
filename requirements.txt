@@ -7,3 +7,4 @@ markitdown-ocr>=0.1.0,<0.2
 openai>=1.0,<3
 pytest>=8,<9
 httpx>=0.27,<1
+imageio-ffmpeg>=0.5,<1
