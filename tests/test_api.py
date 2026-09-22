@@ -93,12 +93,12 @@ def test_youtube_url_uses_markitdown(monkeypatch):
     assert calls == ["https://www.youtube.com/watch?v=abc123"]
 
 
-def test_convert_url_rejects_non_youtube():
+def test_convert_url_rejects_unsupported_scheme():
     response = client.post(
         "/api/convert-url",
-        json={"url": "https://example.com/video"},
+        json={"url": "file:///etc/passwd"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 400
 
 
 def test_convert_batch(monkeypatch):
