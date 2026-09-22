@@ -78,7 +78,7 @@ Teste:
 http://localhost:8000/api/health
 ```
 
-Depois abra o `index.html` no navegador. Em **Configurações**, mantenha:
+Depois sirva a pasta do projeto por um servidor HTTP local (por exemplo, `python -m http.server 5500`) e abra `http://localhost:5500` no navegador. Em **Configurações**, mantenha:
 
 ```
 Microsoft MarkItDown: ativado
@@ -133,11 +133,10 @@ Download / ZIP
 
 ## Próximos passos recomendados
 
-- Adicionar suporte de OCR do pacote `markitdown-ocr` para documentos digitalizados e imagens.
-- Adicionar PowerPoint, EPUB, ZIP e imagens como tipos de primeira classe na interface.
-- Criar testes automatizados para cada formato.
+- Expandir testes automatizados por formato e cenários de arquivos grandes.
+- Adicionar testes de segurança de frontend/DOM e regressão do Workspace.
+- Adicionar autenticação e rate limiting antes de exposição pública.
 - Criar fila de conversão server-side para lotes muito grandes.
-- Adicionar autenticação/rate limiting antes de exposição pública.
 - Migrar gradualmente o frontend monolítico de `script.js` para módulos.
 
 
@@ -188,12 +187,7 @@ Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA
 - GitHub Actions.
 - testes automatizados do backend.
 - validação sintática do JavaScript.
-- próximos incrementos: cobertura dos formatos, arquivos grandes e testes de segurança.
-- GitHub Actions.
-- testes dos principais formatos.
-- testes de arquivos grandes.
-- lint e validação JavaScript.
-- testes de segurança.
+- próximos incrementos: cobertura ampliada dos formatos, arquivos grandes e testes de segurança.
 
 ### OCR: observação operacional
 A documentação atual do MarkItDown recomenda restringir entradas não confiáveis e usar a API mais estreita possível; este backend usa `convert_local()` e arquivos temporários.
