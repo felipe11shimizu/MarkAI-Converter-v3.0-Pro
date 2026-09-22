@@ -28,7 +28,9 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
 
-APP_VERSION = "3.4.0"
+from backend.youtube_service import DEFAULT_LANGUAGES, YouTubeServiceError, YouTubeTranscriptService
+
+APP_VERSION = "3.5.0"
 MAX_UPLOAD_MB = max(1, int(os.getenv("MARKAI_MAX_UPLOAD_MB", "100")))
 MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
 MAX_URL_MB = max(1, int(os.getenv("MARKAI_MAX_URL_MB", "20")))
@@ -42,6 +44,9 @@ VIDEO_FRAME_INTERVAL = max(1, int(os.getenv("MARKAI_VIDEO_FRAME_INTERVAL", "5"))
 VIDEO_MAX_FRAMES = max(4, int(os.getenv("MARKAI_VIDEO_MAX_FRAMES", "24")))
 URL_TIMEOUT_SECONDS = max(5, int(os.getenv("MARKAI_URL_TIMEOUT_SECONDS", "30")))
 URL_MAX_REDIRECTS = max(0, int(os.getenv("MARKAI_URL_MAX_REDIRECTS", "3")))
+YOUTUBE_CACHE_TTL_SECONDS = max(0, int(os.getenv("MARKAI_YOUTUBE_CACHE_TTL_SECONDS", "900")))
+YOUTUBE_HTTP_PROXY = os.getenv("MARKAI_YOUTUBE_HTTP_PROXY", "")
+YOUTUBE_HTTPS_PROXY = os.getenv("MARKAI_YOUTUBE_HTTPS_PROXY", "")
 OCR_ENABLED = os.getenv("MARKAI_OCR_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 OCR_MODEL = os.getenv("MARKAI_OCR_MODEL", "gpt-4o")
 OCR_API_KEY = os.getenv("MARKAI_OCR_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -359,6 +364,46 @@ def _build_engine():
         return MarkItDown()
 
 _engine = _build_engine()
+_youtube_service = YouTubeTranscriptService(
+    cache_ttl_seconds=YOUTUBE_CACHE_TTL_SECONDS,
+    http_proxy=YOUTUBE_HTTP_PROXY,
+    https_proxy=YOUTUBE_HTTPS_PROXY,
+)
+
+
+def _youtube_error(exc: YouTubeServiceError) -> HTTPException:
+    status_by_code = {
+        "YOUTUBE_URL_EMPTY": 400,
+        "YOUTUBE_URL_INVALID": 400,
+        "YOUTUBE_HOST_INVALID": 400,
+        "YOUTUBE_VIDEO_ID_INVALID": 400,
+        "YOUTUBE_PROVIDER_UNAVAILABLE": 503,
+        "YOUTUBE_PROXY_UNAVAILABLE": 503,
+        "YOUTUBE_TRANSCRIPTS_DISABLED": 422,
+        "YOUTUBE_TRANSCRIPT_NOT_FOUND": 404,
+        "YOUTUBE_VIDEO_UNAVAILABLE": 404,
+        "YOUTUBE_VIDEO_UNPLAYABLE": 422,
+        "YOUTUBE_AGE_RESTRICTED": 403,
+        "YOUTUBE_PO_TOKEN_REQUIRED": 422,
+        "YOUTUBE_TRANSLATION_LANGUAGE_UNAVAILABLE": 422,
+        "YOUTUBE_REQUEST_BLOCKED": 429,
+        "YOUTUBE_IP_BLOCKED": 429,
+    }
+    return HTTPException(
+        status_code=status_by_code.get(exc.code, 422),
+        detail={"code": exc.code, "message": exc.message, "retryable": exc.retryable},
+    )
+
+
+def _youtube_languages(payload: dict) -> list[str]:
+    value = payload.get("languages")
+    if isinstance(value, str):
+        languages = [part.strip() for part in value.split(",") if part.strip()]
+    elif isinstance(value, list):
+        languages = [str(part).strip() for part in value if str(part).strip()]
+    else:
+        languages = list(DEFAULT_LANGUAGES)
+    return languages or list(DEFAULT_LANGUAGES)
 
 
 @app.get("/api/health")
@@ -371,6 +416,7 @@ def health():
         "url_engine": {"enabled": True, "max_mb": MAX_URL_MB, "timeout_seconds": URL_TIMEOUT_SECONDS, "max_redirects": URL_MAX_REDIRECTS, "youtube": True},
         "ocr": {"enabled": OCR_ENABLED, "configured": bool(OCR_API_KEY), "model": OCR_MODEL if OCR_ENABLED and OCR_API_KEY else None},
         "video_analysis": {"enabled": bool(VIDEO_API_KEY), "max_mb": VIDEO_MAX_MB, "model": VIDEO_MODEL if VIDEO_API_KEY else None, "frame_interval_seconds": VIDEO_FRAME_INTERVAL},
+        "youtube": {"enabled": True, "provider": "youtube-transcript-api", "cache_ttl_seconds": YOUTUBE_CACHE_TTL_SECONDS, "proxy_configured": bool(YOUTUBE_HTTP_PROXY or YOUTUBE_HTTPS_PROXY), "default_languages": list(DEFAULT_LANGUAGES)},
     }
 
 
@@ -381,6 +427,61 @@ async def convert(file: UploadFile = File(...)):
     return _convert_bytes(filename, suffix, data)
 
 
+@app.post("/api/youtube/resolve")
+async def youtube_resolve(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    try:
+        source = _youtube_service.parse_url(url)
+    except YouTubeServiceError as exc:
+        raise _youtube_error(exc) from exc
+    return {
+        "ok": True,
+        "engine": "youtube-router",
+        "provider": "youtube-transcript-api",
+        "video_id": source.video_id,
+        "url": source.original_url,
+        "canonical_url": source.canonical_url,
+        "source_type": source.source_type,
+    }
+
+
+@app.post("/api/youtube/transcripts")
+async def youtube_transcripts(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    try:
+        source = _youtube_service.parse_url(url)
+        result = _youtube_service.list_transcripts(source.video_id)
+    except YouTubeServiceError as exc:
+        raise _youtube_error(exc) from exc
+    result.update({
+        "ok": True,
+        "engine": "youtube-transcript-api",
+        "url": source.original_url,
+        "canonical_url": source.canonical_url,
+        "source_type": source.source_type,
+    })
+    return result
+
+
+@app.post("/api/youtube/transcribe")
+async def youtube_transcribe(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    translate_to = str(payload.get("translate_to") or "").strip() or None
+    preserve_formatting = bool(payload.get("preserve_formatting", False))
+    try:
+        result = _youtube_service.transcribe_url(
+            url,
+            languages=_youtube_languages(payload),
+            translate_to=translate_to,
+            preserve_formatting=preserve_formatting,
+        )
+        result["ok"] = True
+        result["engine"] = "youtube-transcript-api"
+        return result
+    except YouTubeServiceError as exc:
+        raise _youtube_error(exc) from exc
+
+
 @app.post("/api/convert-url")
 async def convert_url(payload: dict):
     url = str(payload.get("url") or "").strip()
@@ -389,12 +490,40 @@ async def convert_url(payload: dict):
     if _is_youtube_url(url):
         started = time.perf_counter()
         try:
+            result = _youtube_service.transcribe_url(url, languages=list(DEFAULT_LANGUAGES))
+            markdown = result.get("markdown", "")
+            if markdown.strip():
+                return {
+                    "ok": True,
+                    "engine": "youtube-transcript-api",
+                    "url": url,
+                    "final_url": result.get("canonical_url", url),
+                    "markdown": markdown,
+                    "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+                    "quality": _quality(markdown),
+                    "transcript": {
+                        "provider": result.get("provider"),
+                        "language": result.get("language"),
+                        "language_code": result.get("language_code"),
+                        "is_generated": result.get("is_generated"),
+                        "segments": result.get("segments", []),
+                        "quality": result.get("quality", {}),
+                    },
+                }
+        except YouTubeServiceError:
+            pass
+
+        try:
             result = _engine.convert(url)
             markdown = result.markdown or ""
             if not markdown.strip():
-                raise HTTPException(status_code=422, detail="O MarkItDown não encontrou transcrição/conteúdo no vídeo.")
+                raise HTTPException(status_code=422, detail="Nenhum transcript/conteúdo foi retornado para o vídeo do YouTube.")
             return {
-                "ok": True, "engine": "markitdown-youtube", "url": url, "final_url": url, "markdown": markdown,
+                "ok": True,
+                "engine": "markitdown-youtube-fallback",
+                "url": url,
+                "final_url": url,
+                "markdown": markdown,
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
                 "quality": _quality(markdown),
             }
