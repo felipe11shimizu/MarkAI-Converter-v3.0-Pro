@@ -246,6 +246,32 @@
       </div>
       <div class="modal-body video-analysis-body">
         <div class="video-analysis-summary" id="videoAnalysisSummary"></div>
+        <section class="video-automation-generator">
+          <div class="video-automation-generator-head">
+            <div>
+              <h3>Gerar automação</h3>
+              <p class="form-hint">Transforma as etapas observadas em um roteiro inicial para cada tecnologia. Revise seletores, coordenadas, waits e dados antes de executar.</p>
+            </div>
+            <div class="video-automation-controls">
+              <label class="form-label" for="videoAutomationTarget">Tecnologia</label>
+              <select class="input-field input-field-sm" id="videoAutomationTarget">
+                <option value="pyautogui">PyAutoGUI</option>
+                <option value="playwright">Playwright</option>
+                <option value="selenium">Selenium</option>
+                <option value="rpa">RPA / Robot Framework</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="btnGenerateVideoAutomation"><i data-lucide="code-2"></i>Gerar passos</button>
+            </div>
+          </div>
+          <div class="video-automation-output-head">
+            <span id="videoAutomationStatus" class="form-hint">Aguardando análise do vídeo.</span>
+            <div class="video-automation-output-actions">
+              <button class="btn btn-ghost btn-sm" id="btnCopyVideoAutomation"><i data-lucide="copy"></i>Copiar</button>
+              <button class="btn btn-secondary btn-sm" id="btnDownloadVideoAutomation"><i data-lucide="download"></i>Baixar</button>
+            </div>
+          </div>
+          <pre class="video-automation-code" id="videoAutomationCode">A análise do vídeo será convertida em um roteiro de automação aqui.</pre>
+        </section>
         <div class="video-analysis-grid">
           <section>
             <h3>Etapas identificadas</h3>
