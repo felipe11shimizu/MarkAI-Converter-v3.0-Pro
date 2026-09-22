@@ -2862,7 +2862,7 @@ const VideoTaskAnalyzer = (() => {
       case 'upload': lines.push(locator ? `${locator}.set_input_files(${_pyString('{{ARQUIVO}}')})` : '# TODO: confirmar locator do input[type=file]'); break;
       case 'navigate':
       case 'open': lines.push(`page.goto(${_pyString(target.text || '{{URL}}')})`); break;
-      case 'check': lines.push(locator ? `# TODO: validar estado de ${locator}` : '# TODO: implementar validação observada'); break;
+      case 'check': lines.push(locator ? `assert ${locator}.is_visible()` : '# TODO: implementar validação observada'); break;
       case 'submit': lines.push(locator ? `${locator}.click()` : '# TODO: localizar botão de envio'); break;
       default: lines.push(`# TODO: implementar ação "${action}" observada`);
     }
@@ -2891,7 +2891,7 @@ const VideoTaskAnalyzer = (() => {
       case 'open': lines.push(`driver.get(${_pyString(target.text || '{{URL}}')})`); break;
       case 'upload': lines.push(find ? `${find}.send_keys(${_pyString('{{ARQUIVO_ABSOLUTO}}')})` : '# TODO: confirmar locator do input[type=file]'); break;
       case 'submit': lines.push(find ? `${find}.click()` : '# TODO: localizar botão de envio'); break;
-      case 'check': lines.push(`# TODO: assert/validação: ${String(step.poscondicao || step.resultado || 'condição observada').replace(/\\n/g, ' ')}`); break;
+      case 'check': lines.push(find ? `assert ${find}.is_displayed()` : '# TODO: implementar validação observada'); break;
       default: lines.push(`# TODO: implementar ação "${action}" observada`);
     }
     if (step.poscondicao) lines.push(`# Pós-condição observada: ${String(step.poscondicao).replace(/\\n/g, ' ')}`);
