@@ -26,8 +26,8 @@ def test_health_contract_reports_operational_limits():
 @pytest.mark.parametrize(
     ("url", "message"),
     [
-        ("ftp://example.com/file.pdf", "http or https"),
-        ("https:///missing-host", "http or https"),
+        ("ftp://example.com/file.pdf", "http ou https"),
+        ("https:///missing-host", "http ou https"),
     ],
 )
 def test_remote_url_rejects_invalid_scheme_or_host(url, message):
