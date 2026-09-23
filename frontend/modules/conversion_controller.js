@@ -74,11 +74,12 @@
       ui.showProcessing('Juntando arquivos…', 'Processando ' + items.length + ' arquivos');
       ui.setStatus('Fazendo merge…', 'busy');
       try {
-        const result = await getState().mergeEngine.merge((p, name) => {
+        const markdown = await getState().mergeEngine.merge((p, name) => {
           ui.setProcessingSub('Convertendo: ' + name);
         });
+        if (workspace) workspace.scheduleSave();
         ui.hideProcessing();
-        ui.loadMarkdown(result.markdown, result.fileName);
+        ui.loadMarkdown(markdown, 'documento_combinado.md');
         ui.setProgress(1);
         ui.setStatus('Merge concluído', 'idle');
         ui.toast('Arquivos juntados com sucesso.', 'success');
