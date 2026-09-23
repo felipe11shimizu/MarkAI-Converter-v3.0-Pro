@@ -48,7 +48,7 @@ function button() {
   controller.bind();
   await btnEnhanceAI.dispatch('click');
 
-  assert.deepEqual(calls.map(c => c[0]), ['enhance', 'history', 'load', 'version', 'toast', 'status']);
+  assert.deepEqual(calls.map(c => c[0]), ['status', 'enhance', 'history', 'load', 'version', 'toast', 'status']);
   assert.equal(btnEnhanceAI.disabled, false);
   assert.equal(btnEnhanceAI.classList.has('loading'), false);
   console.log('ai_ui_controller module tests: ok');
