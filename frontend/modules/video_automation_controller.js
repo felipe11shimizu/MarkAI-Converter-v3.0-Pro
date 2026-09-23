@@ -16,13 +16,17 @@ function create({
     documentRef = globalThis.document,
     windowRef = globalThis,
     abortSignal = globalThis.AbortSignal,
-    signalTimeout: injectedSignalTimeout
+    signalTimeout: injectedSignalTimeout,
+    evidenceTimeline = globalThis.MarkAIVideoEvidenceTimeline
   } = {}) {
   let lastAnalysis = null;
   const $ = id => documentRef ? documentRef.getElementById(id) : null;
   const signalTimeout = injectedSignalTimeout || ((ms) =>
     typeof abortSignal?.timeout === 'function' ? abortSignal.timeout(ms) : undefined
   );
+  if (!evidenceTimeline || typeof evidenceTimeline.normalize !== 'function') {
+    throw new TypeError('VideoAutomationController requires a VideoEvidenceTimeline dependency.');
+  }
   if (!validator || typeof validator.normalizePlatform !== 'function' ||
       typeof validator.validateStep !== 'function' || typeof validator.validateAnalysis !== 'function') {
     throw new TypeError('VideoAutomationController requires an AutomationValidator dependency.');
@@ -408,13 +412,18 @@ function create({
     return panel;
   }
 
+  function normalizeEvidenceTimeline(data) {
+    return evidenceTimeline.normalize(data);
+  }
+
   function _renderEvidenceMatrix(data) {
     const root = $('videoEvidenceMatrix');
     if (!root) return;
     root.replaceChildren();
 
     const analysis = data?.analysis || {};
-    const steps = Array.isArray(analysis.etapas) ? analysis.etapas : [];
+    const timeline = normalizeEvidenceTimeline(data);
+    const steps = timeline.steps;
     const title = documentRef.createElement('h3');
     title.textContent = 'Matriz de evidência · fala × frame × ação × decisão';
     root.appendChild(title);
@@ -422,11 +431,13 @@ function create({
     const summary = documentRef.createElement('div');
     summary.className = 'video-evidence-matrix-summary';
     const evidenceSummary = analysis.evidencia_resumo || {};
+    const stepsWithFrames = steps.filter(step => step.frameIndices.length > 0).length;
+    const stepsWithTranscript = steps.filter(step => step.transcriptSegmentIndices.length > 0).length;
     summary.textContent =
       'Etapas: ' + steps.length +
-      ' · frames correlacionados: ' + (evidenceSummary.etapas_com_frame || 0) +
-      ' · fala correlacionada: ' + (evidenceSummary.etapas_com_transcricao || 0) +
-      ' · segmentos de transcrição: ' + (evidenceSummary.segmentos_transcricao_total || 0);
+      ' · frames correlacionados: ' + (evidenceSummary.etapas_com_frame ?? stepsWithFrames) +
+      ' · fala correlacionada: ' + (evidenceSummary.etapas_com_transcricao ?? stepsWithTranscript) +
+      ' · segmentos de transcrição: ' + (evidenceSummary.segmentos_transcricao_total ?? timeline.transcriptSegments.length);
     root.appendChild(summary);
 
     if (!steps.length) {
@@ -453,19 +464,14 @@ function create({
     const tbody = documentRef.createElement('tbody');
     steps.forEach((step, index) => {
       const row = documentRef.createElement('tr');
-      const evidence = step.evidencia || {};
       const cells = [
-        String(step.ordem || index + 1),
-        String(step.timestamp || evidence.timestamp_seconds || ''),
-        String(step.tipo_acao || 'other') + (step.acao ? ' · ' + step.acao : ''),
-        Array.isArray(evidence.frame_indices) ? evidence.frame_indices.join(', ') : '',
-        Array.isArray(evidence.transcript_segment_indices) ? evidence.transcript_segment_indices.join(', ') : '',
-        [
-          step.precondicao ? 'pré: ' + step.precondicao : '',
-          step.poscondicao ? 'pós: ' + step.poscondicao : '',
-          step.resultado ? 'resultado: ' + step.resultado : ''
-        ].filter(Boolean).join(' · ') || '—',
-        step.confianca == null ? '—' : Math.round(Number(step.confianca) * 100) + '%'
+        String(step.order || index + 1),
+        step.timestamp == null ? '' : String(step.timestamp),
+        String(step.actionType || 'other') + (step.action ? ' · ' + step.action : ''),
+        step.frameIndices.join(', '),
+        step.transcriptSegmentIndices.join(', '),
+        '—',
+        step.confidence == null ? '—' : Math.round(step.confidence * 100) + '%'
       ];
       cells.forEach((value, cellIndex) => {
         const td = documentRef.createElement('td');
@@ -1131,7 +1137,8 @@ function create({
 
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
-    generateAutomation, validateAnalysis, automationFilename, isVideo
+    generateAutomation, validateAnalysis, automationFilename, isVideo,
+    normalizeEvidenceTimeline
   };
 }
 
