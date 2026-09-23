@@ -215,12 +215,17 @@ A modularização foi iniciada sem alterar o contrato funcional da aplicação:
 - `frontend/modules/markitdown_engine.js`: serviço de comunicação com o backend MarkItDown.
 - `frontend/modules/workspace_store.js`: persistência IndexedDB de projetos, documentos, versões e histórico de IA.
 - `frontend/modules/file_parser.js`: parsers locais de texto, código, PDF, DOCX, CSV, XLSX e JSON, com fallback do MarkItDown.
-- `frontend/modules/url_fetcher.js`
-- `frontend/modules/merge_engine.js`: ingestão de URLs e identificação de URLs do YouTube.
+- `frontend/modules/url_fetcher.js`: serviço de ingestão e identificação de URLs.
+- `frontend/modules/merge_engine.js`: orquestração da consolidação da fila.
+- `frontend/modules/ai_engine.js`: serviço de pós-processamento com provedores de IA.
+- `frontend/modules/conversion_quality.js`: métricas e comparação de qualidade.
+- `frontend/modules/chat_formatter.js`: normalização de conversas em Markdown.
+- `frontend/modules/ui_dom.js`: camada de apresentação responsável por referências DOM, helpers de escape/sanitização e metadados visuais.
 - `video_automation_validator.js`: validador de automação já isolado anteriormente.
-- `script.js` permanece como controlador legado compatível, consumindo os módulos por interfaces globais estáveis.
-- CI valida sintaxe dos novos módulos e testes de carregamento/integração básica.
-Próximos módulos: parsers, WorkspaceStore, serviços de vídeo/YouTube, IA, merge e UI, sempre com extração incremental e regressão automatizada.
+- `script.js` permanece como controlador de compatibilidade durante a migração, consumindo módulos por interfaces globais estáveis.
+- A regra de dependência é unidirecional: infraestrutura/serviços não dependem da UI; controladores de UI dependem de serviços; o bootstrap apenas compõe as dependências.
+- Extrações devem preservar contratos funcionais e ser acompanhadas de testes determinísticos no Node.js.
+- Próxima frente: dividir o UIManager por casos de uso/controladores (workspace, queue/conversion, youtube/video, editor/preview, settings) e reduzir script.js a bootstrap + composição.
 
 ### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
 - testes determinísticos do validador de automação no Node.js executados no GitHub Actions.
@@ -248,3 +253,34 @@ uvicorn backend.app:app --reload --port 8000
 ### Validação adicional
 - Os módulos UMD extraídos possuem exportação CommonJS para testes Node e exportação global para execução no navegador.
 - `MergeEngine` foi desacoplado do `UIManager` por injeção de `renderQueue`, evitando dependência circular de inicialização.
+
+### Arquitetura-alvo da Fase 7
+
+```text
+                 Presentation / UI
+                 DOM · controllers · views
+                           │
+                 Application / Use Cases
+                 convert · merge · workspace
+                 enhance · youtube · export
+                           │
+                    Domain / Contracts
+                 queue · document · result
+                 validation · quality
+                           │
+                 Infrastructure / Adapters
+                 IndexedDB · HTTP · MarkItDown
+                 Gemini/OpenAI · parsers
+```
+
+Princípios:
+1. Dependência aponta para dentro: serviços não importam UIManager.
+2. Injeção de dependências: HTTP, armazenamento, relógio e renderização podem ser substituídos nos testes.
+3. Casos de uso explícitos: convertFile, mergeQueue, enhanceMarkdown, saveWorkspace e generateAutomation não devem depender diretamente de eventos DOM.
+4. Estado centralizado: AppState é a fonte de verdade; controllers traduzem eventos da interface para ações.
+5. Adapters finos: WorkspaceStore, MarkItDownEngine, URLFetcher e AIEngine isolam APIs externas.
+6. UI sem regra de negócio: DOM/renderização não decide política de conversão, validação ou persistência.
+7. Bootstrap único: index.html carrega módulos; um bootstrap futuro compõe as dependências e inicializa a aplicação.
+8. Migração incremental: cada extração mantém a aplicação executável e adiciona teste de contrato antes da próxima extração.
+
+O primeiro passo dessa arquitetura foi concluído com a extração de frontend/modules/ui_dom.js, removendo referências DOM e helpers de apresentação do núcleo do UIManager sem alterar o fluxo funcional.
