@@ -351,6 +351,14 @@ function create({
 
     actions.append(approve, pending, ignore);
     editor.appendChild(actions);
+    if (reviewFinalizedAt) {
+      [action.input, details.input, type.input, targetText.input, targetDescription.input,
+        targetControl.input, selector.input, x.input, y.input, shortcut.input, dataField.input,
+        dataValue.input, sensitiveSelect.input, precondition.input, postcondition.input,
+        confidence.input, note.input, approve, pending, ignore].forEach(control => {
+        control.disabled = true;
+      });
+    }
     return editor;
   }
 
@@ -1021,6 +1029,8 @@ function create({
       finalizeButton.disabled = Boolean(reviewFinalizedAt);
       finalizeButton.textContent = reviewFinalizedAt ? 'Revisão finalizada' : 'Finalizar revisão';
     }
+    const approveAllButton = $('btnApproveAllVideoSteps');
+    if (approveAllButton) approveAllButton.disabled = Boolean(reviewFinalizedAt);
     _renderReviewHistory();
     _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
