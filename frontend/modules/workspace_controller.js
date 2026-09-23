@@ -69,10 +69,6 @@
     }
 
     async function init() {
-      if (!globalThis.indexedDB) {
-        setWorkspaceStatus('IndexedDB indisponível');
-        return null;
-      }
       try {
         const project = await workspaceStore.init();
         const queue = await workspaceStore.loadQueue(project.id);
