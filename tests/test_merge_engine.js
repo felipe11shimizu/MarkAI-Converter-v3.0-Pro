@@ -28,9 +28,9 @@ const engine = create({
 (async () => {
   const progress = [];
   const output = await engine.merge((value, name) => progress.push([value, name]));
-  assert.match(output, /## 1\\. a\\.txt/);
+  assert.match(output, /## 1\. a\.txt/);
   assert.match(output, /# A/);
-  assert.match(output, /## 2\\. b\\.txt/);
+  assert.match(output, /## 2\. b\.txt/);
   assert.match(output, /B convertido/);
   assert.equal(queue[1].status, 'done');
   assert.equal(queue[1].result, 'B convertido');
