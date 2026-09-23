@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="MarkAI Converter v3.0 Pro — Converta PDF, DOCX, XLSX, código-fonte e mais em Markdown perfeito, 100% no navegador." />
-  <title>MarkAI Converter v3.0 — Pro Edition</title>
+  <meta name="description" content="MarkAI Converter v3.6 Pro — Conversão híbrida com Microsoft MarkItDown + fallback no navegador." />
+  <title>MarkAI Converter v3.6 — Pro Edition</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark-dimmed.min.css" />
   <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -35,10 +36,10 @@
         </div>
         <div class="brand-text">
           <h1 class="brand-name">MarkAI<span class="brand-accent"> Converter</span></h1>
-          <span class="brand-badge">v3.0 Pro</span>
+          <span class="brand-badge">v3.6 Pro</span>
         </div>
       </div>
-      <p class="header-tagline">Converta qualquer documento em Markdown perfeito &mdash; 100% no navegador.</p>
+      <p class="header-tagline">Converta documentos com MarkItDown no servidor ou automaticamente pelo navegador.</p>
       <div class="header-actions">
         <div class="status-pill" id="statusPill">
           <span class="status-dot" id="statusDot"></span>
@@ -57,13 +58,30 @@
             <span class="badge-count" id="queueCount">0</span>
           </div>
           <div class="drop-zone" id="dropZone" role="button" tabindex="0">
-            <input type="file" id="fileInput" multiple accept=".txt,.csv,.md,.json,.pdf,.docx,.xlsx,.xls,.py,.js,.ts,.html,.css,.sql,.sh,.rb,.go,.rs,.java,.cpp,.c,.php,.yaml,.yml,.xml,.kt,.swift" style="display:none" />
+            <input type="file" id="fileInput" multiple accept=".txt,.csv,.md,.json,.xml,.pdf,.docx,.doc,.pptx,.xlsx,.xls,.epub,.zip,.html,.htm,.py,.js,.ts,.jsx,.tsx,.css,.scss,.sql,.sh,.rb,.go,.rs,.java,.cpp,.c,.cs,.php,.yaml,.yml,.toml,.ini,.r,.lua,.pl,.kt,.swift,.vue,.svelte,.png,.jpg,.jpeg,.gif,.webp,.wav,.mp3,.m4a,.mp4,.mov,.webm,.mkv,.avi" style="display:none" />
             <div class="drop-zone-content">
               <div class="drop-icon-wrap"><i data-lucide="file-plus-2"></i></div>
               <p class="drop-title">Arraste arquivos aqui</p>
               <p class="drop-sub">ou <button class="link-btn" id="browseBtn" type="button">selecione do computador</button></p>
-              <p class="drop-hint">PDF &middot; DOCX &middot; XLSX &middot; CSV &middot; JSON &middot; Código</p>
+              <p class="drop-hint">PDF &middot; DOCX &middot; XLSX &middot; CSV &middot; JSON &middot; Vídeo &middot; Código</p>
             </div>
+          </div>
+        </div>
+        <div class="panel workspace-panel" id="workspacePanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="folder-kanban"></i>Workspace</span>
+            <button class="btn-icon-xs" id="btnWorkspace" title="Gerenciar workspace"><i data-lucide="external-link"></i></button>
+          </div>
+          <div class="workspace-panel-body">
+            <select class="input-field input-field-sm" id="workspaceProjectSelect" aria-label="Projeto ativo"></select>
+            <div class="workspace-quick-actions">
+              <button class="btn btn-secondary btn-sm" id="btnWorkspaceSave"><i data-lucide="save"></i>Salvar</button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceVersion"><i data-lucide="history"></i>Versão</button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceExport"><i data-lucide="archive"></i>Exportar</button>
+            </div>
+            <label class="form-label workspace-prompt-label" for="workspaceAIPrompt">Prompt da IA</label>
+            <textarea class="input-textarea workspace-ai-prompt" id="workspaceAIPrompt" rows="3" placeholder="Opcional: descreva como a IA deve melhorar o Markdown..."></textarea>
+            <p class="form-hint workspace-status" id="workspaceStatus">Workspace local ativo</p>
           </div>
         </div>
         <div class="panel panel-queue" id="queuePanel" style="display:none">
@@ -78,11 +96,52 @@
               <button class="btn btn-outline btn-full" id="btnDownloadZip" style="margin-top:0.5rem"><i data-lucide="archive"></i>Baixar Todos (ZIP)</button>
           </div>
         </div>
+        <div class="panel video-panel" id="videoPanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="video"></i>Analisar Vídeo</span>
+            <span class="badge-count video-badge">IA</span>
+          </div>
+          <input type="file" id="videoInput" accept=".mp4,.mov,.webm,.mkv,.avi,video/*" style="display:none" />
+          <button class="btn btn-accent btn-full" id="btnVideoAnalyze"><i data-lucide="scan-search"></i>Analisar tarefas</button>
+          <textarea class="input-textarea video-prompt" id="videoPrompt" rows="3" placeholder="Opcional: diga o que deseja identificar. Ex.: descreva o passo a passo do RPA e os sistemas utilizados."></textarea>
+          <p class="form-hint">Arraste um vídeo para a área de importação ou use este botão. O sistema identifica etapas, ações, telas, decisões e resultados.</p>
+        </div>
         <div class="panel" id="urlPanel">
           <div class="panel-header"><span class="panel-title"><i data-lucide="globe"></i>Importar URL</span></div>
           <div class="input-row">
             <input type="url" class="input-field" id="urlInput" placeholder="https://exemplo.com/artigo..." />
             <button class="btn btn-accent" id="btnFetchUrl"><i data-lucide="arrow-right"></i></button>
+          </div>
+          <div class="youtube-controls" id="youtubeControls" hidden>
+            <div class="youtube-controls-title"><i data-lucide="youtube"></i><span>YouTube</span></div>
+            <div class="youtube-controls-grid">
+              <label class="form-group">
+                <span class="form-label">Idioma da legenda</span>
+                <select class="input-field input-field-sm" id="youtubeLanguage">
+                  <option value="auto">Automático (PT → EN → ES)</option>
+                  <option value="pt-BR">Português (Brasil)</option>
+                  <option value="pt">Português</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                  <option value="fr">Français</option>
+                </select>
+              </label>
+              <label class="form-group">
+                <span class="form-label">Traduzir</span>
+                <select class="input-field input-field-sm" id="youtubeTranslate">
+                  <option value="">Não traduzir</option>
+                  <option value="pt">Português</option>
+                  <option value="en">English</option>
+                  <option value="es">Español</option>
+                </select>
+              </label>
+            </div>
+            <div class="youtube-actions">
+              <button class="btn btn-primary btn-sm" id="btnYoutubeTranscribe"><i data-lucide="text"></i>Transcrever</button>
+              <button class="btn btn-ghost btn-sm" id="btnYoutubeLanguages"><i data-lucide="list"></i>Idiomas</button>
+              <button class="btn btn-ai btn-sm" id="btnYoutubeAnalyze"><i data-lucide="scan-search"></i>Analisar processo</button>
+            </div>
+            <p class="form-hint" id="youtubeStatus">Detectado como YouTube. A transcrição será obtida com timestamps. “Analisar processo” requer a análise visual do YouTube habilitada no backend.</p>
           </div>
         </div>
         <div class="panel" id="chatPanel">
@@ -126,7 +185,8 @@
               </div>
             </div>
             <div class="toolbar-right">
-              <button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
+              <button class="btn btn-ghost btn-sm" id="btnWorkspaceToolbar"><i data-lucide="folder-kanban"></i><span>Workspace</span></button><button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
+              <button class="btn btn-ghost btn-sm" id="btnCompare" title="Comparar MarkItDown x conversor local"><i data-lucide="columns-2"></i><span>Comparar</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
               <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
               <button class="btn btn-ghost btn-icon-sm" id="btnReset"><i data-lucide="x"></i></button>
@@ -168,6 +228,124 @@
     </div>
   </div>
 
+  <dialog class="modal modal-lg" id="modalWorkspace">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="folder-kanban"></i> Workspace</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseWorkspace"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body workspace-modal-body">
+        <div class="workspace-project-create">
+          <input class="input-field" id="workspaceProjectName" placeholder="Nome do novo projeto..." />
+          <button class="btn btn-primary" id="btnCreateWorkspaceProject"><i data-lucide="plus"></i>Novo projeto</button>
+        </div>
+        <div class="workspace-grid">
+          <section class="workspace-section">
+            <div class="workspace-section-head">
+              <h3>Projetos</h3>
+              <button class="btn btn-ghost btn-sm" id="btnRenameWorkspaceProject"><i data-lucide="pencil"></i>Renomear</button>
+            </div>
+            <div class="workspace-project-list" id="workspaceProjectList"></div>
+            <div class="workspace-project-actions">
+              <button class="btn btn-ghost btn-sm" id="btnDeleteWorkspaceProject"><i data-lucide="trash-2"></i>Excluir projeto</button>
+              <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceJson"><i data-lucide="file-json"></i>Exportar JSON</button>
+              <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceZip"><i data-lucide="archive"></i>Exportar ZIP</button>
+            </div>
+          </section>
+          <section class="workspace-section">
+            <div class="workspace-section-head"><h3>Histórico do projeto</h3><span class="badge-count" id="workspaceHistoryCount">0</span></div>
+            <div class="workspace-tabs">
+              <button class="workspace-tab active" id="workspaceTabVersions">Versões</button>
+              <button class="workspace-tab" id="workspaceTabAI">IA</button>
+            </div>
+            <div class="workspace-history-list" id="workspaceHistoryList"></div>
+          </section>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <span class="form-hint">Os dados ficam armazenados localmente neste navegador via IndexedDB.</span>
+        <button class="btn btn-primary" id="btnWorkspaceDone"><i data-lucide="check"></i>Concluído</button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="modal modal-lg" id="modalVideoAnalysis">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="scan-search"></i> Análise de Tarefas do Vídeo</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseVideoAnalysis"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body video-analysis-body">
+        <div class="video-analysis-summary" id="videoAnalysisSummary"></div>
+        <section class="video-review-toolbar" id="videoReviewToolbar">
+          <div class="video-review-toolbar-info">
+            <strong>Revisão assistida</strong>
+            <span id="videoReviewSummary">0 aprovadas · 0 para revisar · 0 ignoradas</span>
+          </div>
+          <div class="video-review-toolbar-actions">
+            <select class="input-field input-field-sm" id="videoReviewFilter" aria-label="Filtrar etapas">
+              <option value="all">Todas</option>
+              <option value="pending">Para revisar</option>
+              <option value="approved">Aprovadas</option>
+              <option value="ignored">Ignoradas</option>
+              <option value="validation_ready">Validação pronta</option>
+              <option value="validation_warning">Validação com alertas</option>
+              <option value="validation_blocked">Validação bloqueada</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" id="btnValidateVideoAutomation"><i data-lucide="shield-check"></i>Validar automação</button>
+            <button class="btn btn-secondary btn-sm" id="btnApproveAllVideoSteps"><i data-lucide="check-check"></i>Aprovar todas</button>
+          </div>
+        </section>
+        <section class="video-automation-generator">
+          <div class="video-automation-generator-head">
+            <div>
+              <h3>Gerar automação</h3>
+              <p class="form-hint">Transforma as etapas observadas em um roteiro inicial para cada tecnologia. Revise seletores, coordenadas, waits e dados antes de executar.</p>
+            </div>
+            <div class="video-automation-controls">
+              <span class="video-review-required-note">Somente etapas aprovadas entram no código.</span>
+              <label class="form-label" for="videoAutomationTarget">Tecnologia</label>
+              <select class="input-field input-field-sm" id="videoAutomationTarget">
+                <option value="pyautogui">PyAutoGUI</option>
+                <option value="playwright">Playwright</option>
+                <option value="selenium">Selenium</option>
+                <option value="rpa">RPA / Robot Framework</option>
+              </select>
+              <button class="btn btn-primary btn-sm" id="btnGenerateVideoAutomation"><i data-lucide="code-2"></i>Gerar passos</button>
+            </div>
+          </div>
+          <div class="video-automation-output-head">
+            <span id="videoAutomationStatus" class="form-hint">Aguardando análise do vídeo.</span>
+            <div class="video-automation-output-actions">
+              <button class="btn btn-ghost btn-sm" id="btnCopyVideoAutomation"><i data-lucide="copy"></i>Copiar</button>
+              <button class="btn btn-secondary btn-sm" id="btnDownloadVideoAutomation"><i data-lucide="download"></i>Baixar</button>
+            </div>
+          </div>
+          <pre class="video-automation-code" id="videoAutomationCode">A análise do vídeo será convertida em um roteiro de automação aqui.</pre>
+        </section>
+        <section class="video-evidence-matrix" id="videoEvidenceMatrix" aria-live="polite"></section>
+        <div class="video-analysis-grid">
+          <section>
+            <h3>Etapas identificadas</h3>
+            <div class="video-steps" id="videoSteps"></div>
+          </section>
+          <section>
+            <h3>Transcrição</h3>
+            <pre class="video-transcript" id="videoTranscript"></pre>
+          </section>
+        </div>
+        <details class="video-json-details">
+          <summary>JSON estruturado</summary>
+          <pre class="video-json" id="videoJson"></pre>
+        </details>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnCopyVideoJson"><i data-lucide="copy"></i>Copiar JSON</button>
+        <button class="btn btn-primary" id="btnDownloadVideoJson"><i data-lucide="download"></i>Baixar JSON</button>
+        <button class="btn btn-ghost" id="btnCloseVideoAnalysis2">Concluído</button>
+      </div>
+    </div>
+  </dialog>
   <dialog class="modal" id="modalSettings">
     <div class="modal-card">
       <div class="modal-header">
@@ -199,7 +377,22 @@
               <input type="password" class="input-field" id="aiApiKey" placeholder="Cole sua API Key aqui..." autocomplete="off" />
               <button class="btn btn-ghost btn-icon-sm" id="btnToggleKey" type="button"><i data-lucide="eye"></i></button>
             </div>
-            <p class="form-hint">Salva no localStorage. Nunca compartilhada além do provedor selecionado.</p>
+            <p class="form-hint">A chave permanece no navegador e é enviada somente ao provedor escolhido quando você usar a função de IA.</p>
+          </div>
+        </div>
+        <div class="settings-section">
+          <h3 class="settings-section-title"><i data-lucide="server"></i> Motor de Conversão</h3>
+          <div class="toggle-row">
+            <div class="toggle-info">
+              <label class="form-label" for="toggleMarkItDown">Microsoft MarkItDown</label>
+              <p class="form-hint">Prioriza o motor oficial no backend quando disponível e usa o conversor local como fallback.</p>
+            </div>
+            <label class="toggle-switch" for="toggleMarkItDown"><input type="checkbox" id="toggleMarkItDown" checked /><span class="slider"></span></label>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="markitdownEndpoint">Endpoint MarkItDown</label>
+            <input type="url" class="input-field" id="markitdownEndpoint" value="http://localhost:8000" placeholder="http://localhost:8000" />
+            <p class="form-hint">Ex.: http://localhost:8000. O app verifica automaticamente se o serviço está disponível.</p>
           </div>
         </div>
         <div class="settings-section">
@@ -243,7 +436,39 @@
     </div>
   </dialog>
 
+  <dialog class="modal modal-xl" id="modalCompare">
+    <div class="modal-card" style="max-width:1400px;width:96vw">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="columns-2"></i> Comparação de motores — <span id="compareFileName">arquivo</span></h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseCompare"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <section>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem">
+            <strong>Microsoft MarkItDown</strong>
+            <small id="compareMarkitdownStats" class="form-hint"></small>
+          </div>
+          <textarea id="compareMarkitdown" class="code-editor" readonly style="width:100%;min-height:55vh;resize:vertical"></textarea>
+        </section>
+        <section>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.5rem">
+            <strong>Conversor local</strong>
+            <small id="compareBrowserStats" class="form-hint"></small>
+          </div>
+          <textarea id="compareBrowser" class="code-editor" readonly style="width:100%;min-height:55vh;resize:vertical"></textarea>
+        </section>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="btnUseBrowser"><i data-lucide="check"></i> Usar conversor local</button>
+        <button class="btn btn-primary" id="btnUseMarkItDown"><i data-lucide="check"></i> Usar MarkItDown</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast-container" id="toastContainer"></div>
+  <script src="frontend/modules/core_state.js"></script>
+  <script src="frontend/modules/markitdown_engine.js"></script>
+  <script src="video_automation_validator.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
