@@ -62,6 +62,6 @@ sensitiveData.analysis.etapas[0].validation_overrides = { pyautogui: true };
 const sensitiveValidation = controller.validateAnalysis(sensitiveData, 'pyautogui');
 assert.equal(sensitiveValidation.summary.warning, 1);
 const sensitiveCode = controller.generateAutomation(sensitiveData, 'pyautogui');
-assert.match(sensitiveCode, /\\{\\{DADO_SENSIVEL\\}\\}/);
+assert.ok(sensitiveCode.includes('{{DADO_SENSIVEL}}'));
 
 console.log('video_automation_controller module tests: ok');
