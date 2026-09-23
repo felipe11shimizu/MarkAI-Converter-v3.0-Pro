@@ -559,9 +559,17 @@ function create({
     return evidenceTimeline.normalize(data);
   }
 
+  function reviewPackageReadiness(data = lastAnalysis) {
+    if (!data) return { ready: false, reason: 'Nenhuma análise de vídeo disponível.' };
+    if (!reviewFinalizedAt) return { ready: false, reason: 'Finalize a revisão humana para habilitar o pacote auditável.' };
+    if (finalizedReviewSnapshot && _reviewIntegrityKey(data) !== _reviewIntegrityKey(finalizedReviewSnapshot)) {
+      return { ready: false, reason: 'A análise foi alterada após a finalização; revise e finalize novamente.' };
+    }
+    return { ready: true, reason: 'Pacote auditável pronto para exportação.' };
+  }
+
   function isReviewPackageReady(data = lastAnalysis) {
-    return Boolean(data && reviewFinalizedAt) &&
-      (!finalizedReviewSnapshot || _reviewIntegrityKey(data) === _reviewIntegrityKey(finalizedReviewSnapshot));
+    return reviewPackageReadiness(data).ready;
   }
 
   function reviewPackageManifest(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
@@ -1164,12 +1172,17 @@ function create({
     const approveAllButton = $('btnApproveAllVideoSteps');
     if (approveAllButton) approveAllButton.disabled = Boolean(reviewFinalizedAt);
     const packageButton = $('btnDownloadVideoReviewPackage');
-    if (packageButton) {
-      const packageReady = isReviewPackageReady(lastAnalysis);
-      packageButton.disabled = !packageReady;
-      packageButton.title = packageReady
-        ? 'Exportar pacote auditável da revisão finalizada'
-        : 'Finalize a revisão para habilitar o pacote auditável';
+    const packageStatus = $('videoReviewPackageStatus');
+    if (packageButton || packageStatus) {
+      const readiness = reviewPackageReadiness(lastAnalysis);
+      if (packageButton) {
+        packageButton.disabled = !readiness.ready;
+        packageButton.title = readiness.reason;
+      }
+      if (packageStatus) {
+        packageStatus.textContent = readiness.reason;
+        packageStatus.className = 'form-hint video-review-package-status' + (readiness.ready ? ' ready' : '');
+      }
     }
     _renderReviewHistory();
     _renderEvidenceTimeline(data);
@@ -1584,7 +1597,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageManifest, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageReadiness, reviewPackageManifest, getOriginalAnalysis, getReviewHistory
   };
 }
 

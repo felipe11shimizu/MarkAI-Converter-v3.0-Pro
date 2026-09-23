@@ -98,6 +98,14 @@ const data = {
   }
 };
 
+assert.deepEqual(controller.reviewPackageReadiness(), {
+  ready: false,
+  reason: 'Nenhuma análise de vídeo disponível.'
+});
+assert.deepEqual(controller.reviewPackageReadiness(data), {
+  ready: false,
+  reason: 'Finalize a revisão humana para habilitar o pacote auditável.'
+});
 assert.equal(controller.isReviewPackageReady(data), false);
 assert.equal(await controller.exportReviewPackage(data, 'pyautogui'), false);
 
@@ -146,6 +154,10 @@ const blockedBeforeFinalization = controller.generateAutomation(data, 'pyautogui
 assert.match(blockedBeforeFinalization, /Geração bloqueada/);
 assert.doesNotMatch(blockedBeforeFinalization, /import pyautogui/);
 assert.equal(controller.finalizeReview(), true);
+assert.deepEqual(controller.reviewPackageReadiness(data), {
+  ready: true,
+  reason: 'Pacote auditável pronto para exportação.'
+});
 assert.equal(controller.isReviewPackageReady(data), true);
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
@@ -176,6 +188,10 @@ assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
 assert.equal(finalizedIntegrityAudit.review.integrity_match, true);
 
 data.analysis.etapas[0].acao = 'alteração externa após finalização';
+assert.deepEqual(controller.reviewPackageReadiness(data), {
+  ready: false,
+  reason: 'A análise foi alterada após a finalização; revise e finalize novamente.'
+});
 assert.equal(controller.isReviewPackageReady(data), false);
 const integrityBlocked = controller.generateAutomation(data, 'pyautogui');
 assert.match(integrityBlocked, /revisão finalizada foi alterada/);

@@ -1338,3 +1338,6 @@ body::before {
 .video-review-history-item small {
   color: var(--text-muted, #94a3b8);
 }
+
+.video-review-package-status { display: inline-flex; align-items: center; margin-left: 0.5rem; }
+.video-review-package-status.ready { font-weight: 600; }
