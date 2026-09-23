@@ -1403,7 +1403,13 @@ function create({
   }
 
   function generateAutomation(data, platform = 'pyautogui') {
-    lastAnalysis = data;
+    if (data !== lastAnalysis) {
+      lastAnalysis = data;
+      originalAnalysisSnapshot = _snapshot(data);
+      reviewHistory = [];
+      reviewFinalizedAt = null;
+    }
+    _ensureReviewState(data);
     return _generateAutomation(platform, data);
   }
 
