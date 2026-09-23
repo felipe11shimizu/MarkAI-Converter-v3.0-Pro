@@ -51,7 +51,7 @@ assert.equal(validation.summary.blocked, 0);
 
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
-assert.match(code, /pyautogui\\.click\\(120, 80\\)/);
+assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
 
 const sensitiveData = JSON.parse(JSON.stringify(data));
