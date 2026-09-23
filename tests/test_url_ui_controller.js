@@ -58,12 +58,11 @@ function element(value = '') {
 
   urlInput.value = 'https://youtube.com/watch?v=abc';
   urlInput.dispatch('input');
-  assert.equal(calls.length, 1);
+  assert.deepEqual(calls, [['fetch', 'https://example.com/artigo']]);
 
   await controller.submit();
   assert.deepEqual(calls.at(-1), ['youtube', 'https://youtube.com/watch?v=abc', { language: 'pt-BR', translateTo: 'en' }]);
 
-  await urlInput.dispatch('input');
   await btnYoutubeTranscribe.dispatch('click');
   assert.deepEqual(calls.at(-1), ['youtube', 'https://youtube.com/watch?v=abc', { language: 'pt-BR', translateTo: 'en' }]);
 
@@ -72,7 +71,7 @@ function element(value = '') {
 
   urlInput.value = 'ftp://example.com';
   await controller.submit();
-  assert.deepEqual(calls.at(-1), ['fetch', 'https://example.com/artigo']);
+  assert.deepEqual(calls.at(-1), ['languages', 'https://youtube.com/watch?v=abc']);
 
   console.log('url_ui_controller module tests: ok');
 })();
