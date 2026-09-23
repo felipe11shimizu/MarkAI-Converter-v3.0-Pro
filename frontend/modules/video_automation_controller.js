@@ -1107,6 +1107,15 @@ function create({
     }
     const approveAllButton = $('btnApproveAllVideoSteps');
     if (approveAllButton) approveAllButton.disabled = Boolean(reviewFinalizedAt);
+    const packageButton = $('btnDownloadVideoReviewPackage');
+    if (packageButton) {
+      const packageReady = Boolean(reviewFinalizedAt) &&
+        (!finalizedReviewSnapshot || _reviewIntegrityKey(lastAnalysis) === _reviewIntegrityKey(finalizedReviewSnapshot));
+      packageButton.disabled = !packageReady;
+      packageButton.title = packageReady
+        ? 'Exportar pacote auditável da revisão finalizada'
+        : 'Finalize a revisão para habilitar o pacote auditável';
+    }
     _renderReviewHistory();
     _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
