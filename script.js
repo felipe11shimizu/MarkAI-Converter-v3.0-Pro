@@ -161,46 +161,6 @@ const UIManager = (() => {
     if (EditorController) EditorController.switchTab(tab.dataset.panel);
   }
 
-  // ── MOTOR COMPARISON ──
-  async function compareItem(id) {
-    const item = QueueManager.getById(id);
-    if (!item) return;
-    if (['pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'].includes(item.ext)) {
-      toast('Este formato não possui parser local para comparação.', 'warning');
-      return;
-    }
-    showProcessing('Comparando motores…', item.name);
-    try {
-      const settled = await Promise.allSettled([
-        MarkItDownEngine.convert(item.file),
-        FileParserStrategy.parseBrowser(item)
-      ]);
-      const remote = settled[0].status === 'fulfilled' ? settled[0].value : null;
-      const local = settled[1].status === 'fulfilled' ? settled[1].value : null;
-      if (!remote?.markdown && !local) throw new Error('Nenhum dos motores conseguiu converter o arquivo.');
-      const rmd = remote?.markdown || '';
-      const bmd = local || '';
-      const rm = ConversionQuality.metrics(rmd);
-      const bm = ConversionQuality.metrics(bmd);
-      const diff = ConversionQuality.diffScore(rmd, bmd);
-      els.compareFileName.textContent = item.name;
-      els.compareMarkitdown.value = rmd || 'MarkItDown indisponível ou falhou.';
-      els.compareBrowser.value = bmd || 'Conversor local indisponível para este formato.';
-      els.compareMarkitdownStats.textContent = rmd
-        ? 'chars: ' + rm.characters.toLocaleString('pt-BR') + ' · linhas: ' + rm.lines + ' · headings: ' + rm.headings + ' · tabelas: ' + rm.tables + ' · links: ' + rm.links + ' · divergência: ' + diff + '%'
-        : 'Indisponível';
-      els.compareBrowserStats.textContent = bmd
-        ? 'chars: ' + bm.characters.toLocaleString('pt-BR') + ' · linhas: ' + bm.lines + ' · headings: ' + bm.headings + ' · tabelas: ' + bm.tables + ' · links: ' + bm.links + ' · divergência: ' + diff + '%'
-        : 'Indisponível';
-      AppState.set('compareState', { id, markitdown: rmd, browser: bmd });
-      hideProcessing();
-      els.modalCompare.showModal();
-    } catch (e) {
-      hideProcessing();
-      toast('Erro na comparação: ' + e.message, 'error');
-    }
-  }
-
   // ── INIT EVENT LISTENERS ──
   function init() {
     AppState.loadSettings();
