@@ -915,14 +915,6 @@ function create({
     _ensureReviewState(data);
     const normalizedPlatform = validator.normalizePlatform(platform);
     _validateAnalysis(data, normalizedPlatform);
-    const steps = (Array.isArray(analysis.etapas) ? analysis.etapas : [])
-      .filter(step => {
-        if (step.review_status !== 'approved') return false;
-        const status = step.validacao_automacao?.status;
-        if (status === 'ready') return true;
-        return status === 'warning' && step.validation_overrides?.[normalizedPlatform] === true;
-      });
-
     const header = [
       '# Roteiro gerado pelo MarkAI Converter — revisão humana obrigatória.',
       '# As ações abaixo foram derivadas da análise observacional do vídeo.',
@@ -930,6 +922,20 @@ function create({
       '# Dados sensíveis são substituídos por placeholders e nunca devem ser embutidos no código.',
       ''
     ];
+    if (!reviewFinalizedAt) {
+      return [
+        ...header,
+        '# Geração bloqueada: a revisão humana ainda não foi finalizada.',
+        '# Conclua todas as etapas pendentes, execute a validação e finalize a revisão antes de gerar a automação.'
+      ].join('\\n');
+    }
+    const steps = (Array.isArray(analysis.etapas) ? analysis.etapas : [])
+      .filter(step => {
+        if (step.review_status !== 'approved') return false;
+        const status = step.validacao_automacao?.status;
+        if (status === 'ready') return true;
+        return status === 'warning' && step.validation_overrides?.[normalizedPlatform] === true;
+      });
 
     if (!steps.length) {
       return [
