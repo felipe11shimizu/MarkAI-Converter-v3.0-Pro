@@ -34,6 +34,18 @@ assert.equal(controller.normalizeEvidenceTimeline({
 }).steps[0].timestamp, 3);
 assert.equal(controller.automationFilename('pyautogui', { filename: 'Meu video.mp4' }), 'Meu_video-automacao-pyautogui.py');
 
+const auditManifest = controller.reviewAuditManifest(data, 'pyautogui');
+assert.equal(auditManifest.schema_version, '1.0');
+assert.equal(auditManifest.filename, 'processo.mp4');
+assert.equal(auditManifest.platform, 'pyautogui');
+assert.equal(auditManifest.original_analysis.preserved, true);
+assert.equal(auditManifest.original_analysis.raw_snapshot_exported, false);
+assert.equal(auditManifest.review.counts.approved, 1);
+assert.equal(auditManifest.review.changes.length, 0);
+assert.equal(auditManifest.validation.generationEligible, 1);
+assert.deepEqual(auditManifest.generation.eligibleStepOrders, [1]);
+assert.match(auditManifest.sensitive_data_policy, /DADO_SENSIVEL/);
+
 const readyStep = {
   ordem: 1,
   acao: 'Clicar no botão',
