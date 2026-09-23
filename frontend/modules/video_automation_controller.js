@@ -491,6 +491,7 @@ function create({
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
       reviewFinalizedAt = null;
+      finalizedReviewSnapshot = null;
     }
     _ensureReviewState(data);
 
@@ -1028,6 +1029,7 @@ function create({
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
       reviewFinalizedAt = null;
+      finalizedReviewSnapshot = null;
     }
     _ensureReviewState(data);
 
@@ -1448,6 +1450,7 @@ function create({
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
       reviewFinalizedAt = null;
+      finalizedReviewSnapshot = null;
     }
     _ensureReviewState(data);
     return _generateAutomation(platform, data);
@@ -1467,6 +1470,7 @@ function create({
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
       reviewFinalizedAt = null;
+      finalizedReviewSnapshot = null;
     }
     _ensureReviewState(data);
     return _validateAnalysis(data, platform);
