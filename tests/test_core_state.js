@@ -3,10 +3,13 @@
 const assert = require('node:assert/strict');
 
 require('../frontend/modules/core_state.js');
+require('../frontend/modules/markitdown_engine.js');
 
 assert.ok(global.MarkAICore);
 assert.ok(global.MarkAICore.AppState);
 assert.ok(global.MarkAICore.QueueManager);
+assert.ok(global.MarkAIConversion);
+assert.ok(global.MarkAIConversion.MarkItDownEngine);
 
 const AppState = global.MarkAICore.AppState;
 const QueueManager = global.MarkAICore.QueueManager;
