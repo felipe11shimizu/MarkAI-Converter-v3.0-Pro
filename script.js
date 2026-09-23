@@ -13,6 +13,7 @@ const QueueManager = globalThis.MarkAICore.QueueManager;
 // Workspace persistence is provided by frontend/modules/workspace_store.js.
 const WorkspaceStore = globalThis.MarkAIWorkspace;
 let WorkspaceController = null;
+let YouTubeController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -450,14 +451,14 @@ const UIManager = (() => {
       if (_updateYoutubeControls() ) _transcribeYoutube();
       else _fetchUrl();
     });
-    els.urlInput.addEventListener('input', () => _updateYoutubeControls());
+    els.urlInput.addEventListener('input', () => YouTubeController.updateControls(els.urlInput.value.trim()));
     els.urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') {
-      if (_updateYoutubeControls()) _transcribeYoutube();
+      if (YouTubeController.updateControls(els.urlInput.value.trim())) YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions());
       else _fetchUrl();
     }});
-    els.btnYoutubeTranscribe?.addEventListener('click', () => _transcribeYoutube());
-    els.btnYoutubeLanguages?.addEventListener('click', () => _listYoutubeLanguages());
-    _updateYoutubeControls();
+    els.btnYoutubeTranscribe?.addEventListener('click', () => YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions()));
+    els.btnYoutubeLanguages?.addEventListener('click', () => YouTubeController.listLanguages(els.urlInput.value.trim()));
+    YouTubeController.updateControls(els.urlInput.value.trim());
 
     // Chat format
     els.btnFormatChat.addEventListener('click', () => {
@@ -721,105 +722,9 @@ const UIManager = (() => {
     }
   }
 
-  // ── YOUTUBE TRANSCRIPTION ──
-  function _updateYoutubeControls(url = els.urlInput.value.trim()) {
-    const isYoutube = URLFetcher.isYouTubeUrl(url);
-    if (els.youtubeControls) els.youtubeControls.hidden = !isYoutube;
-    if (isYoutube && els.youtubeStatus) {
-      els.youtubeStatus.textContent = 'YouTube detectado. A transcrição utiliza timestamps e informa se a legenda é manual ou automática.';
-    }
-    return isYoutube;
-  }
-
-  function _youtubeLanguagePriority() {
-    const selected = els.youtubeLanguage?.value || 'auto';
-    if (selected === 'auto') return ['pt-BR', 'pt', 'en', 'es'];
-    return [selected, 'pt-BR', 'pt', 'en', 'es'].filter((value, index, array) => array.indexOf(value) === index);
-  }
-
-  async function _transcribeYoutube(url = els.urlInput.value.trim()) {
-    if (!URLFetcher.isYouTubeUrl(url)) {
-      toast('Informe uma URL válida do YouTube.', 'warning');
-      return;
-    }
-
-    showProcessing('Transcrevendo YouTube…', url);
-    setStatus('Transcrevendo YouTube…', 'busy');
-    if (els.youtubeStatus) els.youtubeStatus.textContent = 'Consultando legendas disponíveis…';
-
-    try {
-      const endpoint = (AppState.get('settings').markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
-      const payload = {
-        url,
-        languages: _youtubeLanguagePriority(),
-        translate_to: els.youtubeTranslate?.value || null,
-        preserve_formatting: false,
-      };
-      const response = await fetch(endpoint + '/api/youtube/transcribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(120000),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const detail = typeof body.detail === 'object' ? (body.detail.message || body.detail.code) : body.detail;
-        throw new Error(detail || ('Falha HTTP ' + response.status));
-      }
-
-      loadMarkdown(body.markdown, 'youtube_' + (body.video_id || 'video') + '_transcricao.md');
-      setStatus('Transcrição do YouTube concluída', 'idle');
-      if (els.youtubeStatus) {
-        const origin = body.is_generated ? 'legenda automática' : 'legenda manual';
-        const quality = body.quality || {};
-        els.youtubeStatus.textContent =
-          origin + ' · ' + (body.language_code || 'idioma desconhecido') +
-          ' · ' + (quality.segments || 0) + ' segmentos · ' +
-          (quality.words || 0) + ' palavras';
-      }
-      toast('✓ Transcrição do YouTube concluída!', 'success');
-    } catch (error) {
-      setStatus('Erro na transcrição YouTube', 'error');
-      if (els.youtubeStatus) els.youtubeStatus.textContent = 'Falha: ' + (error.message || 'erro desconhecido');
-      toast('Erro no YouTube: ' + error.message, 'error');
-    } finally {
-      hideProcessing();
-    }
-  }
-
-  async function _listYoutubeLanguages(url = els.urlInput.value.trim()) {
-    if (!URLFetcher.isYouTubeUrl(url)) {
-      toast('Informe uma URL válida do YouTube.', 'warning');
-      return;
-    }
-    try {
-      const endpoint = (AppState.get('settings').markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
-      const response = await fetch(endpoint + '/api/youtube/transcripts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-        signal: AbortSignal.timeout(30000),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        const detail = typeof body.detail === 'object' ? (body.detail.message || body.detail.code) : body.detail;
-        throw new Error(detail || ('Falha HTTP ' + response.status));
-      }
-
-      const labels = (body.transcripts || []).map(item => {
-        const type = item.is_generated ? 'automática' : 'manual';
-        const translatable = item.is_translatable ? ' · traduzível' : '';
-        return item.language + ' (' + item.language_code + ') — ' + type + translatable;
-      });
-      if (els.youtubeStatus) {
-        els.youtubeStatus.textContent = labels.length
-          ? 'Legendas disponíveis: ' + labels.join(' · ')
-          : 'Nenhuma faixa de legenda encontrada.';
-      }
-    } catch (error) {
-      if (els.youtubeStatus) els.youtubeStatus.textContent = 'Não foi possível listar as legendas: ' + error.message;
-      toast('Erro ao consultar idiomas: ' + error.message, 'error');
-    }
+  // ── YOUTUBE PRESENTATION ──
+  function _youtubeOptions() {
+    return { language: els.youtubeLanguage?.value || 'auto', translateTo: els.youtubeTranslate?.value || null };
   }
 
   // ── URL FETCH ──
@@ -903,7 +808,9 @@ const UIManager = (() => {
     renderWorkspaceHistory: _renderWorkspaceHistory,
     showCurrentWorkspaceDocument: _showCurrentWorkspaceDocument,
     showEmptyWorkspace: _showEmptyWorkspace,
-    setWorkspaceStatus: text => { if (els.workspaceStatus) els.workspaceStatus.textContent = String(text ?? ''); }
+    setWorkspaceStatus: text => { if (els.workspaceStatus) els.workspaceStatus.textContent = String(text ?? ''); },
+    setYoutubeControlsVisible: visible => { if (els.youtubeControls) els.youtubeControls.hidden = !visible; },
+    setYoutubeStatusText: text => { if (els.youtubeStatus) els.youtubeStatus.textContent = String(text ?? ''); }
   };
 })();
 
@@ -939,6 +846,20 @@ document.addEventListener('DOMContentLoaded', () => {
       toast: (message, type) => UIManager.toast(message, type),
       showCurrentDocument: item => UIManager.showCurrentWorkspaceDocument(item),
       showEmptyWorkspace: () => UIManager.showEmptyWorkspace()
+    }
+  });
+
+  YouTubeController = globalThis.MarkAIYouTubeController.create({
+    urlService: URLFetcher,
+    getSettings: () => AppState.get('settings'),
+    ui: {
+      setControlsVisible: visible => UIManager.setYoutubeControlsVisible(visible),
+      setStatusText: text => UIManager.setYoutubeStatusText(text),
+      showProcessing: (label, sub) => UIManager.showProcessing(label, sub),
+      hideProcessing: () => UIManager.hideProcessing(),
+      setStatus: (text, state) => UIManager.setStatus(text, state),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      toast: (msg, type) => UIManager.toast(msg, type)
     }
   });
 
