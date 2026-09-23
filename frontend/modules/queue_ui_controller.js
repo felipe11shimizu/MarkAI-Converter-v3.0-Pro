@@ -100,8 +100,16 @@
       }
 
       const zip = new windowRef.JSZip();
+      const usedNames = new Set();
       items.forEach(item => {
-        const safeName = item.name.replace(/\.[^.]+$/, '') + '.md';
+        const baseName = item.name.replace(/\.[^.]+$/, '') + '.md';
+        let safeName = baseName;
+        let suffix = 2;
+        while (usedNames.has(safeName)) {
+          safeName = baseName.replace(/\.md$/, '') + ' (' + suffix + ').md';
+          suffix += 1;
+        }
+        usedNames.add(safeName);
         zip.file(safeName, item.result);
       });
 
