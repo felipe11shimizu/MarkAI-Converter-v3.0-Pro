@@ -29,4 +29,10 @@ assert.doesNotMatch(
   'URL UI bootstrap must not capture YouTubeController before initialization'
 );
 
+assert.match(
+  script,
+  /openSettings:\s*\(\)\s*=>\s*\{\s*SettingsController\.sync\(\);\s*els\.modalSettings\.showModal\(\);\s*\}/,
+  'AI UI must have a concrete settings opener in the UI manager'
+);
+
 console.log('bootstrap dependency order tests: ok');
