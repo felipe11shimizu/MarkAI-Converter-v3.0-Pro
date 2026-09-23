@@ -23,7 +23,7 @@ assert.match(readme, /^# MarkAI Converter v3\.6 Pro/m);
 assert.doesNotMatch(readme, /^# MarkAI Converter v3\.1 Pro/m);
 
 assert.match(backend, /APP_VERSION = "3\.6\.0"/);
-assert.match(backend, /@app\.get\("/api/health")/);
+assert.match(backend, /@app\.get\("\/api\/health"\)/);
 assert.match(backend, /allow_credentials=False/);
 assert.match(backend, /convert_local/);
 assert.match(backend, /URLs com credenciais embutidas não são permitidas/);
