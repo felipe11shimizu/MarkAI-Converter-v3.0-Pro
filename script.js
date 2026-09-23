@@ -19,6 +19,7 @@ let VideoAutomationController = null;
 let SettingsController = null;
 let WorkspaceUIController = null;
 let QueueUIController = null;
+let EditorUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -198,14 +199,6 @@ const UIManager = (() => {
       toast('✓ Conversa formatada!', 'success');
     });
 
-    // Tabs
-    [els.tabRaw, els.tabPreview, els.tabSplit].forEach(tab => {
-      tab.addEventListener('click', () => EditorController.switchTab(tab.dataset.panel));
-    });
-
-    // Editor auto-sync is owned by EditorController.
-    els.markdownEditor.addEventListener('input', () => EditorController.handleInput(els.markdownEditor.value));
-    els.markdownEditorSplit.addEventListener('input', () => EditorController.handleInput(els.markdownEditorSplit.value));
     // Copy
     els.btnCopy.addEventListener('click', async () => {
       try {
@@ -310,7 +303,6 @@ const UIManager = (() => {
       }
       els.modalPreview.close();
     });
-    els.btnPreviewRaw.addEventListener('click', () => EditorController.togglePreviewRaw());
   }
 
 
@@ -563,6 +555,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  EditorUIController = globalThis.MarkAIEditorUIController.create({
+    editorController: EditorController,
+    elements: {
+      tabs: [document.getElementById('tabRaw'), document.getElementById('tabPreview'), document.getElementById('tabSplit')],
+      markdownEditor: document.getElementById('markdownEditor'),
+      markdownEditorSplit: document.getElementById('markdownEditorSplit'),
+      btnPreviewRaw: document.getElementById('btnPreviewRaw')
+    }
+  });
+
   WorkspaceController = globalThis.MarkAIWorkspaceController.create({
     workspaceStore: WorkspaceStore,
     queueManager: QueueManager,
@@ -660,6 +662,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Boot UI
   UIManager.init();
+  EditorUIController.bind();
   SettingsController.bind();
   VideoAutomationController.bind();
 
