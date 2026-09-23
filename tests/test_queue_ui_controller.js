@@ -21,6 +21,7 @@ const queueManager = {
 const controller = {
   async convertItem(id) { calls.push('convert:' + id); },
   async convertAll() { calls.push('convertAll'); },
+  async mergeAll() { calls.push('mergeAll'); },
   async compareItem(id) { calls.push('compare:' + id); }
 };
 const mergeEngine = {
@@ -64,7 +65,6 @@ const ui = {
 const workspaceUi = QueueUIController.create({
   queueManager,
   conversionController: controller,
-  mergeEngine,
   workspaceController,
   editorController: { previewItem(id) { calls.push('preview:' + id); } },
   getState: () => ({ queue }),
@@ -98,9 +98,7 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
   assert.deepEqual(calls.slice(0, 2), ['save', 'render']);
 
   await workspaceUi.mergeAll();
-  assert.ok(calls.includes('status:Fazendo merge…'));
-  assert.ok(calls.includes('save'));
-  assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'load'));
+  assert.ok(calls.includes('mergeAll'));
 
   await workspaceUi.convertAll();
   assert.ok(calls.includes('convertAll'));
