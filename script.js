@@ -1117,7 +1117,29 @@ const UIManager = (() => {
     els.modalPreview.showModal();
   }
 
-  return { init, renderQueue, loadMarkdown, toast };
+  function setProcessingSub(text) {
+    if (els.procSub) els.procSub.textContent = String(text ?? '');
+  }
+
+  function scheduleWorkspaceSave() {
+    _scheduleWorkspaceSave();
+  }
+
+  function showComparison(item, rmd, bmd, rm, bm, diff) {
+    els.compareFileName.textContent = item.name;
+    els.compareMarkitdown.value = rmd || 'MarkItDown indisponível ou falhou.';
+    els.compareBrowser.value = bmd || 'Conversor local indisponível para este formato.';
+    els.compareMarkitdownStats.textContent = rmd
+      ? 'chars: ' + rm.characters.toLocaleString('pt-BR') + ' · linhas: ' + rm.lines + ' · headings: ' + rm.headings + ' · tabelas: ' + rm.tables + ' · links: ' + rm.links + ' · divergência: ' + diff + '%'
+      : 'Indisponível';
+    els.compareBrowserStats.textContent = bmd
+      ? 'chars: ' + bm.characters.toLocaleString('pt-BR') + ' · linhas: ' + bm.lines + ' · headings: ' + bm.headings + ' · tabelas: ' + bm.tables + ' · links: ' + bm.links + ' · divergência: ' + diff + '%'
+      : 'Indisponível';
+    els.modalCompare.showModal();
+  }
+
+  return { init, renderQueue, loadMarkdown, toast, setStatus, setProgress, showProcessing, hideProcessing,
+    setProcessingSub, scheduleWorkspaceSave, showComparison };
 })();
 
 // ══════════════════════════════════════════════
