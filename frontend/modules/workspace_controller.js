@@ -69,21 +69,19 @@
     }
 
     async function init() {
-      try {
-        const project = await workspaceStore.init();
-        const queue = await workspaceStore.loadQueue(project.id);
-        setState({ currentProjectId: project.id, queue });
-        renderQueue();
-        setWorkspaceStatus('Projeto: ' + project.name);
-        const current = queue.find(item => item.status === 'done' && item.result);
-        if (current) showCurrentDocument(current);
-        await listProjects();
-        return project;
-      } catch (error) {
-        console.warn('[MarkAI] Workspace init failed:', error);
-        setWorkspaceStatus('Workspace offline');
-        return null;
+      const project = await workspaceStore.init();
+      if (!project || !project.id) {
+        throw new Error('WorkspaceStore.init() did not return a valid project');
       }
+
+      const queue = await workspaceStore.loadQueue(project.id);
+      setState({ currentProjectId: project.id, queue });
+      renderQueue();
+      setWorkspaceStatus('Projeto: ' + project.name);
+      const current = queue.find(item => item.status === 'done' && item.result);
+      if (current) showCurrentDocument(current);
+      await listProjects();
+      return project;
     }
 
     async function selectProject(projectId) {
