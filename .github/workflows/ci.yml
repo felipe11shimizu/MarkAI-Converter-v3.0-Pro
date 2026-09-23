@@ -29,6 +29,7 @@ jobs:
       - run: node --check frontend/modules/file_parser.js
       - run: node --check frontend/modules/url_fetcher.js
       - run: node --check frontend/modules/merge_engine.js
+      - run: node --check frontend/modules/conversion_controller.js
       - run: node --check frontend/modules/ai_engine.js
       - run: node --check frontend/modules/chat_formatter.js
       - run: node --check frontend/modules/conversion_quality.js
