@@ -58,35 +58,8 @@ const MergeEngine = (() => {
   return { merge };
 })();
 
-// ══════════════════════════════════════════════
-// 5. URL FETCHER
-// ══════════════════════════════════════════════
-const URLFetcher = (() => {
-  async function fetch(url) {
-    const normalized = String(url || '').trim();
-    if (!normalized) throw new Error('Informe uma URL.');
-
-    try {
-      const result = await MarkItDownEngine.convertUrl(normalized);
-      return result.markdown;
-    } catch (error) {
-      const message = error?.message || 'Não foi possível converter a URL.';
-      if (/Backend MarkItDown indisponível/i.test(message)) {
-        throw new Error('O motor de URLs está offline. Inicie o backend MarkItDown e tente novamente.');
-      }
-      throw new Error(message);
-    }
-  }
-
-  function isYouTubeUrl(url) {
-    try {
-      const host = new URL(url).hostname.toLowerCase();
-      return ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtu.be', 'www.youtu.be'].includes(host);
-    } catch (_) { return false; }
-  }
-
-  return { fetch, isYouTubeUrl };
-})();
+// URL ingestion service is provided by frontend/modules/url_fetcher.js.
+const URLFetcher = globalThis.MarkAIUrlService;
 
 // ══════════════════════════════════════════════
 // 6. CHAT FORMATTER
