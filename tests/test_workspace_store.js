@@ -25,3 +25,4 @@ for (const method of required) {
 }
 
 console.log('workspace_store module tests: ok');
+
