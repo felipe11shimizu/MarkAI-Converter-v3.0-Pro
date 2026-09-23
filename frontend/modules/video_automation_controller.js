@@ -1133,6 +1133,7 @@ function create({
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, isVideo
   };
+}
 
   return { create };
 });
