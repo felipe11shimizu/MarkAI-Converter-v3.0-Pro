@@ -102,6 +102,16 @@ assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
 
+const pendingReviewData = JSON.parse(JSON.stringify(data));
+pendingReviewData.analysis.etapas[0].review_status = 'pending';
+controller.validateAnalysis(pendingReviewData, 'pyautogui');
+assert.equal(controller.finalizeReview(), false);
+controller.validateAnalysis(data, 'pyautogui');
+assert.equal(controller.finalizeReview(), true);
+const finalizedAudit = controller.reviewAuditManifest(data, 'pyautogui');
+assert.equal(finalizedAudit.review.finalized, true);
+assert.match(finalizedAudit.review.finalized_at, /^20/);
+
 const sensitiveData = JSON.parse(JSON.stringify(data));
 sensitiveData.analysis.etapas[0].review_status = 'approved';
 sensitiveData.analysis.etapas[0].tipo_acao = 'type';
