@@ -34,17 +34,28 @@
     const setProcessingSub = text => ui.setProcessingSub?.(text);
 
     function onFilesSelected(files) {
-      const added = queueManager.add(files);
-      workspaceController.scheduleSave();
-      renderQueue();
-      toast(added.length + ' arquivo(s) adicionado(s) à fila.', 'success');
+      const normalized = Array.from(files || []).filter(file => file && typeof file.name === 'string');
+      if (!normalized.length) return [];
 
-      if (getState().queue.length === 1 && added.length === 1) {
-        setTimeoutFn(() => {
-          Promise.resolve(conversionController.convertItem(added[0].id)).catch(error => {
-            console.warn('[MarkAI] Conversão automática falhou:', error);
-          });
-        }, 100);
+      try {
+        const added = queueManager.add(normalized);
+        workspaceController.scheduleSave();
+        renderQueue();
+        toast(added.length + ' arquivo(s) adicionado(s) à fila.', 'success');
+
+        if (getState().queue.length === 1 && added.length === 1) {
+          setTimeoutFn(() => {
+            Promise.resolve(conversionController.convertItem(added[0].id)).catch(error => {
+              console.warn('[MarkAI] Conversão automática falhou:', error);
+              toast('Arquivo importado, mas a conversão falhou: ' + error.message, 'error');
+            });
+          }, 100);
+        }
+        return added;
+      } catch (error) {
+        console.error('[MarkAI] Falha ao importar arquivo:', error);
+        toast('Não foi possível importar o arquivo: ' + (error?.message || error), 'error');
+        return [];
       }
     }
 
@@ -188,10 +199,18 @@
       browseBtn?.addEventListener('click', event => {
         event.stopPropagation();
       });
-      fileInput?.addEventListener('change', event => {
-        if (event.target.files.length) onFilesSelected(event.target.files);
-        event.target.value = '';
-      });
+      const handleFileInput = event => {
+        const input = event.currentTarget || event.target;
+        const files = input?.files ? Array.from(input.files) : [];
+        if (files.length) onFilesSelected(files);
+        // Clear only after the current event has been processed so Android
+        // has completed its native FileList hand-off.
+        setTimeoutFn(() => {
+          try { input.value = ''; } catch (_) {}
+        }, 0);
+      };
+      fileInput?.addEventListener('change', handleFileInput);
+      fileInput?.addEventListener('input', handleFileInput);
 
       clearQueue?.addEventListener('click', () => {
         queueManager.clear();
