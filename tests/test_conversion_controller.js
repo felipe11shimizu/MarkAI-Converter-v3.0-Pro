@@ -23,7 +23,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   };
   const controller = Controller.create({
     queueManager: queue, markItDownEngine: markitdown, fileParserStrategy: parser,
-    conversionQuality: quality, getState: () => ({ mergeEngine: { merge: async () => ({markdown:'# merged',fileName:'merged.md'}) } }),
+    conversionQuality: quality, getState: () => ({ mergeEngine: { merge: async () => '# merged' } }),
     setState: patch => calls.push(['state', patch]), ui, workspace: { scheduleSave() { calls.push(['save']); } }
   });
   const result = await controller.convertItem('1');
@@ -32,7 +32,8 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   assert.ok(calls.some(x => x[0] === 'load'));
   await controller.convertAll();
   assert.strictEqual(items[1].status, 'done');
-  await controller.mergeAll();
+  const mergeResult = await controller.mergeAll();
+  assert.deepStrictEqual(mergeResult, { markdown: '# merged', fileName: 'documento_combinado.md' });
   assert.ok(calls.some(x => x[0] === 'load' && x[1] === '# merged'));
   assert.ok(calls.some(x => x[0] === 'save'));
   console.log('conversion_controller tests passed');
