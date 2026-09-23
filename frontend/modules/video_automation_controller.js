@@ -563,6 +563,32 @@ function create({
       (!finalizedReviewSnapshot || _reviewIntegrityKey(data) === _reviewIntegrityKey(finalizedReviewSnapshot));
   }
 
+  function reviewPackageManifest(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
+    if (!data || !isReviewPackageReady(data)) return false;
+    const normalizedPlatform = validator.normalizePlatform(platform);
+    const base = String(data?.filename || 'video').replace(/\\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+    const automationFilename = _automationFilename(normalizedPlatform, data);
+    const auditFilename = base + '-auditoria-revisao.json';
+    const analysisFilename = base + '-analise-revisada.json';
+    const packageFilename = base + '-pacote-manifesto.json';
+    return {
+      schema_version: '1.0',
+      package_type: 'markai-video-review-package',
+      generated_at: new Date().toISOString(),
+      source_filename: data?.filename || null,
+      platform: normalizedPlatform,
+      review_finalized_at: reviewFinalizedAt,
+      integrity_match: true,
+      sensitive_data_policy: 'Sensitive values are not included in exported analysis; automation uses {{DADO_SENSIVEL}}.',
+      files: [
+        { name: automationFilename, type: 'automation', description: 'Generated automation for the selected platform.' },
+        { name: auditFilename, type: 'review_audit', description: 'Human review, validation and integrity audit manifest.' },
+        { name: analysisFilename, type: 'reviewed_analysis', description: 'Sanitized reviewed analysis with sensitive placeholders.' },
+        { name: packageFilename, type: 'package_manifest', description: 'Manifest of the package contents and export state.' }
+      ]
+    };
+  }
+
   async function exportReviewPackage(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
     if (!isReviewPackageReady(data)) return false;
     if (typeof zipImpl !== 'function') throw new TypeError('Review package export requires JSZip.');
@@ -570,11 +596,13 @@ function create({
     const code = _generateAutomation(normalizedPlatform, data);
     const audit = reviewAuditManifest(data, normalizedPlatform);
     const analysis = _safeJsonData(data);
+    const packageManifest = reviewPackageManifest(data, normalizedPlatform);
     const zip = new zipImpl();
     const base = String(data?.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
     zip.file(_automationFilename(normalizedPlatform, data), code);
     zip.file(base + '-auditoria-revisao.json', JSON.stringify(audit, null, 2));
     zip.file(base + '-analise-revisada.json', JSON.stringify(analysis, null, 2));
+    zip.file(base + '-pacote-manifesto.json', JSON.stringify(packageManifest, null, 2));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = windowRef.URL.createObjectURL(blob);
     const a = documentRef.createElement('a');
@@ -1531,7 +1559,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageManifest, getOriginalAnalysis, getReviewHistory
   };
 }
 
