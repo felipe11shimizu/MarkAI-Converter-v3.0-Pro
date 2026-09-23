@@ -5,6 +5,36 @@ const VideoAutomationController = require('../frontend/modules/video_automation_
 const Validator = require('../video_automation_validator.js');
 const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js');
 
+class FakeZip {
+  constructor() { this.files = {}; }
+  file(name, content) { this.files[name] = content; }
+  async generateAsync() { return new Blob(['zip']); }
+}
+
+const downloadState = { href: null, name: null };
+const fakeDocument = {
+  createElement(tag) {
+    return {
+      tagName: tag,
+      click() { downloadState.clicked = true; },
+      set href(value) { downloadState.href = value; },
+      get href() { return downloadState.href; },
+      set download(value) { downloadState.name = value; },
+      get download() { return downloadState.name; }
+    };
+  },
+  body: { appendChild() {}, removeChild() {} },
+  getElementById() { return null; }
+};
+const fakeWindow = {
+  Blob,
+  URL: {
+    createObjectURL() { return 'blob:review-package'; },
+    revokeObjectURL() {}
+  },
+  setTimeout() {}
+};
+
 const controller = VideoAutomationController.create({
   getSettings: () => ({ markitdownEndpoint: 'http://localhost:8000' }),
   urlService: { isYouTubeUrl: url => /youtube\\.com|youtu\\.be/i.test(String(url || '')) },
@@ -14,8 +44,9 @@ const controller = VideoAutomationController.create({
   fetchImpl: async () => {
     throw new Error('fetch should not be called by deterministic tests');
   },
-  documentRef: null,
-  windowRef: {}
+  documentRef: fakeDocument,
+  windowRef: fakeWindow,
+  zipImpl: FakeZip
 });
 
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
@@ -55,6 +86,10 @@ const data = {
     etapas: [readyStep]
   }
 };
+
+const packageData = await controller.exportReviewPackage(data, 'pyautogui');
+assert.equal(packageData, true);
+assert.equal(downloadState.name, 'processo-pacote-revisao.zip');
 
 const auditManifest = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(auditManifest.schema_version, '1.0');
