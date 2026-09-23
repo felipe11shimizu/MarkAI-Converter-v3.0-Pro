@@ -151,20 +151,9 @@
     }
 
     function openFilePicker(fileInput) {
-      if (!fileInput) return false;
-      try {
-        if (typeof fileInput.showPicker === 'function') {
-          fileInput.showPicker();
-          return true;
-        }
-      } catch (error) {
-        console.warn('[MarkAI] showPicker indisponível, usando fallback:', error);
-      }
-      if (typeof fileInput.click === 'function') {
-        fileInput.click();
-        return true;
-      }
-      return false;
+      if (!fileInput || typeof fileInput.click !== 'function') return false;
+      fileInput.click();
+      return true;
     }
 
     function bind() {
@@ -194,10 +183,12 @@
           fileInput?.click();
         }
       });
+      // The visible "select from computer" control is a <label for="fileInput">.
+      // Let the browser perform the native activation on mobile; do not call
+      // showPicker()/click() here, which can be rejected or behave inconsistently
+      // on Android browsers when the control is nested inside the drop zone.
       browseBtn?.addEventListener('click', event => {
-        event.preventDefault();
         event.stopPropagation();
-        openFilePicker(fileInput);
       });
       fileInput?.addEventListener('change', event => {
         if (event.target.files.length) onFilesSelected(event.target.files);
