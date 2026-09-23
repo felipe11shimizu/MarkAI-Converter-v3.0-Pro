@@ -109,7 +109,7 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
 
   queue.push({ id: 'q2', name: 'teste.txt', status: 'done', result: '# segundo' });
   await workspaceUi.downloadZip();
-  const zipCall = calls.find(call => Array.isArray(call) && call[0] === 'zip');
+  const zipCall = calls.filter(call => Array.isArray(call) && call[0] === 'zip').at(-1);
   assert.ok(zipCall);
   assert.deepEqual(zipCall[1].map(file => file[0]), ['teste.md', 'teste (2).md']);
 
