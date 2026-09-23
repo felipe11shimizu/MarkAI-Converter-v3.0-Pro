@@ -58,14 +58,26 @@
       return fetchUrl();
     }
 
+    function transcribeYouTube() {
+      return youtubeController.transcribe(getUrl(), youtubeOptions());
+    }
+
+    function listYouTubeLanguages() {
+      return youtubeController.listLanguages(getUrl());
+    }
+
     function bind() {
       elements.btnFetchUrl.addEventListener('click', submit);
       elements.urlInput.addEventListener('keydown', event => {
         if (event.key === 'Enter') submit();
       });
+      elements.urlInput.addEventListener('input', () => youtubeController.updateControls(getUrl()));
+      elements.btnYoutubeTranscribe?.addEventListener('click', transcribeYouTube);
+      elements.btnYoutubeLanguages?.addEventListener('click', listYouTubeLanguages);
+      youtubeController.updateControls(getUrl());
     }
 
-    return { bind, fetchUrl, submit, youtubeOptions };
+    return { bind, fetchUrl, submit, youtubeOptions, transcribeYouTube, listYouTubeLanguages };
   }
 
   return { create };
