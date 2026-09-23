@@ -87,9 +87,7 @@ const data = {
   }
 };
 
-const packageData = await controller.exportReviewPackage(data, 'pyautogui');
-assert.equal(packageData, true);
-assert.equal(downloadState.name, 'processo-pacote-revisao.zip');
+assert.equal(await controller.exportReviewPackage(data, 'pyautogui'), false);
 
 const auditManifest = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(auditManifest.schema_version, '1.0');
@@ -140,6 +138,10 @@ const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
+
+const packageData = await controller.exportReviewPackage(data, 'pyautogui');
+assert.equal(packageData, true);
+assert.equal(downloadState.name, 'processo-pacote-revisao.zip');
 
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
