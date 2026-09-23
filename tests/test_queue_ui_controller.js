@@ -107,7 +107,7 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-download') } });
   assert.ok(calls.includes('download-click'));
 
-  queue.push({ id: 'q2', name: 'teste.txt', status: 'done', result: '# segundo' });
+  queue.push({ id: 'q2', name: 'teste.md', status: 'done', result: '# segundo' });
   await workspaceUi.downloadZip();
   const zipCall = calls.filter(call => Array.isArray(call) && call[0] === 'zip').at(-1);
   assert.ok(zipCall);
