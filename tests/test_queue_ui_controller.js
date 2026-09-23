@@ -5,9 +5,10 @@ const QueueUIController = require('../frontend/modules/queue_ui_controller.js');
 
 const calls = [];
 const queue = [];
+const timers = { setTimeout(fn) { calls.push('timer'); fn(); } };
 const queueManager = {
   add(files) {
-    const item = { id: 'q1', name: files[0].name, status: 'queued' };
+    const item = { id: 'q1', name: files[0].name, status: 'queued', result: '# resultado' };
     queue.push(item);
     return [item];
   },
@@ -31,8 +32,19 @@ const mergeEngine = {
 const workspaceController = {
   scheduleSave() { calls.push('save'); }
 };
+
+function button(id, ...classes) {
+  return {
+    dataset: { id },
+    classList: { contains(name) { return classes.includes(name); } }
+  };
+}
+
 const documentRef = {
-  getElementById() { return null; }
+  getElementById(id) {
+    if (id === 'queueList') return { querySelectorAll() { return []; } };
+    return null;
+  }
 };
 const ui = {
   renderQueue() { calls.push('render'); },
@@ -54,7 +66,8 @@ const workspaceUi = QueueUIController.create({
   getState: () => ({ queue }),
   ui,
   documentRef,
-  windowRef: {}
+  windowRef: {},
+  timers
 });
 
 assert.ok(workspaceUi);
@@ -62,10 +75,13 @@ assert.equal(typeof workspaceUi.bind, 'function');
 assert.equal(typeof workspaceUi.onFilesSelected, 'function');
 assert.equal(typeof workspaceUi.mergeAll, 'function');
 assert.equal(typeof workspaceUi.convertAll, 'function');
+assert.equal(typeof workspaceUi.handleQueueAction, 'function');
 
 (async () => {
   workspaceUi.onFilesSelected([{ name: 'teste.md' }]);
   assert.equal(queue.length, 1);
+  assert.ok(calls.includes('timer'));
+  assert.ok(calls.includes('convert:q1'));
   assert.deepEqual(calls.slice(0, 2), ['save', 'render']);
 
   await workspaceUi.mergeAll();
@@ -76,5 +92,15 @@ assert.equal(typeof workspaceUi.convertAll, 'function');
   await workspaceUi.convertAll();
   assert.ok(calls.includes('convertAll'));
 
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-compare') } });
+  assert.ok(calls.includes('compare:q1'));
+
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-preview') } });
+  assert.ok(calls.includes('preview:q1'));
+
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-remove') } });
+  assert.ok(calls.includes('empty:true'));
+  assert.ok(calls.filter(call => call === 'save').length >= 2);
+
   console.log('queue_ui_controller module tests: ok');
-})();
+})().catch(err => { console.error(err); process.exit(1); });
