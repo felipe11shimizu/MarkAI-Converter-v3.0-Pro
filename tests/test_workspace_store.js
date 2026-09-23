@@ -2,9 +2,9 @@
 
 const assert = require('node:assert/strict');
 
-require('../frontend/modules/workspace_store.js');
+const WorkspaceStore = require('../frontend/modules/workspace_store.js');
 
-assert.ok(global.MarkAIWorkspace);
+assert.ok(WorkspaceStore);
 const required = [
   'init',
   'listProjects',
@@ -21,7 +21,7 @@ const required = [
 ];
 
 for (const method of required) {
-  assert.equal(typeof global.MarkAIWorkspace[method], 'function', method + ' should be exported');
+  assert.equal(typeof WorkspaceStore[method], 'function', method + ' should be exported');
 }
 
 console.log('workspace_store module tests: ok');
