@@ -4,8 +4,8 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  function create({ queueManager, markItDownEngine, fileParserStrategy, conversionQuality, getState, setState, ui, workspace }) {
-    if (!queueManager || !markItDownEngine || !fileParserStrategy || !conversionQuality || !getState || !setState || !ui) {
+  function create({ queueManager, markItDownEngine, fileParserStrategy, conversionQuality, mergeEngine, getState, setState, ui, workspace }) {
+    if (!queueManager || !markItDownEngine || !fileParserStrategy || !conversionQuality || !mergeEngine || !getState || !setState || !ui) {
       throw new Error('ConversionController requires queue, engines, state and UI dependencies.');
     }
 
@@ -74,7 +74,7 @@
       ui.showProcessing('Juntando arquivos…', 'Processando ' + items.length + ' arquivos');
       ui.setStatus('Fazendo merge…', 'busy');
       try {
-        const markdown = await getState().mergeEngine.merge((p, name) => {
+        const markdown = await mergeEngine.merge((p, name) => {
           ui.setProcessingSub('Convertendo: ' + name);
         });
         const fileName = 'documento_combinado.md';
