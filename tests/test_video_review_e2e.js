@@ -26,7 +26,7 @@ const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js
         click() {},
         set download(value) { downloads.name = value; },
         get download() { return downloads.name; },
-        set href() {},
+        set href(value) {},
         get href() { return ''; }
       };
     },
