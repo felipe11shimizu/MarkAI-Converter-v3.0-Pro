@@ -12,6 +12,7 @@ const QueueManager = globalThis.MarkAICore.QueueManager;
 
 // Workspace persistence is provided by frontend/modules/workspace_store.js.
 const WorkspaceStore = globalThis.MarkAIWorkspace;
+let WorkspaceController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -81,49 +82,25 @@ const UIManager = (() => {
   const _sanitizeMarkdownHtml = UIDom.sanitizeMarkdownHtml;
   const _escapeHtml = UIDom.escapeHtml;
 
-  // ── WORKSPACE UI ──
+  // ── WORKSPACE PRESENTATION ──
   let _workspaceHistoryMode = 'versions';
-  let _workspaceSaveTimer = null;
 
-  async function _workspaceSyncQueue() {
-    const projectId = AppState.get('currentProjectId');
-    if (!projectId) return;
-    try {
-      await WorkspaceStore.saveQueue(projectId, AppState.get('queue'));
-      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Salvo localmente · ' + new Date().toLocaleTimeString('pt-BR');
-    } catch (e) {
-      console.warn('[MarkAI] Workspace save failed:', e);
-      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Erro ao salvar workspace';
-    }
-  }
-
-  function _scheduleWorkspaceSave() {
-    clearTimeout(_workspaceSaveTimer);
-    _workspaceSaveTimer = setTimeout(_workspaceSyncQueue, 600);
-  }
-
-  async function _refreshWorkspaceProjects() {
-    const projects = await WorkspaceStore.listProjects();
+  function _refreshWorkspaceProjects(projects = []) {
     const activeId = AppState.get('currentProjectId');
     els.workspaceProjectSelect.innerHTML = projects.map(p =>
       '<option value="' + p.id + '"' + (p.id === activeId ? ' selected' : '') + '>' +
-      p.name.replace(/</g, '&lt;') + '</option>'
+      _escapeHtml(p.name) + '</option>'
     ).join('');
     els.workspaceProjectList.innerHTML = projects.length ? projects.map(p => {
       const countLabel = p.id === activeId ? ' · ativo' : '';
       return '<div class="workspace-project-item' + (p.id === activeId ? ' active' : '') + '" data-project-id="' + p.id + '">' +
-        '<div class="workspace-project-name">' + p.name.replace(/</g, '&lt;') + '</div>' +
+        '<div class="workspace-project-name">' + _escapeHtml(p.name) + '</div>' +
         '<div class="workspace-project-meta">Atualizado ' + new Date(p.updatedAt || p.createdAt).toLocaleString('pt-BR') + countLabel + '</div>' +
       '</div>';
     }).join('') : '<div class="workspace-empty">Nenhum projeto.</div>';
   }
 
-  async function _renderWorkspaceHistory() {
-    const projectId = AppState.get('currentProjectId');
-    if (!projectId) return;
-    const records = _workspaceHistoryMode === 'versions'
-      ? await WorkspaceStore.listVersions(projectId)
-      : await WorkspaceStore.listAIHistory(projectId);
+  function _renderWorkspaceHistory(records = []) {
     els.workspaceHistoryCount.textContent = records.length;
     if (!records.length) {
       els.workspaceHistoryList.innerHTML = '<div class="workspace-empty">Nenhum registro neste projeto.</div>';
@@ -137,217 +114,31 @@ const UIManager = (() => {
         ? (item.source || 'editor') + ' · ' + String(item.markdown || '').slice(0, 140)
         : String(item.prompt || 'Prompt padrão do sistema').slice(0, 140);
       return '<div class="workspace-history-item" data-history-id="' + item.id + '">' +
-        '<div class="workspace-history-title">' + title.replace(/</g, '&lt;') + '</div>' +
+        '<div class="workspace-history-title">' + _escapeHtml(title) + '</div>' +
         '<div class="workspace-history-meta">' + new Date(item.createdAt).toLocaleString('pt-BR') + '</div>' +
-        '<div class="workspace-history-preview">' + preview.replace(/</g, '&lt;') + '</div>' +
+        '<div class="workspace-history-preview">' + _escapeHtml(preview) + '</div>' +
       '</div>';
     }).join('');
   }
 
   async function _openWorkspace() {
     try {
-      await _refreshWorkspaceProjects();
-      await _renderWorkspaceHistory();
+      await WorkspaceController.listProjects();
+      await WorkspaceController.listHistory(_workspaceHistoryMode);
       els.modalWorkspace.showModal();
     } catch (e) {
       toast('Erro ao abrir workspace: ' + e.message, 'error');
     }
   }
 
-  async function _selectProject(projectId) {
-    if (!projectId || projectId === AppState.get('currentProjectId')) return;
-    await _workspaceSyncQueue();
-    const queue = await WorkspaceStore.loadQueue(projectId);
-    AppState.set('currentProjectId', projectId);
-    AppState.set('queue', queue);
-    renderQueue();
-    const current = queue.find(i => i.status === 'done' && i.result);
-    if (current) {
-      loadMarkdown(current.result, current.name.replace(/\.[^.]+$/, '') + '.md');
-    } else {
-      AppState.set('currentMd', '');
-      els.workspaceContent.style.display = 'none';
-      els.emptyState.style.display = 'flex';
-    }
-    await _refreshWorkspaceProjects();
-    await _renderWorkspaceHistory();
-    if (els.workspaceStatus) els.workspaceStatus.textContent = 'Projeto: ' + (els.workspaceProjectSelect.selectedOptions[0]?.textContent || '');
-    toast('Projeto carregado.', 'success');
+  function _showCurrentWorkspaceDocument(item) {
+    if (item?.result) loadMarkdown(item.result, item.name.replace(/\.[^.]+$/, '') + '.md');
   }
 
-  async function _createProject() {
-    await _workspaceSyncQueue();
-    const name = els.workspaceProjectName.value.trim();
-    if (!name) { toast('Informe o nome do projeto.', 'warning'); return; }
-    const project = await WorkspaceStore.createProject(name);
-    els.workspaceProjectName.value = '';
-    AppState.set('currentProjectId', project.id);
-    AppState.set('queue', []);
+  function _showEmptyWorkspace() {
     AppState.set('currentMd', '');
-    renderQueue();
     els.workspaceContent.style.display = 'none';
     els.emptyState.style.display = 'flex';
-    await _refreshWorkspaceProjects();
-    await _renderWorkspaceHistory();
-    toast('Projeto criado e ativado.', 'success');
-  }
-
-  async function _saveWorkspaceVersion(source = 'manual') {
-    const projectId = AppState.get('currentProjectId');
-    const md = AppState.get('currentMd');
-    if (!projectId || !md) { toast('Não há conteúdo para versionar.', 'warning'); return; }
-    const version = await WorkspaceStore.saveVersion(
-      projectId, null, AppState.get('currentFileName'), md, source,
-      ''
-    );
-    await WorkspaceStore.updateProject({ ...(await WorkspaceStore.listProjects()).find(p => p.id === projectId) });
-    await _renderWorkspaceHistory();
-    if (els.workspaceStatus) els.workspaceStatus.textContent = 'Versão salva · ' + new Date(version.createdAt).toLocaleTimeString('pt-BR');
-    toast('Versão do Markdown salva.', 'success');
-  }
-
-  async function _exportWorkspaceJson() {
-    const projectId = AppState.get('currentProjectId');
-    if (!projectId) return;
-    const payload = await WorkspaceStore.exportProject(projectId);
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-    _downloadBlob(blob, (payload.project?.name || 'markai-workspace') + '.json');
-    toast('Workspace exportado em JSON.', 'success');
-  }
-
-  async function _exportWorkspaceZip() {
-    const projectId = AppState.get('currentProjectId');
-    if (!projectId) return;
-    if (!window.JSZip) { toast('Biblioteca ZIP ainda não carregou.', 'warning'); return; }
-    const payload = await WorkspaceStore.exportProject(projectId);
-    const zip = new JSZip();
-    const safe = String(payload.project?.name || 'workspace').replace(/[^a-z0-9_-]+/gi, '_');
-    zip.file('workspace.json', JSON.stringify(payload, null, 2));
-    payload.documents.forEach((d, i) => {
-      if (d.result) zip.file('markdown/' + String(i + 1).padStart(3, '0') + '_' + String(d.name || 'documento').replace(/[^a-z0-9_.-]+/gi, '_') + '.md', d.result);
-    });
-    const versions = payload.versions || [];
-    versions.forEach((v, i) => {
-      if (v.markdown) zip.file('versions/' + String(i + 1).padStart(3, '0') + '_' + String(v.name || 'versao').replace(/[^a-z0-9_.-]+/gi, '_') + '.md', v.markdown);
-    });
-    const content = await zip.generateAsync({ type: 'blob' });
-    _downloadBlob(content, safe + '.zip');
-    toast('Workspace exportado em ZIP.', 'success');
-  }
-
-  function _downloadBlob(blob, fileName) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  // ── TOAST ──
-  function toast(msg, type = 'info', duration = 3500) {
-    const icons = { success: 'check-circle', error: 'alert-circle', info: 'info', warning: 'alert-triangle' };
-    const el = document.createElement('div');
-    el.className = `toast ${type}`;
-    const icon = document.createElement('i');
-    icon.dataset.lucide = icons[type] || 'info';
-    const text = document.createElement('span');
-    text.textContent = String(msg ?? '');
-    el.append(icon, text);
-    els.toastContainer.appendChild(el);
-    lucide.createIcons({ el });
-    setTimeout(() => {
-      el.classList.add('removing');
-      el.addEventListener('animationend', () => el.remove());
-    }, duration);
-  }
-
-  // ── STATUS ──
-  function setStatus(text, state = 'idle') {
-    els.statusText.textContent = text;
-    els.statusDot.className = 'status-dot' + (state !== 'idle' ? ` ${state}` : '');
-  }
-
-  // ── PROGRESS ──
-  function setProgress(pct, show = true) {
-    els.progressWrap.style.display = show ? 'block' : 'none';
-    els.progressBar.style.width = (pct * 100).toFixed(1) + '%';
-  }
-
-  // ── PROCESSING OVERLAY ──
-  function showProcessing(label = 'Processando…', sub = 'Aguarde') {
-    els.procLabel.textContent = label;
-    els.procSub.textContent = sub;
-    els.procOverlay.style.display = 'flex';
-  }
-  function hideProcessing() {
-    els.procOverlay.style.display = 'none';
-  }
-
-  // ── QUEUE RENDER ──
-  function renderQueue() {
-    const queue = AppState.get('queue');
-    els.queueCount.textContent = queue.length;
-    els.queuePanel.style.display = queue.length ? 'block' : 'none';
-
-    const ordered = QueueManager.getOrdered();
-    const ids = ordered.map(i => i.id);
-    // Only re-render if needed
-    const existingIds = Array.from(els.queueList.querySelectorAll('.queue-item')).map(e => e.dataset.id);
-    const same = ids.length === existingIds.length && ids.every((id, i) => id === existingIds[i]);
-    if (same && queue.length === existingIds.length) {
-      // Just update statuses
-      for (const item of queue) {
-        const el = els.queueList.querySelector(`[data-id="${item.id}"]`);
-        if (el) {
-          const si = el.querySelector('.qi-status');
-          si.setAttribute('class', 'qi-status');
-          si.setAttribute('data-lucide', _statusIcon(item.status));
-          el.className = `queue-item ${item.status}`;
-        }
-      }
-      lucide.createIcons();
-      return;
-    }
-
-    els.queueList.innerHTML = '';
-    for (const item of (ordered.length ? ordered : queue)) {
-      const li = document.createElement('li');
-      li.className = `queue-item ${item.status}`;
-      li.dataset.id = item.id;
-      li.innerHTML = `
-        <i data-lucide="grip-vertical" class="qi-drag"></i>
-        <input type="checkbox" class="qi-check" data-id="${item.id}" title="Selecionar" />
-        <div class="qi-icon ${_extClass(item.ext)}">${EXT_LABELS[item.ext] || item.ext.toUpperCase()}</div>
-        <div class="qi-info">
-          <div class="qi-name" title="${_escapeHtml(item.name)}">${_escapeHtml(item.name)}</div>
-          <div class="qi-size">${_formatSize(item.size)}</div>
-        </div>
-        <div class="qi-actions">
-          <button class="btn btn-ghost btn-icon-xs qi-btn-preview" data-id="${item.id}" title="Pré-visualizar">
-            <i data-lucide="eye"></i>
-          </button>
-          <button class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="${item.id}" title="Converter">
-            <i data-lucide="zap"></i>
-          </button>
-          <button class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="${item.id}" title="Comparar motores">
-            <i data-lucide="columns-2"></i>
-          </button>
-          <button class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="${item.id}" title="Baixar Arquivo">
-            <i data-lucide="download"></i>
-          </button>
-          <button class="btn btn-ghost btn-icon-xs qi-btn-remove" data-id="${item.id}" title="Remover">
-            <i data-lucide="x"></i>
-          </button>
-        </div>
-        <i data-lucide="${_statusIcon(item.status)}" class="qi-status"></i>
-      `;
-      els.queueList.appendChild(li);
-    }
-    lucide.createIcons();
-    QueueManager.initSortable(els.queueList);
-  }
-
-  function _statusIcon(status) {
-    return { pending:'clock', converting:'loader-2', done:'check-circle', error:'alert-circle' }[status] || 'clock';
   }
 
   // ── LOAD MARKDOWN INTO WORKSPACE ──
@@ -485,7 +276,7 @@ const UIManager = (() => {
     AppState.loadSettings();
     _applySettings();
     _setupMarkdown();
-    _initWorkspace();
+    WorkspaceController.init();
 
     // Workspace
     els.btnWorkspace?.addEventListener('click', _openWorkspace);
@@ -493,15 +284,18 @@ const UIManager = (() => {
     els.btnCloseWorkspace?.addEventListener('click', () => els.modalWorkspace.close());
     els.btnWorkspaceDone?.addEventListener('click', () => els.modalWorkspace.close());
     els.modalWorkspace?.addEventListener('click', e => { if (e.target === els.modalWorkspace) els.modalWorkspace.close(); });
-    els.workspaceProjectSelect?.addEventListener('change', e => _selectProject(e.target.value));
-    els.btnWorkspaceSave?.addEventListener('click', async () => { await _workspaceSyncQueue(); toast('Workspace salvo.', 'success'); });
-    els.btnWorkspaceVersion?.addEventListener('click', () => _saveWorkspaceVersion('manual'));
+    els.workspaceProjectSelect?.addEventListener('change', e => WorkspaceController.selectProject(e.target.value));
+    els.btnWorkspaceSave?.addEventListener('click', async () => {
+      await WorkspaceController.syncQueue();
+      toast('Workspace salvo.', 'success');
+    });
+    els.btnWorkspaceVersion?.addEventListener('click', () => WorkspaceController.saveVersion('manual'));
     els.btnWorkspaceExport?.addEventListener('click', _exportWorkspaceZip);
     els.btnCreateWorkspaceProject?.addEventListener('click', _createProject);
     els.workspaceProjectName?.addEventListener('keydown', e => { if (e.key === 'Enter') _createProject(); });
     els.workspaceProjectList?.addEventListener('click', e => {
       const item = e.target.closest('[data-project-id]');
-      if (item) _selectProject(item.dataset.projectId);
+      if (item) WorkspaceController.selectProject(item.dataset.projectId);
     });
     els.btnRenameWorkspaceProject?.addEventListener('click', async () => {
       const projectId = AppState.get('currentProjectId');
@@ -509,39 +303,25 @@ const UIManager = (() => {
       if (!project) return;
       const name = window.prompt('Novo nome do projeto:', project.name);
       if (!name?.trim()) return;
-      project.name = name.trim();
-      await WorkspaceStore.updateProject(project);
-      await _refreshWorkspaceProjects();
-      toast('Projeto renomeado.', 'success');
+      await WorkspaceController.renameProject(projectId, name);
     });
-    els.btnDeleteWorkspaceProject?.addEventListener('click', async () => {
-      const projects = await WorkspaceStore.listProjects();
-      if (projects.length <= 1) { toast('Mantenha pelo menos um projeto.', 'warning'); return; }
-      const projectId = AppState.get('currentProjectId');
-      const project = projects.find(p => p.id === projectId);
-      if (!project || !window.confirm('Excluir o projeto "' + project.name + '" e todo o histórico local?')) return;
-      await WorkspaceStore.deleteProject(projectId);
-      const next = (await WorkspaceStore.listProjects())[0];
-      AppState.set('currentProjectId', next.id);
-      AppState.set('queue', await WorkspaceStore.loadQueue(next.id));
-      renderQueue();
-      await _refreshWorkspaceProjects();
-      await _renderWorkspaceHistory();
-      toast('Projeto excluído.', 'success');
-    });
+    els.btnDeleteWorkspaceProject?.addEventListener('click', () => WorkspaceController.deleteProject(
+      AppState.get('currentProjectId'),
+      project => window.confirm('Excluir o projeto "' + project.name + '" e todo o histórico local?')
+    ));
     els.btnExportWorkspaceJson?.addEventListener('click', _exportWorkspaceJson);
     els.btnExportWorkspaceZip?.addEventListener('click', _exportWorkspaceZip);
     els.workspaceTabVersions?.addEventListener('click', async () => {
       _workspaceHistoryMode = 'versions';
       els.workspaceTabVersions.classList.add('active');
       els.workspaceTabAI.classList.remove('active');
-      await _renderWorkspaceHistory();
+      await WorkspaceController.listHistory('versions');
     });
     els.workspaceTabAI?.addEventListener('click', async () => {
       _workspaceHistoryMode = 'ai';
       els.workspaceTabAI.classList.add('active');
       els.workspaceTabVersions.classList.remove('active');
-      await _renderWorkspaceHistory();
+      await WorkspaceController.listHistory('ai');
     });
 
     els.workspaceHistoryList?.addEventListener('click', async e => {
@@ -1122,7 +902,7 @@ const UIManager = (() => {
   }
 
   function scheduleWorkspaceSave() {
-    _scheduleWorkspaceSave();
+    WorkspaceController.scheduleSave();
   }
 
   function showComparison(item, rmd, bmd, rm, bm, diff) {
@@ -1139,7 +919,13 @@ const UIManager = (() => {
   }
 
   return { init, renderQueue, loadMarkdown, toast, setStatus, setProgress, showProcessing, hideProcessing,
-    setProcessingSub, scheduleWorkspaceSave, showComparison };
+    setProcessingSub, scheduleWorkspaceSave, showComparison,
+    refreshWorkspaceProjects: _refreshWorkspaceProjects,
+    renderWorkspaceHistory: _renderWorkspaceHistory,
+    showCurrentWorkspaceDocument: _showCurrentWorkspaceDocument,
+    showEmptyWorkspace: _showEmptyWorkspace,
+    setWorkspaceStatus: text => { if (els.workspaceStatus) els.workspaceStatus.textContent = String(text ?? ''); }
+  };
 })();
 
 // ══════════════════════════════════════════════
@@ -1154,6 +940,28 @@ document.addEventListener('DOMContentLoaded', () => {
     window['pdfjs-dist/build/pdf'].GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   }
+
+  // Compose application services before UI boot.
+  WorkspaceController = globalThis.MarkAIWorkspaceController.create({
+    workspaceStore: WorkspaceStore,
+    queueManager: QueueManager,
+    getState: () => ({
+      currentProjectId: AppState.get('currentProjectId'),
+      queue: AppState.get('queue'),
+      currentMd: AppState.get('currentMd'),
+      currentFileName: AppState.get('currentFileName')
+    }),
+    setState: patch => Object.entries(patch).forEach(([key, value]) => AppState.set(key, value)),
+    ui: {
+      setWorkspaceStatus: text => UIManager.setWorkspaceStatus(text),
+      renderQueue: () => UIManager.renderQueue(),
+      refreshProjects: projects => UIManager.refreshWorkspaceProjects(projects),
+      renderHistory: records => UIManager.renderWorkspaceHistory(records),
+      toast: (message, type) => UIManager.toast(message, type),
+      showCurrentDocument: item => UIManager.showCurrentWorkspaceDocument(item),
+      showEmptyWorkspace: () => UIManager.showEmptyWorkspace()
+    }
+  });
 
   // Boot UI
   UIManager.init();
