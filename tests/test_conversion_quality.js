@@ -11,7 +11,7 @@ assert.deepEqual(ConversionQuality.metrics('# T\n\ntexto'), {
 assert.equal(ConversionQuality.diffScore('a', 'a'), 0);
 assert.equal(ConversionQuality.diffScore('a', 'b'), 100);
 
-const realisticMarkdown = '# Relatório de conversão\\n\\nEste é um documento com [um link](https://example.com).\\n\\n| Coluna A | Coluna B |\\n| --- | --- |\\n| 10 | 20 |';
+const realisticMarkdown = '# Relatório de conversão\n\nEste é um documento com [um link](https://example.com).\n\n| Coluna A | Coluna B |\n| --- | --- |\n| 10 | 20 |';
 assert.deepEqual(ConversionQuality.metrics(realisticMarkdown), {
   characters: 132,
   lines: 7,
