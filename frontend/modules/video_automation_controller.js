@@ -428,7 +428,7 @@ function create({
   }
 
   function _scrollToEvidenceStep(order) {
-    const target = document.querySelector('[data-video-step-order="' + String(order) + '"]');
+    const target = documentRef?.querySelector?.('[data-video-step-order="' + String(order) + '"]');
     if (!target) return;
     target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     target.focus?.({ preventScroll: true });
