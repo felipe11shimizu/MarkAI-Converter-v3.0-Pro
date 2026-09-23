@@ -82,6 +82,9 @@ jobs:
           for test in "${tests[@]}"; do
             echo "::group::$test"
             echo "Running $test"
-            node "$test"
+            if ! node "$test"; then
+              echo "::error title=Frontend test failed::$test"
+              exit 1
+            fi
             echo "::endgroup::"
           done

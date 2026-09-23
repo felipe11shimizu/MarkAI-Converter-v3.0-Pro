@@ -1308,3 +1308,33 @@ body::before {
   outline: 2px solid rgba(34, 211, 238, .75);
   outline-offset: 3px;
 }
+
+
+.video-review-history {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid rgba(148, 163, 184, .18);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, .2);
+}
+.video-review-history h3 { margin: 0 0 .35rem; }
+.video-review-history-list {
+  display: grid;
+  gap: .5rem;
+  margin: .75rem 0 0;
+  padding-left: 1.25rem;
+}
+.video-review-history-item {
+  display: grid;
+  gap: .15rem;
+  padding: .55rem .7rem;
+  border-radius: 8px;
+  background: rgba(30, 41, 59, .4);
+}
+.video-review-history-item time {
+  font-size: .75rem;
+  color: var(--text-muted, #94a3b8);
+}
+.video-review-history-item small {
+  color: var(--text-muted, #94a3b8);
+}

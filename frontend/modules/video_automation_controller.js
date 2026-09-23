@@ -463,6 +463,54 @@ function create({
     windowRef.setTimeout?.(() => target.classList.remove('video-step-evidence-focus'), 1200);
   }
 
+  function _renderReviewHistory() {
+    const root = $('videoReviewHistory');
+    if (!root) return;
+    root.replaceChildren();
+
+    const title = documentRef.createElement('h3');
+    title.textContent = 'Auditoria da revisão';
+    root.appendChild(title);
+
+    const meta = documentRef.createElement('p');
+    meta.className = 'form-hint';
+    meta.textContent = reviewHistory.length
+      ? 'Análise original preservada · ' + reviewHistory.length + ' alteração(ões) registradas.'
+      : 'Análise original preservada · nenhuma alteração de revisão registrada.';
+    root.appendChild(meta);
+
+    if (!reviewHistory.length) return;
+
+    const list = documentRef.createElement('ol');
+    list.className = 'video-review-history-list';
+    reviewHistory.forEach(change => {
+      const item = documentRef.createElement('li');
+      item.className = 'video-review-history-item';
+
+      const head = documentRef.createElement('strong');
+      head.textContent = 'Etapa ' + change.stepOrder + ' · ' + (
+        change.reason === 'edit' ? 'edição' :
+        change.reason === 'approve_all' ? 'aprovação em lote' :
+        'alteração de status'
+      );
+
+      const time = documentRef.createElement('time');
+      time.dateTime = change.timestamp;
+      time.textContent = new Date(change.timestamp).toLocaleString('pt-BR');
+
+      const details = documentRef.createElement('small');
+      details.textContent = [
+        'Antes: ' + (change.before?.review_status || '—'),
+        'Depois: ' + (change.after?.review_status || '—'),
+        change.after?.review_note ? 'Observação: ' + change.after.review_note : ''
+      ].filter(Boolean).join(' · ');
+
+      item.append(head, time, details);
+      list.appendChild(item);
+    });
+    root.appendChild(list);
+  }
+
   function _renderEvidenceTimeline(data) {
     const root = $('videoEvidenceTimeline');
     if (!root) return;
@@ -894,6 +942,7 @@ function create({
     }
 
     _updateReviewSummary(platform);
+    _renderReviewHistory();
     _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
 
