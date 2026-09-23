@@ -23,6 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: node --check script.js
       - run: node --check frontend/modules/core_state.js
+      - run: node --check frontend/modules/markitdown_engine.js
       - run: node --check video_automation_validator.js
       - run: node tests/test_video_automation_validator.js
       - run: node tests/test_core_state.js
