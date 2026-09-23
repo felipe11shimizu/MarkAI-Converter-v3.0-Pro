@@ -18,6 +18,7 @@ function create({
     abortSignal = globalThis.AbortSignal,
     signalTimeout: injectedSignalTimeout,
     zipImpl = globalThis.JSZip,
+    cryptoImpl = globalThis.crypto,
     evidenceTimeline = globalThis.MarkAIVideoEvidenceTimeline
   } = {}) {
   let lastAnalysis = null;
@@ -589,6 +590,15 @@ function create({
     };
   }
 
+  async function _sha256Text(value) {
+    if (!cryptoImpl?.subtle || typeof cryptoImpl.subtle.digest !== 'function') {
+      throw new TypeError('Review package export requires Web Crypto SHA-256 support.');
+    }
+    const bytes = new TextEncoder().encode(String(value));
+    const digest = await cryptoImpl.subtle.digest('SHA-256', bytes);
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  }
+
   async function exportReviewPackage(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
     if (!isReviewPackageReady(data)) return false;
     if (typeof zipImpl !== 'function') throw new TypeError('Review package export requires JSZip.');
@@ -596,13 +606,28 @@ function create({
     const code = _generateAutomation(normalizedPlatform, data);
     const audit = reviewAuditManifest(data, normalizedPlatform);
     const analysis = _safeJsonData(data);
-    const packageManifest = reviewPackageManifest(data, normalizedPlatform);
-    const zip = new zipImpl();
     const base = String(data?.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
-    zip.file(_automationFilename(normalizedPlatform, data), code);
-    zip.file(base + '-auditoria-revisao.json', JSON.stringify(audit, null, 2));
-    zip.file(base + '-analise-revisada.json', JSON.stringify(analysis, null, 2));
-    zip.file(base + '-pacote-manifesto.json', JSON.stringify(packageManifest, null, 2));
+    const automationFilename = _automationFilename(normalizedPlatform, data);
+    const auditFilename = base + '-auditoria-revisao.json';
+    const analysisFilename = base + '-analise-revisada.json';
+    const manifestFilename = base + '-pacote-manifesto.json';
+    const auditJson = JSON.stringify(audit, null, 2);
+    const analysisJson = JSON.stringify(analysis, null, 2);
+    const packageManifest = reviewPackageManifest(data, normalizedPlatform);
+    packageManifest.integrity = {
+      algorithm: 'SHA-256',
+      scope: 'automation, review audit and reviewed analysis; the manifest itself is excluded to avoid circular hashing.',
+      artifacts: [
+        { name: automationFilename, sha256: await _sha256Text(code) },
+        { name: auditFilename, sha256: await _sha256Text(auditJson) },
+        { name: analysisFilename, sha256: await _sha256Text(analysisJson) }
+      ]
+    };
+    const zip = new zipImpl();
+    zip.file(automationFilename, code);
+    zip.file(auditFilename, auditJson);
+    zip.file(analysisFilename, analysisJson);
+    zip.file(manifestFilename, JSON.stringify(packageManifest, null, 2));
     const blob = await zip.generateAsync({ type: 'blob' });
     const url = windowRef.URL.createObjectURL(blob);
     const a = documentRef.createElement('a');
