@@ -19,7 +19,7 @@ assert.doesNotMatch(
 
 assert.match(
   script,
-  /youtubeController:\s*\{\s*updateControls:\s*\(\.\.\.args\)\s*=>\s*YouTubeController\.updateControls\(\.\.\.args\),\s*transcribe:\s*\(\.\.\.args\)\s*=>\s*YouTubeController\.transcribe\(\.\.\.args\)\s*\}/,
+  /youtubeController:\s*\{\s*updateControls:\s*\(\.\.\.args\)\s*=>\s*YouTubeController\.updateControls\(\.\.\.args\),\s*transcribe:\s*\(\.\.\.args\)\s*=>\s*YouTubeController\.transcribe\(\.\.\.args\),\s*listLanguages:\s*\(\.\.\.args\)\s*=>\s*YouTubeController\.listLanguages\(\.\.\.args\)\s*\}/,
   'URL UI bootstrap must resolve YouTubeController lazily'
 );
 
