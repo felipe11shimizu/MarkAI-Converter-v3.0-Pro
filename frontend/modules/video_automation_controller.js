@@ -416,6 +416,82 @@ function create({
     return evidenceTimeline.normalize(data);
   }
 
+  function _formatTimestamp(seconds) {
+    if (seconds == null || !Number.isFinite(Number(seconds))) return '—';
+    const total = Math.max(0, Math.round(Number(seconds)));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const secs = total % 60;
+    return hours
+      ? String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0')
+      : String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+  }
+
+  function _scrollToEvidenceStep(order) {
+    const target = documentRef?.querySelector?.('[data-video-step-order="' + String(order) + '"]');
+    if (!target) return;
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    target.focus?.({ preventScroll: true });
+    target.classList.add('video-step-evidence-focus');
+    windowRef.setTimeout?.(() => target.classList.remove('video-step-evidence-focus'), 1200);
+  }
+
+  function _renderEvidenceTimeline(data) {
+    const root = $('videoEvidenceTimeline');
+    if (!root) return;
+    root.replaceChildren();
+
+    const timeline = normalizeEvidenceTimeline(data);
+    const title = documentRef.createElement('h3');
+    title.textContent = 'Timeline operacional de evidências';
+    root.appendChild(title);
+
+    const hint = documentRef.createElement('p');
+    hint.className = 'form-hint';
+    hint.textContent = 'Selecione uma etapa para localizar a evidência correspondente na revisão.';
+    root.appendChild(hint);
+
+    if (!timeline.steps.length) {
+      const empty = documentRef.createElement('small');
+      empty.textContent = 'Nenhuma etapa disponível na timeline.';
+      root.appendChild(empty);
+      return;
+    }
+
+    const track = documentRef.createElement('div');
+    track.className = 'video-evidence-timeline-track';
+
+    timeline.steps.forEach(step => {
+      const item = documentRef.createElement('button');
+      item.type = 'button';
+      item.className = 'video-evidence-timeline-item';
+      item.dataset.videoStepOrder = String(step.order);
+      item.title = 'Localizar etapa ' + step.order;
+      item.addEventListener('click', () => _scrollToEvidenceStep(step.order));
+
+      const time = documentRef.createElement('span');
+      time.className = 'video-evidence-timeline-time';
+      time.textContent = _formatTimestamp(step.timestamp);
+
+      const label = documentRef.createElement('strong');
+      label.textContent = 'Etapa ' + step.order;
+
+      const action = documentRef.createElement('span');
+      action.className = 'video-evidence-timeline-action';
+      action.textContent = step.action || 'Ação não identificada';
+
+      const refs = documentRef.createElement('small');
+      refs.textContent =
+        'Frame: ' + (step.frameIndices.length ? step.frameIndices.join(', ') : '—') +
+        ' · Fala: ' + (step.transcriptSegmentIndices.length ? step.transcriptSegmentIndices.join(', ') : '—');
+
+      item.append(time, label, action, refs);
+      track.appendChild(item);
+    });
+
+    root.appendChild(track);
+  }
+
   function _renderEvidenceMatrix(data) {
     const root = $('videoEvidenceMatrix');
     if (!root) return;
@@ -787,6 +863,7 @@ function create({
     }
 
     _updateReviewSummary(platform);
+    _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
 
     if (list) {
@@ -805,6 +882,8 @@ function create({
         const validation = step.validacao_automacao || _validateStepForPlatform(step, platform);
         const card = documentRef.createElement('article');
         card.className = 'video-step-card review-' + status.className;
+        card.dataset.videoStepOrder = String(step.ordem || index + 1);
+        card.tabIndex = -1;
 
         const head = documentRef.createElement('div');
         head.className = 'video-step-head';

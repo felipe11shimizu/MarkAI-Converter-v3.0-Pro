@@ -21,6 +21,17 @@ const controller = VideoAutomationController.create({
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
 assert.equal(controller.isVideo({ type: '', name: 'screen.webm' }), true);
 assert.equal(controller.isVideo({ type: 'text/plain', name: 'notes.txt' }), false);
+assert.equal(controller.normalizeEvidenceTimeline({
+  timeline: [{ frame_index: 1, timestamp: 3 }],
+  transcript_segments: [{ index: 1, start: 3, duration: 2, text: 'Confirmação' }],
+  analysis: { etapas: [{
+    ordem: 1,
+    timestamp: '00:03',
+    acao: 'Clicar',
+    tipo_acao: 'click',
+    evidencia: { frame_indices: [1], transcript_segment_indices: [1] }
+  }] }
+}).steps[0].timestamp, 3);
 assert.equal(controller.automationFilename('pyautogui', { filename: 'Meu video.mp4' }), 'Meu_video-automacao-pyautogui.py');
 
 const readyStep = {
