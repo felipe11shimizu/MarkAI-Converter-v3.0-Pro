@@ -16,7 +16,8 @@
     getState,
     ui = {},
     documentRef = globalThis.document,
-    windowRef = globalThis
+    windowRef = globalThis,
+    timers = {}
   } = {}) {
     if (!queueManager) throw new Error('QueueUIController requires queueManager');
     if (!conversionController) throw new Error('QueueUIController requires conversionController');
@@ -25,6 +26,7 @@
     if (typeof getState !== 'function') throw new Error('QueueUIController requires getState');
 
     const $ = id => documentRef?.getElementById(id);
+    const setTimeoutFn = timers.setTimeout || globalThis.setTimeout;
     const toast = (message, type) => ui.toast?.(message, type);
     const renderQueue = () => ui.renderQueue?.();
     const loadMarkdown = (markdown, name) => ui.loadMarkdown?.(markdown, name);
@@ -40,7 +42,11 @@
       toast(added.length + ' arquivo(s) adicionado(s) à fila.', 'success');
 
       if (getState().queue.length === 1 && added.length === 1) {
-        setTimeout(() => conversionController.convertItem(added[0].id), 100);
+        setTimeoutFn(() => {
+          Promise.resolve(conversionController.convertItem(added[0].id)).catch(error => {
+            console.warn('[MarkAI] Conversão automática falhou:', error);
+          });
+        }, 100);
       }
     }
 
@@ -146,9 +152,9 @@
         workspaceController.scheduleSave();
         if (!getState().queue.length) ui.setEmptyState?.(true);
       } else if (btn.classList.contains('qi-btn-convert')) {
-        conversionController.convertItem(id);
+        void conversionController.convertItem(id);
       } else if (btn.classList.contains('qi-btn-compare')) {
-        conversionController.compareItem(id);
+        void conversionController.compareItem(id);
       } else if (btn.classList.contains('qi-btn-download')) {
         downloadItem(queueManager.getById(id));
       } else if (btn.classList.contains('qi-btn-preview')) {
@@ -178,7 +184,10 @@
       });
       dropZone?.addEventListener('click', () => fileInput?.click());
       dropZone?.addEventListener('keydown', event => {
-        if (event.key === 'Enter' || event.key === ' ') fileInput?.click();
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput?.click();
+        }
       });
       browseBtn?.addEventListener('click', event => {
         event.stopPropagation();
