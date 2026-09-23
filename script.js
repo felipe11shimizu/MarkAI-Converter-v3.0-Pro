@@ -17,6 +17,7 @@ let YouTubeController = null;
 let EditorController = null;
 let VideoAutomationController = null;
 let SettingsController = null;
+let WorkspaceUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -210,62 +211,7 @@ const UIManager = (() => {
       toast('Não foi possível carregar o workspace.', 'error');
     });
 
-    // Workspace
-    els.btnWorkspace?.addEventListener('click', _openWorkspace);
-    els.btnWorkspaceToolbar?.addEventListener('click', _openWorkspace);
-    els.btnCloseWorkspace?.addEventListener('click', () => els.modalWorkspace.close());
-    els.btnWorkspaceDone?.addEventListener('click', () => els.modalWorkspace.close());
-    els.modalWorkspace?.addEventListener('click', e => { if (e.target === els.modalWorkspace) els.modalWorkspace.close(); });
-    els.workspaceProjectSelect?.addEventListener('change', e => WorkspaceController.selectProject(e.target.value));
-    els.btnWorkspaceSave?.addEventListener('click', async () => {
-      await WorkspaceController.syncQueue();
-      toast('Workspace salvo.', 'success');
-    });
-    els.btnWorkspaceVersion?.addEventListener('click', () => WorkspaceController.saveVersion('manual'));
-    els.btnWorkspaceExport?.addEventListener('click', _exportWorkspaceZip);
-    els.btnCreateWorkspaceProject?.addEventListener('click', _createProject);
-    els.workspaceProjectName?.addEventListener('keydown', e => { if (e.key === 'Enter') _createProject(); });
-    els.workspaceProjectList?.addEventListener('click', e => {
-      const item = e.target.closest('[data-project-id]');
-      if (item) WorkspaceController.selectProject(item.dataset.projectId);
-    });
-    els.btnRenameWorkspaceProject?.addEventListener('click', async () => {
-      const projectId = AppState.get('currentProjectId');
-      const project = (await WorkspaceStore.listProjects()).find(p => p.id === projectId);
-      if (!project) return;
-      const name = window.prompt('Novo nome do projeto:', project.name);
-      if (!name?.trim()) return;
-      await WorkspaceController.renameProject(projectId, name);
-    });
-    els.btnDeleteWorkspaceProject?.addEventListener('click', () => WorkspaceController.deleteProject(
-      AppState.get('currentProjectId'),
-      project => window.confirm('Excluir o projeto "' + project.name + '" e todo o histórico local?')
-    ));
-    els.btnExportWorkspaceJson?.addEventListener('click', _exportWorkspaceJson);
-    els.btnExportWorkspaceZip?.addEventListener('click', _exportWorkspaceZip);
-    els.workspaceTabVersions?.addEventListener('click', async () => {
-      _workspaceHistoryMode = 'versions';
-      els.workspaceTabVersions.classList.add('active');
-      els.workspaceTabAI.classList.remove('active');
-      await WorkspaceController.listHistory('versions');
-    });
-    els.workspaceTabAI?.addEventListener('click', async () => {
-      _workspaceHistoryMode = 'ai';
-      els.workspaceTabAI.classList.add('active');
-      els.workspaceTabVersions.classList.remove('active');
-      await WorkspaceController.listHistory('ai');
-    });
-
-    els.workspaceHistoryList?.addEventListener('click', async e => {
-      const item = e.target.closest('[data-history-id]');
-      if (!item || _workspaceHistoryMode !== 'versions') return;
-      const records = await WorkspaceStore.listVersions(AppState.get('currentProjectId'));
-      const version = records.find(v => v.id === item.dataset.historyId);
-      if (!version?.markdown) return;
-      loadMarkdown(version.markdown, version.name || 'documento.md');
-      els.modalWorkspace.close();
-      toast('Versão carregada no editor.', 'success');
-    });
+    WorkspaceUIController.bind();
 
     // Drop zone
     els.dropZone.addEventListener('dragover', e => {
@@ -679,6 +625,8 @@ const UIManager = (() => {
     setPreviewRawLabel: label => { els.btnPreviewRaw.textContent = label; },
     showPreviewModal: () => els.modalPreview.showModal(),
     renderWorkspacePreview: () => {},
+    getWorkspaceHistoryMode: () => _workspaceHistoryMode,
+    setWorkspaceHistoryMode: mode => { _workspaceHistoryMode = mode === 'ai' ? 'ai' : 'versions'; },
     refreshWorkspaceProjects: _refreshWorkspaceProjects,
     renderWorkspaceHistory: _renderWorkspaceHistory,
     showCurrentWorkspaceDocument: _showCurrentWorkspaceDocument,
@@ -809,6 +757,20 @@ document.addEventListener('DOMContentLoaded', () => {
       toast: (message, type) => UIManager.toast(message, type),
       showCurrentDocument: item => UIManager.showCurrentWorkspaceDocument(item),
       showEmptyWorkspace: () => UIManager.showEmptyWorkspace()
+    }
+  });
+
+  WorkspaceUIController = globalThis.MarkAIWorkspaceUIController.create({
+    workspaceController: WorkspaceController,
+    workspaceStore: WorkspaceStore,
+    getState: () => ({
+      currentProjectId: AppState.get('currentProjectId')
+    }),
+    ui: {
+      getHistoryMode: () => UIManager.getWorkspaceHistoryMode(),
+      setHistoryMode: mode => UIManager.setWorkspaceHistoryMode(mode),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      toast: (message, type) => UIManager.toast(message, type)
     }
   });
 
