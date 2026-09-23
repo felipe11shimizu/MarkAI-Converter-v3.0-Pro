@@ -63,10 +63,19 @@ assert.deepEqual(normalizedTimeline.steps[0].transcriptSegmentIndices, []);
 assert.equal(normalizedTimeline.steps[0].reviewStatus, 'approved');
 
 const validation = controller.validateAnalysis(data, 'pyautogui');
+const originalBeforeReview = controller.getOriginalAnalysis();
+assert.equal(originalBeforeReview.analysis.etapas[0].review_status, 'approved');
 assert.equal(validation.summary.total, 1);
 assert.equal(validation.summary.ready, 1);
 assert.equal(validation.summary.warning, 0);
 assert.equal(validation.summary.blocked, 0);
+
+const historyAfterValidation = controller.getReviewHistory();
+assert.deepEqual(historyAfterValidation, []);
+
+const edited = controller.getOriginalAnalysis();
+edited.analysis.etapas[0].acao = 'alteração externa';
+assert.equal(controller.getOriginalAnalysis().analysis.etapas[0].acao, 'Clicar no botão');
 
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
