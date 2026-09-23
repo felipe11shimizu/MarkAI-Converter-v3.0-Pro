@@ -44,25 +44,39 @@ jobs:
       - run: node --check video_automation_validator.js
       - run: node --check frontend/modules/video_automation_controller.js
       - run: node --check frontend/modules/settings_controller.js
-      - run: node tests/test_video_automation_validator.js
-      - run: node tests/test_video_automation_controller.js
-      - run: node tests/test_settings_controller.js
-      - run: node tests/test_core_state.js
-      - run: node tests/test_ui_dom.js
-      - run: node tests/test_workspace_store.js
-      - run: node tests/test_workspace_controller.js
-      - run: node tests/test_workspace_ui_controller.js
-      - run: node tests/test_queue_ui_controller.js
-      - run: node tests/test_youtube_controller.js
-      - run: node tests/test_editor_controller.js
-      - run: node tests/test_editor_ui_controller.js
-      - run: node tests/test_file_parser.js
-      - run: node tests/test_url_fetcher.js
-      - run: node tests/test_url_ui_controller.js
-      - run: node tests/test_merge_engine.js
-      - run: node tests/test_conversion_controller.js
-      - run: node tests/test_ai_engine.js
-      - run: node tests/test_ai_ui_controller.js
-      - run: node tests/test_chat_formatter.js
-      - run: node tests/test_conversion_quality.js
-      - run: node tests/test_queue_ingestion.js
+      - name: Run frontend tests
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          tests=(
+            tests/test_video_automation_validator.js
+            tests/test_video_automation_controller.js
+            tests/test_settings_controller.js
+            tests/test_core_state.js
+            tests/test_ui_dom.js
+            tests/test_workspace_store.js
+            tests/test_workspace_controller.js
+            tests/test_workspace_ui_controller.js
+            tests/test_queue_ui_controller.js
+            tests/test_youtube_controller.js
+            tests/test_editor_controller.js
+            tests/test_editor_ui_controller.js
+            tests/test_file_parser.js
+            tests/test_url_fetcher.js
+            tests/test_url_ui_controller.js
+            tests/test_merge_engine.js
+            tests/test_conversion_controller.js
+            tests/test_ai_engine.js
+            tests/test_ai_ui_controller.js
+            tests/test_chat_formatter.js
+            tests/test_conversion_quality.js
+            tests/test_queue_ingestion.js
+          )
+
+          for test in "${tests[@]}"; do
+            echo "::group::$test"
+            echo "Running $test"
+            node "$test"
+            echo "::endgroup::"
+          done
