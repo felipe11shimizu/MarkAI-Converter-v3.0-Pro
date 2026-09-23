@@ -8,7 +8,7 @@ const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js
 (async () => {
 
 class FakeZip {
-  constructor() { this.files = {}; }
+  constructor() { this.files = {}; FakeZip.last = this; }
   file(name, content) { this.files[name] = content; }
   async generateAsync() { return new Blob(['zip']); }
 }
@@ -146,6 +146,14 @@ assert.doesNotMatch(code, /DADO_SENSIVEL/);
 const packageData = await controller.exportReviewPackage(data, 'pyautogui');
 assert.equal(packageData, true);
 assert.equal(downloadState.name, 'processo-pacote-revisao.zip');
+const packageManifest = JSON.parse(FakeZip.last.files['processo-pacote-manifesto.json']);
+assert.equal(packageManifest.schema_version, '1.0');
+assert.equal(packageManifest.package_type, 'markai-video-review-package');
+assert.equal(packageManifest.source_filename, 'processo.mp4');
+assert.equal(packageManifest.platform, 'pyautogui');
+assert.equal(packageManifest.integrity_match, true);
+assert.equal(packageManifest.files.length, 4);
+assert.match(packageManifest.sensitive_data_policy, /DADO_SENSIVEL/);
 
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
