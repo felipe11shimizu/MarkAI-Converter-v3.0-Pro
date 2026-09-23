@@ -40,6 +40,29 @@ const AIEngine = globalThis.MarkAIAIEngine.create({
  
 // Conversion quality is provided by frontend/modules/conversion_quality.js.
 const ConversionQuality = globalThis.MarkAIConversionQuality;
+const ConversionController = globalThis.MarkAIConversionController.create({
+  queueManager: QueueManager,
+  markItDownEngine: MarkItDownEngine,
+  fileParserStrategy: FileParserStrategy,
+  conversionQuality: ConversionQuality,
+  getState: () => ({
+    mergeEngine: MergeEngine,
+  }),
+  setState: patch => Object.entries(patch).forEach(([key, value]) => AppState.set(key, value)),
+  ui: {
+    renderQueue: () => UIManager.renderQueue(),
+    setStatus: (text, state) => UIManager.setStatus(text, state),
+    setProgress: (pct, show) => UIManager.setProgress(pct, show),
+    loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+    toast: (msg, type) => UIManager.toast(msg, type),
+    showProcessing: (label, sub) => UIManager.showProcessing(label, sub),
+    hideProcessing: () => UIManager.hideProcessing(),
+    setProcessingSub: sub => UIManager.setProcessingSub(sub),
+    showComparison: (item, rmd, bmd, rm, bm, diff) => UIManager.showComparison(item, rmd, bmd, rm, bm, diff),
+  },
+  workspace: { scheduleSave: () => UIManager.scheduleWorkspaceSave() },
+});
+
 
 // ══════════════════════════════════════════════
 // 8. UI MANAGER — DOM, events, toasts, modals
@@ -396,47 +419,6 @@ const UIManager = (() => {
     }
   }
 
-  // ── CONVERT SINGLE ITEM ──
-  async function convertItem(id) {
-    const item = QueueManager.getById(id);
-    if (!item) return;
-
-    QueueManager.update(id, { status: 'converting' });
-    renderQueue();
-    setStatus(`Convertendo ${item.name}…`, 'busy');
-    setProgress(0.1);
-
-    try {
-      let result = null, engine = 'browser', conversionMeta = null;
-      if (await MarkItDownEngine.isAvailable()) {
-        try {
-          const remote = await MarkItDownEngine.convert(item.file, p => setProgress(p));
-          if (remote?.markdown) {
-            result = remote.markdown;
-            engine = 'markitdown';
-            conversionMeta = remote.meta || null;
-          }
-        } catch (remoteError) {
-          console.warn('[MarkAI] Fallback local:', remoteError);
-        }
-      }
-      if (!result) result = await FileParserStrategy.parseBrowser(item, p => setProgress(p));
-      QueueManager.update(id, { status: 'done', result, engine, conversionMeta });
-      _scheduleWorkspaceSave();
-      renderQueue();
-      setProgress(1);
-      loadMarkdown(result, item.name.replace(/\.[^.]+$/, '') + '.md');
-      setStatus(`${item.name} convertido`, 'idle');
-      toast(`✓ ${item.name} convertido com sucesso!`, 'success');
-    } catch(e) {
-      QueueManager.update(id, { status: 'error' });
-      renderQueue();
-      setProgress(0, false);
-      setStatus('Erro na conversão', 'error');
-      toast(`Erro: ${e.message}`, 'error');
-    }
-  }
-
   // ── MOTOR COMPARISON ──
   async function compareItem(id) {
     const item = QueueManager.getById(id);
@@ -661,7 +643,7 @@ const UIManager = (() => {
       let last = null;
       for (const item of items) {
         if (item.status !== 'done') {
-          await convertItem(item.id);
+          await ConversionController.convertItem(item.id);
           last = item.id;
         }
       }
@@ -682,9 +664,9 @@ const UIManager = (() => {
           els.workspaceContent.style.display = 'none';
         }
       } else if (btn.classList.contains('qi-btn-convert')) {
-        convertItem(id);
+        ConversionController.convertItem(id);
       } else if (btn.classList.contains('qi-btn-compare')) {
-        compareItem(id);
+        ConversionController.compareItem(id);
             } else if (btn.classList.contains('qi-btn-download')) {
         const item = QueueManager.getById(id);
         if (item && item.result) {
@@ -889,7 +871,7 @@ const UIManager = (() => {
       const base = current.replace(/\.[^.]+$/, '');
       const item = QueueManager.getOrdered().find(i => i.name.replace(/\.[^.]+$/, '') === base) || QueueManager.getOrdered().find(i => i.result);
       if (!item) { toast('Nenhum arquivo disponível para comparação.', 'warning'); return; }
-      compareItem(item.id);
+      ConversionController.compareItem(item.id);
     });
 
     // Preview Modal
@@ -976,7 +958,7 @@ const UIManager = (() => {
 
     // Auto-convert single file
     if (AppState.get('queue').length === 1 && added.length === 1) {
-      setTimeout(() => convertItem(added[0].id), 100);
+      setTimeout(() => ConversionController.convertItem(added[0].id), 100);
     }
   }
 
