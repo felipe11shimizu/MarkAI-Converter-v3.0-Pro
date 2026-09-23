@@ -23,7 +23,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   };
   const controller = Controller.create({
     queueManager: queue, markItDownEngine: markitdown, fileParserStrategy: parser,
-    conversionQuality: quality, getState: () => ({ mergeEngine: { merge: async () => '# merged' } }),
+    conversionQuality: quality, mergeEngine: { merge: async () => '# merged' }, getState: () => ({}),
     setState: patch => calls.push(['state', patch]), ui, workspace: { scheduleSave() { calls.push(['save']); } }
   });
   const result = await controller.convertItem('1');
