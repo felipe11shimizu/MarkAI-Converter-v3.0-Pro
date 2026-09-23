@@ -34,6 +34,7 @@ jobs:
       - run: node --check frontend/modules/editor_ui_controller.js
       - run: node --check frontend/modules/file_parser.js
       - run: node --check frontend/modules/url_fetcher.js
+      - run: node --check frontend/modules/url_ui_controller.js
       - run: node --check frontend/modules/merge_engine.js
       - run: node --check frontend/modules/conversion_controller.js
       - run: node --check frontend/modules/ai_engine.js
@@ -56,6 +57,7 @@ jobs:
       - run: node tests/test_editor_ui_controller.js
       - run: node tests/test_file_parser.js
       - run: node tests/test_url_fetcher.js
+      - run: node tests/test_url_ui_controller.js
       - run: node tests/test_merge_engine.js
       - run: node tests/test_conversion_controller.js
       - run: node tests/test_ai_engine.js
