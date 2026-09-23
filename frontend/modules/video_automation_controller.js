@@ -973,6 +973,7 @@ function create({
       lastAnalysis = data;
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
+      reviewFinalizedAt = null;
     }
     _ensureReviewState(data);
 
