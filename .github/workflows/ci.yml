@@ -27,6 +27,8 @@ jobs:
       - run: node --check frontend/modules/markitdown_engine.js
       - run: node --check frontend/modules/workspace_store.js
       - run: node --check frontend/modules/workspace_controller.js
+      - run: node --check frontend/modules/workspace_ui_controller.js
+      - run: node --check frontend/modules/queue_ui_controller.js
       - run: node --check frontend/modules/youtube_controller.js
       - run: node --check frontend/modules/editor_controller.js
       - run: node --check frontend/modules/file_parser.js
@@ -46,6 +48,8 @@ jobs:
       - run: node tests/test_ui_dom.js
       - run: node tests/test_workspace_store.js
       - run: node tests/test_workspace_controller.js
+      - run: node tests/test_workspace_ui_controller.js
+      - run: node tests/test_queue_ui_controller.js
       - run: node tests/test_youtube_controller.js
       - run: node tests/test_editor_controller.js
       - run: node tests/test_file_parser.js

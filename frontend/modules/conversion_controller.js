@@ -69,20 +69,22 @@
       const items = queueManager.getOrdered();
       if (!items.length) {
         ui.toast('Nenhum arquivo na fila.', 'warning');
-        return;
+        return null;
       }
       ui.showProcessing('Juntando arquivos…', 'Processando ' + items.length + ' arquivos');
       ui.setStatus('Fazendo merge…', 'busy');
       try {
-        const result = await getState().mergeEngine.merge((p, name) => {
+        const markdown = await getState().mergeEngine.merge((p, name) => {
           ui.setProcessingSub('Convertendo: ' + name);
         });
+        const fileName = 'documento_combinado.md';
+        if (workspace) workspace.scheduleSave();
         ui.hideProcessing();
-        ui.loadMarkdown(result.markdown, result.fileName);
+        ui.loadMarkdown(markdown, fileName);
         ui.setProgress(1);
         ui.setStatus('Merge concluído', 'idle');
         ui.toast('Arquivos juntados com sucesso.', 'success');
-        return result;
+        return { markdown, fileName };
       } catch (e) {
         ui.hideProcessing();
         ui.toast('Erro no merge: ' + e.message, 'error');

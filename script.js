@@ -17,6 +17,8 @@ let YouTubeController = null;
 let EditorController = null;
 let VideoAutomationController = null;
 let SettingsController = null;
+let WorkspaceUIController = null;
+let QueueUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -210,193 +212,9 @@ const UIManager = (() => {
       toast('Não foi possível carregar o workspace.', 'error');
     });
 
-    // Workspace
-    els.btnWorkspace?.addEventListener('click', _openWorkspace);
-    els.btnWorkspaceToolbar?.addEventListener('click', _openWorkspace);
-    els.btnCloseWorkspace?.addEventListener('click', () => els.modalWorkspace.close());
-    els.btnWorkspaceDone?.addEventListener('click', () => els.modalWorkspace.close());
-    els.modalWorkspace?.addEventListener('click', e => { if (e.target === els.modalWorkspace) els.modalWorkspace.close(); });
-    els.workspaceProjectSelect?.addEventListener('change', e => WorkspaceController.selectProject(e.target.value));
-    els.btnWorkspaceSave?.addEventListener('click', async () => {
-      await WorkspaceController.syncQueue();
-      toast('Workspace salvo.', 'success');
-    });
-    els.btnWorkspaceVersion?.addEventListener('click', () => WorkspaceController.saveVersion('manual'));
-    els.btnWorkspaceExport?.addEventListener('click', _exportWorkspaceZip);
-    els.btnCreateWorkspaceProject?.addEventListener('click', _createProject);
-    els.workspaceProjectName?.addEventListener('keydown', e => { if (e.key === 'Enter') _createProject(); });
-    els.workspaceProjectList?.addEventListener('click', e => {
-      const item = e.target.closest('[data-project-id]');
-      if (item) WorkspaceController.selectProject(item.dataset.projectId);
-    });
-    els.btnRenameWorkspaceProject?.addEventListener('click', async () => {
-      const projectId = AppState.get('currentProjectId');
-      const project = (await WorkspaceStore.listProjects()).find(p => p.id === projectId);
-      if (!project) return;
-      const name = window.prompt('Novo nome do projeto:', project.name);
-      if (!name?.trim()) return;
-      await WorkspaceController.renameProject(projectId, name);
-    });
-    els.btnDeleteWorkspaceProject?.addEventListener('click', () => WorkspaceController.deleteProject(
-      AppState.get('currentProjectId'),
-      project => window.confirm('Excluir o projeto "' + project.name + '" e todo o histórico local?')
-    ));
-    els.btnExportWorkspaceJson?.addEventListener('click', _exportWorkspaceJson);
-    els.btnExportWorkspaceZip?.addEventListener('click', _exportWorkspaceZip);
-    els.workspaceTabVersions?.addEventListener('click', async () => {
-      _workspaceHistoryMode = 'versions';
-      els.workspaceTabVersions.classList.add('active');
-      els.workspaceTabAI.classList.remove('active');
-      await WorkspaceController.listHistory('versions');
-    });
-    els.workspaceTabAI?.addEventListener('click', async () => {
-      _workspaceHistoryMode = 'ai';
-      els.workspaceTabAI.classList.add('active');
-      els.workspaceTabVersions.classList.remove('active');
-      await WorkspaceController.listHistory('ai');
-    });
+    WorkspaceUIController.bind();
 
-    els.workspaceHistoryList?.addEventListener('click', async e => {
-      const item = e.target.closest('[data-history-id]');
-      if (!item || _workspaceHistoryMode !== 'versions') return;
-      const records = await WorkspaceStore.listVersions(AppState.get('currentProjectId'));
-      const version = records.find(v => v.id === item.dataset.historyId);
-      if (!version?.markdown) return;
-      loadMarkdown(version.markdown, version.name || 'documento.md');
-      els.modalWorkspace.close();
-      toast('Versão carregada no editor.', 'success');
-    });
-
-    // Drop zone
-    els.dropZone.addEventListener('dragover', e => {
-      e.preventDefault();
-      els.dropZone.classList.add('drag-over');
-    });
-    els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('drag-over'));
-    els.dropZone.addEventListener('drop', e => {
-      e.preventDefault();
-      els.dropZone.classList.remove('drag-over');
-      if (e.dataTransfer.files.length) _onFilesSelected(e.dataTransfer.files);
-    });
-    els.dropZone.addEventListener('click', () => els.fileInput.click());
-    els.dropZone.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') els.fileInput.click(); });
-    els.browseBtn.addEventListener('click', e => { e.stopPropagation(); els.fileInput.click(); });
-    els.fileInput.addEventListener('change', e => {
-      if (e.target.files.length) _onFilesSelected(e.target.files);
-      e.target.value = '';
-    });
-
-    // Queue actions
-    els.btnClearQueue.addEventListener('click', () => {
-      QueueManager.clear();
-      renderQueue();
-      WorkspaceController.scheduleSave();
-      toast('Fila limpa.', 'info');
-    });
-
-    els.btnMergeAll.addEventListener('click', async () => {
-      const items = QueueManager.getOrdered();
-      if (!items.length) { toast('Nenhum arquivo na fila.', 'warning'); return; }
-      showProcessing('Juntando arquivos…', `Processando ${items.length} arquivos`);
-      setStatus('Fazendo merge…', 'busy');
-      try {
-        const result = await MergeEngine.merge((p, name) => {
-          els.procSub.textContent = `Convertendo: ${name}`;
-        });
-        hideProcessing();
-        loadMarkdown(result, 'documento_combinado.md');
-        setStatus('Merge concluído', 'idle');
-        toast(`✓ ${items.length} arquivos combinados!`, 'success');
-      } catch(e) {
-        hideProcessing();
-        setStatus('Erro no merge', 'error');
-        toast(`Erro: ${e.message}`, 'error');
-      }
-    });
-
-        els.btnDownloadZip.addEventListener('click', async () => {
-            const checkedBoxes = Array.from(els.queueList.querySelectorAll('.qi-check:checked'));
-      let items;
-      if (checkedBoxes.length > 0) {
-        const checkedIds = checkedBoxes.map(cb => cb.dataset.id);
-        items = QueueManager.getOrdered().filter(i => checkedIds.includes(i.id) && i.status === 'done' && i.result);
-        if (!items.length) { toast('Nenhum arquivo convertido entre os selecionados.', 'warning'); return; }
-      } else {
-        items = QueueManager.getOrdered().filter(i => i.status === 'done' && i.result);
-      }
-      if (!items.length) { toast('Nenhum arquivo convertido na fila para baixar.', 'warning'); return; }
-      if (!window.JSZip) { toast('Carregando biblioteca ZIP, tente novamente em instantes.', 'info'); return; }
-      
-      const zip = new JSZip();
-      items.forEach(item => {
-        let safeName = item.name.replace(/\.[^.]+$/, '') + '.md';
-        zip.file(safeName, item.result);
-      });
-      
-      showProcessing('Compactando arquivos...', items.length + ' arquivos');
-      try {
-        const content = await zip.generateAsync({type:"blob"});
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(content);
-        a.download = 'arquivos_convertidos.zip';
-        a.click();
-        URL.revokeObjectURL(a.href);
-        toast('✓ ZIP com ' + items.length + ' arquivos baixado!', 'success');
-      } catch(e) {
-        toast('Erro ao criar ZIP: ' + e.message, 'error');
-      } finally {
-        hideProcessing();
-      }
-    });
-
-    els.btnConvertAll.addEventListener('click', async () => {
-      const items = QueueManager.getOrdered();
-      if (!items.length) { toast('Nenhum arquivo na fila.', 'warning'); return; }
-      let last = null;
-      for (const item of items) {
-        if (item.status !== 'done') {
-          await ConversionController.convertItem(item.id);
-          last = item.id;
-        }
-      }
-      if (!last) toast('Todos os arquivos já convertidos.', 'info');
-    });
-
-    // Queue item delegation
-    els.queueList.addEventListener('click', e => {
-      const btn = e.target.closest('button[data-id]');
-      if (!btn) return;
-      const id = btn.dataset.id;
-      if (btn.classList.contains('qi-btn-remove')) {
-        QueueManager.remove(id);
-        renderQueue();
-        WorkspaceController.scheduleSave();
-        if (!AppState.get('queue').length) {
-          els.emptyState.style.display = 'flex';
-          els.workspaceContent.style.display = 'none';
-        }
-      } else if (btn.classList.contains('qi-btn-convert')) {
-        ConversionController.convertItem(id);
-      } else if (btn.classList.contains('qi-btn-compare')) {
-        ConversionController.compareItem(id);
-            } else if (btn.classList.contains('qi-btn-download')) {
-        const item = QueueManager.getById(id);
-        if (item && item.result) {
-          const blob = new Blob([item.result], { type: 'text/markdown;charset=utf-8' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url; 
-          a.download = item.name.replace(/\.[^.]+$/, '') + '.md';
-          document.body.appendChild(a); a.click(); document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          toast('✓ ' + a.download + ' baixado!', 'success');
-        } else {
-          toast('Converta o arquivo primeiro.', 'warning');
-        }
-      } else if (btn.classList.contains('qi-btn-preview')) {
-        EditorController.previewItem(id);
-      }
-    });
+    QueueUIController.bind();
 
     // URL fetch
     els.btnFetchUrl.addEventListener('click', () => {
@@ -480,7 +298,7 @@ const UIManager = (() => {
         const projectId = AppState.get('currentProjectId');
         if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: customPrompt || 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
         loadMarkdown(improved, AppState.get('currentFileName'));
-        await _saveWorkspaceVersion('ai');
+        await WorkspaceController.saveVersion('ai');
         toast('✓ Markdown melhorado pela IA!', 'success');
         setStatus('IA concluída', 'idle');
       } catch(e) {
@@ -551,18 +369,7 @@ const UIManager = (() => {
     });
   }
 
-  // ── FILE SELECTION ──
-  function _onFilesSelected(files) {
-    const added = QueueManager.add(files);
-      WorkspaceController.scheduleSave();
-    renderQueue();
-    toast(`${added.length} arquivo(s) adicionado(s) à fila.`, 'success');
-
-    // Auto-convert single file
-    if (AppState.get('queue').length === 1 && added.length === 1) {
-      setTimeout(() => ConversionController.convertItem(added[0].id), 100);
-    }
-  }
+  // Queue UI interactions are delegated to QueueUIController.
 
   // ── YOUTUBE PRESENTATION ──
   function _youtubeOptions() {
@@ -620,6 +427,10 @@ const UIManager = (() => {
         els.workspaceContent.style.flexDirection = 'column';
         els.workspaceContent.style.height = '100%';
       }
+    },
+    setEmptyState: empty => {
+      els.emptyState.style.display = empty ? 'flex' : 'none';
+      els.workspaceContent.style.display = empty ? 'none' : 'flex';
     },
     setEditorDocumentName: name => {
       els.docName.textContent = name || 'documento.md';
@@ -679,6 +490,8 @@ const UIManager = (() => {
     setPreviewRawLabel: label => { els.btnPreviewRaw.textContent = label; },
     showPreviewModal: () => els.modalPreview.showModal(),
     renderWorkspacePreview: () => {},
+    getWorkspaceHistoryMode: () => _workspaceHistoryMode,
+    setWorkspaceHistoryMode: mode => { _workspaceHistoryMode = mode === 'ai' ? 'ai' : 'versions'; },
     refreshWorkspaceProjects: _refreshWorkspaceProjects,
     renderWorkspaceHistory: _renderWorkspaceHistory,
     showCurrentWorkspaceDocument: _showCurrentWorkspaceDocument,
@@ -809,6 +622,42 @@ document.addEventListener('DOMContentLoaded', () => {
       toast: (message, type) => UIManager.toast(message, type),
       showCurrentDocument: item => UIManager.showCurrentWorkspaceDocument(item),
       showEmptyWorkspace: () => UIManager.showEmptyWorkspace()
+    }
+  });
+
+  QueueUIController = globalThis.MarkAIQueueUIController.create({
+    queueManager: QueueManager,
+    conversionController: ConversionController,
+    mergeEngine: MergeEngine,
+    workspaceController: WorkspaceController,
+    editorController: EditorController,
+    getState: () => ({ queue: AppState.get('queue') }),
+    ui: {
+      renderQueue: () => UIManager.renderQueue(),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      showProcessing: (label, sub) => UIManager.showProcessing(label, sub),
+      hideProcessing: () => UIManager.hideProcessing(),
+      setStatus: (text, state) => UIManager.setStatus(text, state),
+      setProcessingSub: text => UIManager.setProcessingSub(text),
+      setEmptyState: empty => UIManager.setEmptyState(empty),
+      toast: (message, type) => UIManager.toast(message, type)
+    },
+    timers: {
+      setTimeout: globalThis.setTimeout
+    }
+  });
+
+  WorkspaceUIController = globalThis.MarkAIWorkspaceUIController.create({
+    workspaceController: WorkspaceController,
+    workspaceStore: WorkspaceStore,
+    getState: () => ({
+      currentProjectId: AppState.get('currentProjectId')
+    }),
+    ui: {
+      getHistoryMode: () => UIManager.getWorkspaceHistoryMode(),
+      setHistoryMode: mode => UIManager.setWorkspaceHistoryMode(mode),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      toast: (message, type) => UIManager.toast(message, type)
     }
   });
 
