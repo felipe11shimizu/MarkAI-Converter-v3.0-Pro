@@ -448,7 +448,7 @@ const UIManager = (() => {
 
     // URL fetch
     els.btnFetchUrl.addEventListener('click', () => {
-      if (_updateYoutubeControls() ) _transcribeYoutube();
+      if (YouTubeController.updateControls(els.urlInput.value.trim())) YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions());
       else _fetchUrl();
     });
     els.urlInput.addEventListener('input', () => YouTubeController.updateControls(els.urlInput.value.trim()));
