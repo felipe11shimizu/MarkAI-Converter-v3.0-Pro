@@ -38,8 +38,10 @@ jobs:
       - run: node --check frontend/modules/conversion_quality.js
       - run: node --check video_automation_validator.js
       - run: node --check frontend/modules/video_automation_controller.js
+      - run: node --check frontend/modules/settings_controller.js
       - run: node tests/test_video_automation_validator.js
       - run: node tests/test_video_automation_controller.js
+      - run: node tests/test_settings_controller.js
       - run: node tests/test_core_state.js
       - run: node tests/test_ui_dom.js
       - run: node tests/test_workspace_store.js
