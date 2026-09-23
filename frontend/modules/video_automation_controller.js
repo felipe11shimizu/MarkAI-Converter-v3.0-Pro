@@ -20,6 +20,8 @@ function create({
     evidenceTimeline = globalThis.MarkAIVideoEvidenceTimeline
   } = {}) {
   let lastAnalysis = null;
+  let originalAnalysisSnapshot = null;
+  let reviewHistory = [];
   const $ = id => documentRef ? documentRef.getElementById(id) : null;
   const signalTimeout = injectedSignalTimeout || ((ms) =>
     typeof abortSignal?.timeout === 'function' ? abortSignal.timeout(ms) : undefined
@@ -99,6 +101,25 @@ function create({
     return validation;
   }
 
+  function _snapshot(value) {
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (_) {
+      return value;
+    }
+  }
+
+  function _recordReviewChange(index, before, after, reason) {
+    reviewHistory.push({
+      timestamp: new Date().toISOString(),
+      stepIndex: index,
+      stepOrder: after?.ordem ?? before?.ordem ?? index + 1,
+      reason: reason || 'review',
+      before: _snapshot(before),
+      after: _snapshot(after)
+    });
+  }
+
   function _ensureReviewState(data) {
     const analysis = data?.analysis;
     if (!analysis || !Array.isArray(analysis.etapas)) return;
@@ -159,6 +180,7 @@ function create({
   function _setReviewStatus(index, status, options = {}) {
     const step = lastAnalysis?.analysis?.etapas?.[index];
     if (!step || !REVIEW_STATUSES[status]) return;
+    const before = _snapshot(step);
     const platform = _currentAutomationPlatform();
     step.review_status = status;
     step.validation_overrides = step.validation_overrides || {};
@@ -168,14 +190,17 @@ function create({
     } else if (status !== 'approved') {
       step.validation_overrides[platform] = false;
     }
+    _recordReviewChange(index, before, step, 'status');
     render(lastAnalysis, { open: false });
   }
 
   function _approveAllVideoSteps() {
     if (!lastAnalysis?.analysis?.etapas) return;
-    lastAnalysis.analysis.etapas.forEach(step => {
+    lastAnalysis.analysis.etapas.forEach((step, index) => {
+      const before = _snapshot(step);
       step.review_status = 'approved';
       step.validation_overrides = {};
+      _recordReviewChange(index, before, step, 'approve_all');
     });
     render(lastAnalysis, { open: false });
   }
@@ -183,6 +208,7 @@ function create({
   function _persistStepEdit(index, values) {
     const step = lastAnalysis?.analysis?.etapas?.[index];
     if (!step) return;
+    const before = _snapshot(step);
     step.acao = values.acao;
     step.detalhes = values.detalhes;
     step.tipo_acao = values.tipo_acao;
@@ -209,6 +235,7 @@ function create({
     step.validation_overrides = {};
     if (validation.status === 'warning') step.validation_overrides[platform] = true;
 
+    _recordReviewChange(index, before, step, 'edit');
     render(lastAnalysis, { open: false });
   }
 
@@ -821,7 +848,11 @@ function create({
   }
 
   function render(data, options = {}) {
-    lastAnalysis = data;
+    if (data !== lastAnalysis) {
+      lastAnalysis = data;
+      originalAnalysisSnapshot = _snapshot(data);
+      reviewHistory = [];
+    }
     _ensureReviewState(data);
 
     const analysis = data.analysis || {};
@@ -1208,8 +1239,20 @@ function create({
     return _generateAutomation(platform, data);
   }
 
+  function getOriginalAnalysis() {
+    return _snapshot(originalAnalysisSnapshot);
+  }
+
+  function getReviewHistory() {
+    return _snapshot(reviewHistory);
+  }
+
   function validateAnalysis(data, platform = _currentAutomationPlatform(data)) {
-    lastAnalysis = data;
+    if (data !== lastAnalysis) {
+      lastAnalysis = data;
+      originalAnalysisSnapshot = _snapshot(data);
+      reviewHistory = [];
+    }
     _ensureReviewState(data);
     return _validateAnalysis(data, platform);
   }
@@ -1221,7 +1264,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, isVideo,
-    normalizeEvidenceTimeline
+    normalizeEvidenceTimeline, getOriginalAnalysis, getReviewHistory
   };
 }
 
