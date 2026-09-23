@@ -575,7 +575,7 @@ function create({
   function reviewPackageManifest(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
     if (!data || !isReviewPackageReady(data)) return false;
     const normalizedPlatform = validator.normalizePlatform(platform);
-    const base = String(data?.filename || 'video').replace(/\\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+    const base = String(data?.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
     const automationFilename = _automationFilename(normalizedPlatform, data);
     const auditFilename = base + '-auditoria-revisao.json';
     const analysisFilename = base + '-analise-revisada.json';
