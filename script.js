@@ -14,6 +14,7 @@ const QueueManager = globalThis.MarkAICore.QueueManager;
 const WorkspaceStore = globalThis.MarkAIWorkspace;
 let WorkspaceController = null;
 let YouTubeController = null;
+let EditorController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -70,8 +71,6 @@ const ConversionController = globalThis.MarkAIConversionController.create({
 // 8. UI MANAGER — DOM, events, toasts, modals
 // ══════════════════════════════════════════════
 const UIManager = (() => {
-  let _previewRawMode = false;
-
   // DOM and presentation helpers are provided by frontend/modules/ui_dom.js.
   const UIDomView = UIDom.create();
   const $ = UIDomView.$;
@@ -142,73 +141,21 @@ const UIManager = (() => {
     els.emptyState.style.display = 'flex';
   }
 
-  // ── LOAD MARKDOWN INTO WORKSPACE ──
+  // ── EDITOR CONTROLLER ADAPTERS ──
   function loadMarkdown(md, fileName) {
-    AppState.set('currentMd', md);
-    AppState.set('currentFileName', fileName || 'documento.md');
-
-    els.emptyState.style.display = 'none';
-    els.workspaceContent.style.display = 'flex';
-    els.workspaceContent.style.flexDirection = 'column';
-    els.workspaceContent.style.height = '100%';
-
-    els.docName.textContent = fileName || 'documento.md';
-    els.docName.title = fileName || 'documento.md';
-
-    const activePanel = AppState.get('activePanel');
-    els.markdownEditor.value = md;
-    els.markdownEditorSplit.value = md;
-    _updateStats(md);
-
-    if (activePanel === 'panelPreview' || activePanel === 'panelSplit') {
-      _renderPreview(md);
-    }
-
-    setProgress(1);
-    setTimeout(() => setProgress(0, false), 800);
+    return EditorController ? EditorController.loadMarkdown(md, fileName) : null;
   }
 
   function _updateStats(md) {
-    const words = md.trim() ? md.trim().split(/\s+/).length : 0;
-    const lines = md.split('\n').length;
-    const chars = md.length;
-    els.statWords.textContent = `${words.toLocaleString('pt-BR')} palavras`;
-    els.statLines.textContent = `${lines.toLocaleString('pt-BR')} linhas`;
-    els.statChars.textContent = `${chars.toLocaleString('pt-BR')} chars`;
+    if (EditorController) EditorController.updateStats(md);
   }
 
   function _renderPreview(md) {
-    const settings = AppState.get('settings');
-    const html = _sanitizeMarkdownHtml(md);
-    [els.markdownPreview, els.markdownPreviewSplit].forEach(el => {
-      el.innerHTML = html;
-      if (settings.syntaxHL) {
-        el.querySelectorAll('pre code').forEach(block => {
-          hljs.highlightElement(block);
-        });
-      }
-    });
+    if (EditorController) EditorController.renderPreview(md);
   }
 
-  // ── TABS ──
   function _switchTab(tab) {
-    const panels = { panelRaw: els.panelRaw, panelPreview: els.panelPreview, panelSplit: els.panelSplit };
-    const tabs = [els.tabRaw, els.tabPreview, els.tabSplit];
-
-    tabs.forEach(t => t.classList.remove('active'));
-    Object.values(panels).forEach(p => p.style.display = 'none');
-
-    const panelId = tab.dataset.panel;
-    panels[panelId].style.display = 'flex';
-    tab.classList.add('active');
-    AppState.set('activePanel', panelId);
-
-    if (panelId !== 'panelRaw') {
-      _renderPreview(AppState.get('currentMd'));
-    }
-    if (panelId === 'panelSplit') {
-      els.markdownEditorSplit.value = AppState.get('currentMd');
-    }
+    if (EditorController) EditorController.switchTab(tab.dataset.panel);
   }
 
   // ── MOTOR COMPARISON ──
@@ -442,7 +389,7 @@ const UIManager = (() => {
           toast('Converta o arquivo primeiro.', 'warning');
         }
       } else if (btn.classList.contains('qi-btn-preview')) {
-        _previewItem(id);
+        EditorController.previewItem(id);
       }
     });
 
@@ -471,25 +418,12 @@ const UIManager = (() => {
 
     // Tabs
     [els.tabRaw, els.tabPreview, els.tabSplit].forEach(tab => {
-      tab.addEventListener('click', () => _switchTab(tab));
+      tab.addEventListener('click', () => EditorController.switchTab(tab.dataset.panel));
     });
 
-    // Editor auto-sync
-    function _onEditorInput(editor, e) {
-      const md = editor.value;
-      AppState.set('currentMd', md);
-      _updateStats(md);
-      // Sync sibling editor
-      if (editor === els.markdownEditor) els.markdownEditorSplit.value = md;
-      else els.markdownEditor.value = md;
-      // Auto preview
-      if (AppState.get('settings').autoPreview && AppState.get('activePanel') !== 'panelRaw') {
-        _renderPreview(md);
-      }
-      if (AppState.get('activePanel') === 'panelSplit') _renderPreview(md);
-    }
-    els.markdownEditor.addEventListener('input', e => { _onEditorInput(els.markdownEditor, e); WorkspaceController.scheduleSave(); });
-    els.markdownEditorSplit.addEventListener('input', e => { _onEditorInput(els.markdownEditorSplit, e); WorkspaceController.scheduleSave(); });
+    // Editor auto-sync is owned by EditorController.
+    els.markdownEditor.addEventListener('input', () => EditorController.handleInput(els.markdownEditor.value));
+    els.markdownEditorSplit.addEventListener('input', () => EditorController.handleInput(els.markdownEditorSplit.value));
     // Copy
     els.btnCopy.addEventListener('click', async () => {
       try {
@@ -520,19 +454,7 @@ const UIManager = (() => {
     });
 
     // Reset
-    els.btnReset.addEventListener('click', async () => {
-      AppState.set('currentMd', '');
-      els.markdownEditor.value = '';
-      els.markdownEditorSplit.value = '';
-      els.markdownPreview.innerHTML = '';
-      els.markdownPreviewSplit.innerHTML = '';
-      els.workspaceContent.style.display = 'none';
-      els.emptyState.style.display = 'flex';
-      _updateStats('');
-      setProgress(0, false);
-      setStatus('Pronto', 'idle');
-      WorkspaceController.scheduleSave();
-    });
+    els.btnReset.addEventListener('click', () => EditorController.reset());
 
     // AI Enhance
     els.btnEnhanceAI.addEventListener('click', async () => {
@@ -645,24 +567,7 @@ const UIManager = (() => {
       }
       els.modalPreview.close();
     });
-    els.btnPreviewRaw.addEventListener('click', () => {
-      _previewRawMode = !_previewRawMode;
-      const id = AppState.get('previewItemId');
-      const item = id ? QueueManager.getById(id) : null;
-      if (item && item.result) {
-        if (_previewRawMode) {
-          const pre = document.createElement('pre');
-          const code = document.createElement('code');
-          code.textContent = item.result;
-          pre.appendChild(code);
-          els.previewContent.replaceChildren(pre);
-          els.btnPreviewRaw.textContent = 'Ver Preview';
-        } else {
-          els.previewContent.innerHTML = _sanitizeMarkdownHtml(item.result);
-          els.btnPreviewRaw.textContent = 'Ver Raw';
-        }
-      }
-    });
+    els.btnPreviewRaw.addEventListener('click', () => EditorController.togglePreviewRaw());
   }
 
   // ── SETTINGS UI ──
@@ -748,39 +653,6 @@ const UIManager = (() => {
     }
   }
 
-  // ── PREVIEW MODAL ──
-  async function _previewItem(id) {
-    const item = QueueManager.getById(id);
-    if (!item) return;
-    AppState.set('previewItemId', id);
-
-    els.previewFileName.textContent = item.name;
-    els.previewContent.innerHTML = '';
-
-    let result = item.result;
-    if (!result) {
-      showProcessing('Convertendo para preview…', item.name);
-      try {
-        result = await FileParserStrategy.parse(item);
-        QueueManager.update(id, { status: 'done', result });
-        renderQueue();
-      } catch(e) {
-        hideProcessing();
-        toast(`Erro ao pré-visualizar: ${e.message}`, 'error');
-        return;
-      }
-      hideProcessing();
-    }
-
-    els.previewContent.innerHTML = _sanitizeMarkdownHtml(result);
-    if (AppState.get('settings').syntaxHL) {
-      els.previewContent.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
-    }
-    els.btnPreviewRaw.textContent = 'Ver Raw';
-    _previewRawMode = false;
-    els.modalPreview.showModal();
-  }
-
   function setProcessingSub(text) {
     if (els.procSub) els.procSub.textContent = String(text ?? '');
   }
@@ -804,6 +676,72 @@ const UIManager = (() => {
 
   return { init, renderQueue, loadMarkdown, toast, setStatus, setProgress, showProcessing, hideProcessing,
     setProcessingSub, scheduleWorkspaceSave, showComparison,
+    setEditorWorkspaceVisible: visible => {
+      els.emptyState.style.display = visible ? 'none' : 'flex';
+      els.workspaceContent.style.display = visible ? 'flex' : 'none';
+      if (visible) {
+        els.workspaceContent.style.flexDirection = 'column';
+        els.workspaceContent.style.height = '100%';
+      }
+    },
+    setEditorDocumentName: name => {
+      els.docName.textContent = name || 'documento.md';
+      els.docName.title = name || 'documento.md';
+    },
+    setEditorValues: md => {
+      els.markdownEditor.value = md;
+      els.markdownEditorSplit.value = md;
+    },
+    syncEditorValues: md => {
+      if (document.activeElement === els.markdownEditor) els.markdownEditorSplit.value = md;
+      else els.markdownEditor.value = md;
+    },
+    setEditorStats: stats => {
+      els.statWords.textContent = stats.words;
+      els.statLines.textContent = stats.lines;
+      els.statChars.textContent = stats.chars;
+    },
+    setEditorPreviewHtml: html => {
+      [els.markdownPreview, els.markdownPreviewSplit].forEach(el => { el.innerHTML = html; });
+    },
+    renderEditorPreview: (html, settings) => {
+      [els.markdownPreview, els.markdownPreviewSplit].forEach(el => {
+        el.innerHTML = html;
+        if (settings.syntaxHL) el.querySelectorAll('pre code').forEach(block => hljs.highlightElement(block));
+      });
+    },
+    setEditorActivePanel: panelId => {
+      const panels = { panelRaw: els.panelRaw, panelPreview: els.panelPreview, panelSplit: els.panelSplit };
+      const tabs = [els.tabRaw, els.tabPreview, els.tabSplit];
+      tabs.forEach(t => t.classList.remove('active'));
+      Object.values(panels).forEach(p => p.style.display = 'none');
+      if (panels[panelId]) panels[panelId].style.display = 'flex';
+      const tab = tabs.find(t => t.dataset.panel === panelId);
+      if (tab) tab.classList.add('active');
+    },
+    setEditorSplitValue: md => { els.markdownEditorSplit.value = md; },
+    clearEditorsAndPreview: () => {
+      els.markdownEditor.value = '';
+      els.markdownEditorSplit.value = '';
+      els.markdownPreview.innerHTML = '';
+      els.markdownPreviewSplit.innerHTML = '';
+    },
+    setPreviewFileName: name => { els.previewFileName.textContent = name || ''; },
+    clearPreviewContent: () => { els.previewContent.innerHTML = ''; },
+    setPreviewHtml: (html, settings) => {
+      els.previewContent.innerHTML = html;
+      if (settings.syntaxHL) els.previewContent.querySelectorAll('pre code').forEach(b => hljs.highlightElement(b));
+    },
+    setPreviewRawContent: value => {
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = value;
+      pre.appendChild(code);
+      els.previewContent.replaceChildren(pre);
+    },
+    setPreviewRawLabel: label => { els.btnPreviewRaw.textContent = label; },
+    showPreviewModal: () => els.modalPreview.showModal(),
+    renderWorkspacePreview: () => {},
     refreshWorkspaceProjects: _refreshWorkspaceProjects,
     renderWorkspaceHistory: _renderWorkspaceHistory,
     showCurrentWorkspaceDocument: _showCurrentWorkspaceDocument,
