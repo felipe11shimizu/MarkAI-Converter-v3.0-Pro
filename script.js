@@ -30,7 +30,7 @@ const MergeEngine = globalThis.MarkAIMergeEngine.create({
 // URL ingestion service is provided by frontend/modules/url_fetcher.js.
 const URLFetcher = globalThis.MarkAIUrlService;
 
-// ChatFormatter is provided by frontend/modules/chatformatter.js.
+// ChatFormatter is provided by frontend/modules/chat_formatter.js.
 const ChatFormatter = globalThis.MarkAIChatFormatter;
 
 // AI service is provided by frontend/modules/ai_engine.js.
