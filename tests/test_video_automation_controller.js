@@ -5,6 +5,8 @@ const VideoAutomationController = require('../frontend/modules/video_automation_
 const Validator = require('../video_automation_validator.js');
 const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js');
 
+(async () => {
+
 class FakeZip {
   constructor() { this.files = {}; }
   file(name, content) { this.files[name] = content; }
@@ -182,3 +184,7 @@ assert.equal(controller.finalizeReview(), true);
 const sensitiveCode = controller.generateAutomation(sensitiveData, 'pyautogui');
 assert.ok(sensitiveCode.includes('{{DADO_SENSIVEL}}'));
 console.log('video_automation_controller module tests: ok');
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
