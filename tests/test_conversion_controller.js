@@ -32,5 +32,8 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   assert.ok(calls.some(x => x[0] === 'load'));
   await controller.convertAll();
   assert.strictEqual(items[1].status, 'done');
+  await controller.mergeAll();
+  assert.ok(calls.some(x => x[0] === 'load' && x[1] === '# merged'));
+  assert.ok(calls.some(x => x[0] === 'save'));
   console.log('conversion_controller tests passed');
 })().catch(err => { console.error(err); process.exit(1); });
