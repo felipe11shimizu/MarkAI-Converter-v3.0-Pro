@@ -479,7 +479,9 @@ document.addEventListener('DOMContentLoaded', () => {
       settings: AppState.get('settings')
     }),
     workspaceStore: WorkspaceStore,
-    workspaceController: WorkspaceController,
+    workspaceController: {
+      saveVersion: (...args) => WorkspaceController.saveVersion(...args)
+    },
     elements: {
       btnEnhanceAI: document.getElementById('btnEnhanceAI'),
       workspaceAIPrompt: document.getElementById('workspaceAIPrompt')
@@ -494,7 +496,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   UrlUIController = globalThis.MarkAIUrlUIController.create({
     urlService: URLFetcher,
-    youtubeController: YouTubeController,
+    youtubeController: {
+      updateControls: (...args) => YouTubeController.updateControls(...args),
+      transcribe: (...args) => YouTubeController.transcribe(...args)
+    },
     elements: {
       urlInput: document.getElementById('urlInput'),
       btnFetchUrl: document.getElementById('btnFetchUrl'),
