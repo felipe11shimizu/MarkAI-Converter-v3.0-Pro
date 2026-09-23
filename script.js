@@ -53,6 +53,7 @@ const ConversionController = globalThis.MarkAIConversionController.create({
   markItDownEngine: MarkItDownEngine,
   fileParserStrategy: FileParserStrategy,
   conversionQuality: ConversionQuality,
+  mergeEngine: MergeEngine,
   getState: () => ({
   }),
   setState: patch => Object.entries(patch).forEach(([key, value]) => AppState.set(key, value)),
