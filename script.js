@@ -21,6 +21,7 @@ let WorkspaceUIController = null;
 let QueueUIController = null;
 let EditorUIController = null;
 let UrlUIController = null;
+let AIUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -225,36 +226,7 @@ const UIManager = (() => {
     // Reset
     els.btnReset.addEventListener('click', () => EditorController.reset());
 
-    // AI Enhance
-    els.btnEnhanceAI.addEventListener('click', async () => {
-      const md = AppState.get('currentMd');
-      if (!md) { toast('Sem conteúdo para melhorar.', 'warning'); return; }
-      const settings = AppState.get('settings');
-      if (!settings.apiKey) {
-        toast('Configure sua API Key em Configurações.', 'warning');
-        els.modalSettings.showModal();
-        return;
-      }
-      els.btnEnhanceAI.classList.add('loading');
-      els.btnEnhanceAI.disabled = true;
-      setStatus('IA processando…', 'busy');
-      try {
-        const customPrompt = els.workspaceAIPrompt?.value?.trim() || '';
-        const improved = await AIEngine.enhance(md, customPrompt);
-        const projectId = AppState.get('currentProjectId');
-        if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: customPrompt || 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
-        loadMarkdown(improved, AppState.get('currentFileName'));
-        await WorkspaceController.saveVersion('ai');
-        toast('✓ Markdown melhorado pela IA!', 'success');
-        setStatus('IA concluída', 'idle');
-      } catch(e) {
-        toast(`Erro IA: ${e.message}`, 'error');
-        setStatus('Erro na IA', 'error');
-      } finally {
-        els.btnEnhanceAI.classList.remove('loading');
-        els.btnEnhanceAI.disabled = false;
-      }
-    });
+    // AI enhancement is delegated to AIUIController.
 
     // Settings events are delegated to SettingsController.
 
@@ -538,6 +510,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  AIUIController = globalThis.MarkAIAIUIController.create({
+    aiEngine: AIEngine,
+    getState: () => ({
+      currentMd: AppState.get('currentMd'),
+      currentFileName: AppState.get('currentFileName'),
+      currentProjectId: AppState.get('currentProjectId'),
+      settings: AppState.get('settings')
+    }),
+    workspaceStore: WorkspaceStore,
+    workspaceController: WorkspaceController,
+    elements: {
+      btnEnhanceAI: document.getElementById('btnEnhanceAI'),
+      workspaceAIPrompt: document.getElementById('workspaceAIPrompt')
+    },
+    ui: {
+      toast: (message, type) => UIManager.toast(message, type),
+      openSettings: () => UIManager.openSettings(),
+      setStatus: (text, state) => UIManager.setStatus(text, state),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name)
+    }
+  });
+
   UrlUIController = globalThis.MarkAIUrlUIController.create({
     urlService: URLFetcher,
     youtubeController: YouTubeController,
@@ -655,6 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
   UIManager.init();
   EditorUIController.bind();
   UrlUIController.bind();
+  AIUIController.bind();
   SettingsController.bind();
   VideoAutomationController.bind();
 
