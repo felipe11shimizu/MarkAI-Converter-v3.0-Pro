@@ -591,6 +591,7 @@ document.addEventListener('DOMContentLoaded', () => {
     getSettings: () => AppState.get('settings'),
     urlService: URLFetcher,
     validator: globalThis.MarkAIAutomationValidator,
+    evidenceTimeline: globalThis.MarkAIVideoEvidenceTimeline,
     ui: {
       toast: (message, type) => UIManager.toast(message, type)
     }
