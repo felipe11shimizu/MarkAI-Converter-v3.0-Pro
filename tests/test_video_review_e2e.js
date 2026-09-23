@@ -128,7 +128,7 @@ const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js
   // 5. Generation is enabled after finalization.
   const automation = controller.generateAutomation(data, 'pyautogui');
   assert.match(automation, /import pyautogui/);
-  assert.match(automation, /pyautogui\\.click\\(120, 80\\)/);
+  assert.match(automation, /pyautogui\.click\(120, 80\)/);
 
   // 6. Export the complete auditable package.
   assert.equal(await controller.exportReviewPackage(data, 'pyautogui'), true);
