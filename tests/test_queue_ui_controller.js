@@ -6,6 +6,8 @@ const QueueUIController = require('../frontend/modules/queue_ui_controller.js');
 const calls = [];
 const queue = [];
 const timers = { setTimeout(fn) { calls.push('timer'); fn(); } };
+const listeners = {};
+let fileInputClicks = 0;
 const queueManager = {
   add(files) {
     const item = { id: 'q1', name: files[0].name, status: 'queued', result: '# resultado' };
@@ -43,9 +45,14 @@ function button(id, ...classes) {
 
 const documentRef = {
   getElementById(id) {
-    if (id === 'queueList') return { querySelectorAll() { return []; } };
+    if (id === 'queueList') return { querySelectorAll() { return []; }, addEventListener(type, handler) { listeners['queueList:' + type] = handler; } };
+    if (id === 'dropZone') return { classList: { add() {}, remove() {} }, addEventListener(type, handler) { listeners['dropZone:' + type] = handler; } };
+    if (id === 'fileInput') return { click() { fileInputClicks += 1; }, addEventListener(type, handler) { listeners['fileInput:' + type] = handler; } };
+    if (id === 'browseBtn') return { addEventListener(type, handler) { listeners['browseBtn:' + type] = handler; } };
+    if (id === 'btnClearQueue' || id === 'btnMergeAll' || id === 'btnDownloadZip' || id === 'btnConvertAll') return { addEventListener(type, handler) { listeners[id + ':' + type] = handler; } };
     return null;
   },
+  addEventListener(type, handler) { listeners[type] = handler; },
   createElement() {
     return { click() { calls.push('download-click'); } };
   },
