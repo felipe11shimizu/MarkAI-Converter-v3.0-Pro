@@ -10,7 +10,6 @@
   function create({
     queueManager,
     conversionController,
-    mergeEngine,
     workspaceController,
     editorController,
     getState,
@@ -51,25 +50,7 @@
     }
 
     async function mergeAll() {
-      const items = queueManager.getOrdered();
-      if (!items.length) {
-        toast('Nenhum arquivo na fila.', 'warning');
-        return;
-      }
-      showProcessing('Juntando arquivos…', 'Processando ' + items.length + ' arquivos');
-      setStatus('Fazendo merge…', 'busy');
-      try {
-        const result = await mergeEngine.merge((p, name) => setProcessingSub('Convertendo: ' + name));
-        workspaceController.scheduleSave();
-        hideProcessing();
-        loadMarkdown(result, 'documento_combinado.md');
-        setStatus('Merge concluído', 'idle');
-        toast('✓ ' + items.length + ' arquivos combinados!', 'success');
-      } catch (error) {
-        hideProcessing();
-        setStatus('Erro no merge', 'error');
-        toast('Erro: ' + error.message, 'error');
-      }
+      return conversionController.mergeAll();
     }
 
     async function downloadZip() {
