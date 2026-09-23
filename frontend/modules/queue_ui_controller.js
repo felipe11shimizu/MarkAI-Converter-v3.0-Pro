@@ -151,20 +151,9 @@
     }
 
     function openFilePicker(fileInput) {
-      if (!fileInput) return false;
-      try {
-        if (typeof fileInput.showPicker === 'function') {
-          fileInput.showPicker();
-          return true;
-        }
-      } catch (error) {
-        console.warn('[MarkAI] showPicker indisponível, usando fallback:', error);
-      }
-      if (typeof fileInput.click === 'function') {
-        fileInput.click();
-        return true;
-      }
-      return false;
+      if (!fileInput || typeof fileInput.click !== 'function') return false;
+      fileInput.click();
+      return true;
     }
 
     function bind() {
@@ -194,10 +183,10 @@
           fileInput?.click();
         }
       });
+      // "selecione do computador" is a <label for="fileInput"> so the
+      // browser performs the native file-picker activation on mobile.
       browseBtn?.addEventListener('click', event => {
-        event.preventDefault();
         event.stopPropagation();
-        openFilePicker(fileInput);
       });
       fileInput?.addEventListener('change', event => {
         if (event.target.files.length) onFilesSelected(event.target.files);
