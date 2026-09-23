@@ -23,6 +23,7 @@ let EditorUIController = null;
 let UrlUIController = null;
 let AIUIController = null;
 let ComparisonUIController = null;
+let FileActionsUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -209,29 +210,13 @@ const UIManager = (() => {
       }
     });
 
-    // Download
-    els.btnDownload.addEventListener('click', () => {
-      const md = AppState.get('currentMd');
-      if (!md) { toast('Nenhum conteúdo para baixar.', 'warning'); return; }
-      const fileName = AppState.get('currentFileName') || 'documento.md';
-      const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = fileName;
-      document.body.appendChild(a); a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast(`✓ ${fileName} baixado!`, 'success');
-    });
-
-    // Reset
-    els.btnReset.addEventListener('click', () => EditorController.reset());
+    // Download/reset actions are delegated to FileActionsUIController.
 
     // AI enhancement is delegated to AIUIController.
 
     // Settings events are delegated to SettingsController.
 
-    ComparisonUIController.bind();
+    // Comparison UI binding is performed after controller construction.
 
     // Preview Modal
     els.btnClosePreview.addEventListener('click', () => els.modalPreview.close());
@@ -650,6 +635,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   SettingsController.bind();
   VideoAutomationController.bind();
+
+  FileActionsUIController = globalThis.MarkAIFileActionsUIController.create({
+    getState: () => ({
+      currentMd: AppState.get('currentMd'),
+      currentFileName: AppState.get('currentFileName')
+    }),
+    editorController: EditorController,
+    ui: {
+      toast: (message, type) => UIManager.toast(message, type)
+    },
+    document,
+    URL,
+    Blob,
+    elements: {
+      btnDownload: document.getElementById('btnDownload'),
+      btnReset: document.getElementById('btnReset')
+    }
+  });
+  FileActionsUIController.bind();
+  ComparisonUIController.bind();
 
   // File ingestion is centralized in QueueUIController.
 });
