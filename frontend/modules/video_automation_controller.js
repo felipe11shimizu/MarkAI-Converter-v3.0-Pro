@@ -710,7 +710,7 @@ function create({
   }
 
   function _automationFilename(platform, data) {
-    const base = String(data?.filename || 'video').replace(/\\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+    const base = String(data?.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
     return base + '-automacao-' + platform + (platform === 'rpa' ? '.robot' : '.py');
   }
 
