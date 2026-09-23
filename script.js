@@ -627,7 +627,6 @@ document.addEventListener('DOMContentLoaded', () => {
   QueueUIController = globalThis.MarkAIQueueUIController.create({
     queueManager: QueueManager,
     conversionController: ConversionController,
-    mergeEngine: MergeEngine,
     workspaceController: WorkspaceController,
     editorController: EditorController,
     getState: () => ({ queue: AppState.get('queue') }),
@@ -705,7 +704,6 @@ document.addEventListener('DOMContentLoaded', () => {
   VideoAutomationController.bind();
 
   // File ingestion is centralized in QueueUIController.
-});
 });
 
 
