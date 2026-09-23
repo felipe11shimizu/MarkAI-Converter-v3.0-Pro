@@ -205,7 +205,10 @@ const UIManager = (() => {
     AppState.loadSettings();
     SettingsController.sync();
     _setupMarkdown();
-    WorkspaceController.init();
+    WorkspaceController.init().catch(error => {
+      console.warn('[MarkAI] Workspace initialization failed:', error);
+      toast('Não foi possível carregar o workspace.', 'error');
+    });
 
     // Workspace
     els.btnWorkspace?.addEventListener('click', _openWorkspace);

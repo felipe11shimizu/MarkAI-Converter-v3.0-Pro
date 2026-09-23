@@ -47,6 +47,22 @@ function makeStore() {
   };
 }
 
+async function testInitPropagatesStoreError() {
+  const expectedError = new Error('IndexedDB unavailable');
+  const failingController = WorkspaceController.create({
+    workspaceStore: {
+      async init() { throw expectedError; }
+    },
+    getState: () => ({}),
+    setState: () => {}
+  });
+
+  await assert.rejects(
+    failingController.init(),
+    error => error === expectedError
+  );
+}
+
 const store = makeStore();
 const state = {
   currentProjectId: 'p1',
@@ -104,5 +120,6 @@ const controller = WorkspaceController.create({
 
   controller.scheduleSave();
   assert.ok(events.some(e => e[0] === 'timer'));
+  await testInitPropagatesStoreError();
   console.log('workspace_controller module tests: ok');
 })();
