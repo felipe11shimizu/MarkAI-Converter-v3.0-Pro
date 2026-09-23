@@ -194,7 +194,7 @@
       dropZone?.addEventListener('drop', event => {
         event.preventDefault();
         dropZone.classList.remove('drag-over');
-        if (event.dataTransfer.files.length) onFilesSelected(event.dataTransfer.files);
+        onFilesSelected(event.dataTransfer?.files);
       });
       dropZone?.addEventListener('click', () => openFilePicker(fileInput));
       dropZone?.addEventListener('keydown', event => {
