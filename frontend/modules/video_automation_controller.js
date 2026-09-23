@@ -23,6 +23,7 @@ function create({
   let originalAnalysisSnapshot = null;
   let reviewHistory = [];
   let reviewFinalizedAt = null;
+  let finalizedReviewSnapshot = null;
   const $ = id => documentRef ? documentRef.getElementById(id) : null;
   const signalTimeout = injectedSignalTimeout || ((ms) =>
     typeof abortSignal?.timeout === 'function' ? abortSignal.timeout(ms) : undefined
@@ -107,6 +108,29 @@ function create({
       return JSON.parse(JSON.stringify(value));
     } catch (_) {
       return value;
+    }
+  }
+
+  function _reviewIntegrityPayload(data) {
+    const clone = _snapshot(data);
+    const analysis = clone?.analysis;
+    if (analysis && typeof analysis === 'object') {
+      delete analysis.validacao_resumo;
+      delete analysis.validacao_plataforma;
+      if (Array.isArray(analysis.etapas)) {
+        analysis.etapas.forEach(step => {
+          if (step && typeof step === 'object') delete step.validacao_automacao;
+        });
+      }
+    }
+    return clone;
+  }
+
+  function _reviewIntegrityKey(data) {
+    try {
+      return JSON.stringify(_reviewIntegrityPayload(data));
+    } catch (_) {
+      return null;
     }
   }
 
@@ -380,7 +404,10 @@ function create({
     if (!lastAnalysis?.analysis || !Array.isArray(lastAnalysis.analysis.etapas)) return false;
     const counts = _reviewCounts(lastAnalysis);
     if (counts.pending > 0) return false;
-    if (!reviewFinalizedAt) reviewFinalizedAt = new Date().toISOString();
+    if (!reviewFinalizedAt) {
+      finalizedReviewSnapshot = _reviewIntegrityPayload(lastAnalysis);
+      reviewFinalizedAt = new Date().toISOString();
+    }
     render(lastAnalysis, { open: false });
     return true;
   }
@@ -490,6 +517,11 @@ function create({
       review: {
         finalized: Boolean(reviewFinalizedAt),
         finalized_at: reviewFinalizedAt,
+        integrity_protected: Boolean(finalizedReviewSnapshot),
+        integrity_match: Boolean(
+          finalizedReviewSnapshot &&
+          _reviewIntegrityKey(data) === _reviewIntegrityKey(finalizedReviewSnapshot)
+        ),
         counts,
         changes: reviewHistory.map(change => ({
           timestamp: change.timestamp,
@@ -927,6 +959,14 @@ function create({
         ...header,
         '# Geração bloqueada: a revisão humana ainda não foi finalizada.',
         '# Conclua todas as etapas pendentes, execute a validação e finalize a revisão antes de gerar a automação.'
+      ].join('\\n');
+    }
+
+    if (finalizedReviewSnapshot && _reviewIntegrityKey(data) !== _reviewIntegrityKey(finalizedReviewSnapshot)) {
+      return [
+        ...header,
+        '# Geração bloqueada: a revisão finalizada foi alterada após o bloqueio.',
+        '# A análise precisa permanecer idêntica ao conteúdo revisado antes da geração da automação.'
       ].join('\\n');
     }
     const steps = (Array.isArray(analysis.etapas) ? analysis.etapas : [])
