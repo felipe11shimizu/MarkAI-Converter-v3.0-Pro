@@ -560,6 +560,8 @@ function create({
 
   async function exportReviewPackage(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
     if (!data) return false;
+    if (!reviewFinalizedAt) return false;
+    if (finalizedReviewSnapshot && _reviewIntegrityKey(data) !== _reviewIntegrityKey(finalizedReviewSnapshot)) return false;
     if (typeof zipImpl !== 'function') throw new TypeError('Review package export requires JSZip.');
     const normalizedPlatform = validator.normalizePlatform(platform);
     const code = _generateAutomation(normalizedPlatform, data);
