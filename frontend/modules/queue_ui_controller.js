@@ -20,7 +20,6 @@
   } = {}) {
     if (!queueManager) throw new Error('QueueUIController requires queueManager');
     if (!conversionController) throw new Error('QueueUIController requires conversionController');
-    if (!mergeEngine) throw new Error('QueueUIController requires mergeEngine');
     if (!workspaceController) throw new Error('QueueUIController requires workspaceController');
     if (typeof getState !== 'function') throw new Error('QueueUIController requires getState');
 
