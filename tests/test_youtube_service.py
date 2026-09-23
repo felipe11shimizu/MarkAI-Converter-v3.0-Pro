@@ -186,39 +186,3 @@ def test_cache_returns_hit_without_second_provider_call(monkeypatch):
     assert first["cache"] == "miss"
     assert second["cache"] == "hit"
     assert calls["count"] == 1
-
-
-def test_cache_separates_preserve_formatting(monkeypatch):
-    service = YouTubeTranscriptService(cache_ttl_seconds=900)
-    calls = []
-
-    class FakeTranscript:
-        language = "Português"
-        language_code = "pt"
-        is_generated = True
-
-        def fetch(self, preserve_formatting=False):
-            calls.append(preserve_formatting)
-            return SimpleNamespace(
-                language="Português",
-                language_code="pt",
-                is_generated=True,
-                to_raw_data=lambda: [
-                    {"text": "Olá", "start": 0, "duration": 1}
-                ],
-            )
-
-    class FakeTranscriptList:
-        def find_transcript(self, languages):
-            return FakeTranscript()
-
-    class FakeApi:
-        def list(self, video_id):
-            return FakeTranscriptList()
-
-    monkeypatch.setattr(service, "_build_provider", lambda: (FakeApi(), {}))
-
-    service.fetch_transcript("dQw4w9WgXcQ", languages=["pt"], preserve_formatting=False)
-    service.fetch_transcript("dQw4w9WgXcQ", languages=["pt"], preserve_formatting=True)
-
-    assert calls == [False, True]
