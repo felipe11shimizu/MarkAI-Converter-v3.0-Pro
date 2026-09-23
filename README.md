@@ -209,9 +209,14 @@ O OCR oficial do ecossistema MarkItDown utiliza LLM Vision para PDF, DOCX, PPTX 
 - proteção de dados sensíveis com placeholder {{DADO_SENSIVEL}} no editor e nas exportações JSON.
 
 
-### Fase 7 — Modularização — PRÓXIMA
-A evolução de validação foi isolada em `video_automation_validator.js`; a modularização do restante do `script.js` permanece como etapa posterior para reduzir risco de regressão.
-Dividir o `script.js` em módulos de estado, fila, parsers, serviços, merge, IA e UI sem alterar o comportamento funcional.
+### Fase 7 — Modularização — EM EVOLUÇÃO
+A modularização foi iniciada sem alterar o contrato funcional da aplicação:
+- `frontend/modules/core_state.js`: estado reativo e gerenciamento da fila.
+- `frontend/modules/markitdown_engine.js`: serviço de comunicação com o backend MarkItDown.
+- `video_automation_validator.js`: validador de automação já isolado anteriormente.
+- `script.js` permanece como controlador legado compatível, consumindo os módulos por interfaces globais estáveis.
+- CI valida sintaxe dos novos módulos e testes de carregamento/integração básica.
+Próximos módulos: parsers, WorkspaceStore, serviços de vídeo/YouTube, IA, merge e UI, sempre com extração incremental e regressão automatizada.
 
 ### Fase 6 — CI/CD e testes de regressão — IMPLANTADA
 - testes determinísticos do validador de automação no Node.js executados no GitHub Actions.
