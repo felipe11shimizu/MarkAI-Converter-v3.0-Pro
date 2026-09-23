@@ -28,6 +28,14 @@ const fakeDocument = {
   body: { appendChild() {}, removeChild() {} },
   getElementById() { return null; }
 };
+const fakeCrypto = {
+  subtle: {
+    async digest() {
+      return Uint8Array.from({ length: 32 }, (_, index) => index).buffer;
+    }
+  }
+};
+
 const fakeWindow = {
   Blob,
   URL: {
@@ -48,7 +56,8 @@ const controller = VideoAutomationController.create({
   },
   documentRef: fakeDocument,
   windowRef: fakeWindow,
-  zipImpl: FakeZip
+  zipImpl: FakeZip,
+  cryptoImpl: fakeCrypto
 });
 
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
@@ -154,6 +163,13 @@ assert.equal(packageManifest.platform, 'pyautogui');
 assert.equal(packageManifest.integrity_match, true);
 assert.equal(packageManifest.files.length, 4);
 assert.match(packageManifest.sensitive_data_policy, /DADO_SENSIVEL/);
+assert.equal(packageManifest.integrity.algorithm, 'SHA-256');
+assert.equal(packageManifest.integrity.artifacts.length, 3);
+assert.equal(packageManifest.integrity.artifacts[0].sha256.length, 64);
+assert.match(packageManifest.integrity.artifacts[0].sha256, /^[0-9a-f]{64}$/);
+assert.equal(packageManifest.integrity.artifacts[0].name, 'processo-automacao-pyautogui.py');
+assert.equal(packageManifest.integrity.artifacts[1].name, 'processo-auditoria-revisao.json');
+assert.equal(packageManifest.integrity.artifacts[2].name, 'processo-analise-revisada.json');
 
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
