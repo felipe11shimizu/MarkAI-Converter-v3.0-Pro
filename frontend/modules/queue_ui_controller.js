@@ -54,6 +54,7 @@
       setStatus('Fazendo merge…', 'busy');
       try {
         const result = await mergeEngine.merge((p, name) => setProcessingSub('Convertendo: ' + name));
+        workspaceController.scheduleSave();
         hideProcessing();
         loadMarkdown(result, 'documento_combinado.md');
         setStatus('Merge concluído', 'idle');
