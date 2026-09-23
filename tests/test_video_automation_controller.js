@@ -62,10 +62,9 @@ assert.deepEqual(normalizedTimeline.steps[0].frameIndices, [1]);
 assert.deepEqual(normalizedTimeline.steps[0].transcriptSegmentIndices, []);
 assert.equal(normalizedTimeline.steps[0].reviewStatus, 'approved');
 
+const validation = controller.validateAnalysis(data, 'pyautogui');
 const originalBeforeReview = controller.getOriginalAnalysis();
 assert.equal(originalBeforeReview.analysis.etapas[0].review_status, 'approved');
-
-const validation = controller.validateAnalysis(data, 'pyautogui');
 assert.equal(validation.summary.total, 1);
 assert.equal(validation.summary.ready, 1);
 assert.equal(validation.summary.warning, 0);
