@@ -18,6 +18,9 @@ const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
 
 // File parser strategy is provided by frontend/modules/file_parser.js.
 const FileParserStrategy = globalThis.MarkAIFileParser;
+
+// DOM/presentation primitives are provided by frontend/modules/ui_dom.js.
+const UIDom = globalThis.MarkAIUIDom;
 const MergeEngine = globalThis.MarkAIMergeEngine.create({
   queueManager: QueueManager,
   fileParserStrategy: FileParserStrategy,
@@ -44,54 +47,16 @@ const ConversionQuality = globalThis.MarkAIConversionQuality;
 const UIManager = (() => {
   let _previewRawMode = false;
 
-  // ── DOM REFS ──
-  const $ = id => document.getElementById(id);
-  const els = {
-    dropZone: $('dropZone'), fileInput: $('fileInput'), browseBtn: $('browseBtn'),
-    queuePanel: $('queuePanel'), queueList: $('queueList'), queueCount: $('queueCount'),
-    btnClearQueue: $('btnClearQueue'), btnMergeAll: $('btnMergeAll'), btnConvertAll: $('btnConvertAll'), btnDownloadZip: $('btnDownloadZip'),
-    urlInput: $('urlInput'), btnFetchUrl: $('btnFetchUrl'),
-    youtubeControls: $('youtubeControls'), youtubeLanguage: $('youtubeLanguage'), youtubeTranslate: $('youtubeTranslate'),
-    btnYoutubeTranscribe: $('btnYoutubeTranscribe'), btnYoutubeLanguages: $('btnYoutubeLanguages'), youtubeStatus: $('youtubeStatus'),
-    chatInput: $('chatInput'), btnFormatChat: $('btnFormatChat'),
-    emptyState: $('emptyState'), workspaceContent: $('workspaceContent'),
-    docName: $('docName'),
-    statWords: $('statWords'), statLines: $('statLines'), statChars: $('statChars'),
-    btnEnhanceAI: $('btnEnhanceAI'), btnCopy: $('btnCopy'), btnCompare: $('btnCompare'),
-    btnDownload: $('btnDownload'), btnReset: $('btnReset'),
-    progressWrap: $('progressWrap'), progressBar: $('progressBar'),
-    markdownEditor: $('markdownEditor'),
-    markdownPreview: $('markdownPreview'),
-    markdownEditorSplit: $('markdownEditorSplit'),
-    markdownPreviewSplit: $('markdownPreviewSplit'),
-    panelRaw: $('panelRaw'), panelPreview: $('panelPreview'), panelSplit: $('panelSplit'),
-    tabRaw: $('tabRaw'), tabPreview: $('tabPreview'), tabSplit: $('tabSplit'),
-    procOverlay: $('procOverlay'), procLabel: $('procLabel'), procSub: $('procSub'),
-    statusDot: $('statusDot'), statusText: $('statusText'),
-    btnSettings: $('btnSettings'), modalSettings: $('modalSettings'),
-    btnCloseSettings: $('btnCloseSettings'), btnSaveSettings: $('btnSaveSettings'),
-    btnClearApiKey: $('btnClearApiKey'), btnToggleKey: $('btnToggleKey'),
-    btnWorkspace: $('btnWorkspace'), btnWorkspaceToolbar: $('btnWorkspaceToolbar'),
-    workspaceProjectSelect: $('workspaceProjectSelect'), btnWorkspaceSave: $('btnWorkspaceSave'),
-    btnWorkspaceVersion: $('btnWorkspaceVersion'), btnWorkspaceExport: $('btnWorkspaceExport'), workspaceStatus: $('workspaceStatus'),
-    modalWorkspace: $('modalWorkspace'), btnCloseWorkspace: $('btnCloseWorkspace'), btnWorkspaceDone: $('btnWorkspaceDone'),
-    workspaceProjectName: $('workspaceProjectName'), btnCreateWorkspaceProject: $('btnCreateWorkspaceProject'),
-    workspaceProjectList: $('workspaceProjectList'), btnRenameWorkspaceProject: $('btnRenameWorkspaceProject'),
-    btnDeleteWorkspaceProject: $('btnDeleteWorkspaceProject'), btnExportWorkspaceJson: $('btnExportWorkspaceJson'),
-    btnExportWorkspaceZip: $('btnExportWorkspaceZip'), workspaceHistoryCount: $('workspaceHistoryCount'),
-    workspaceHistoryList: $('workspaceHistoryList'), workspaceTabVersions: $('workspaceTabVersions'), workspaceTabAI: $('workspaceTabAI'),
-    aiProvider: $('aiProvider'), aiModel: $('aiModel'), aiApiKey: $('aiApiKey'),
-    workspaceAIPrompt: $('workspaceAIPrompt'),
-    toggleSyntaxHL: $('toggleSyntaxHL'), toggleAutoPreview: $('toggleAutoPreview'),
-    modalPreview: $('modalPreview'), btnClosePreview: $('btnClosePreview'),
-    previewFileName: $('previewFileName'), previewContent: $('previewContent'),
-    btnUsePreview: $('btnUsePreview'), btnPreviewRaw: $('btnPreviewRaw'),
-    modalCompare: $('modalCompare'), btnCloseCompare: $('btnCloseCompare'), compareFileName: $('compareFileName'),
-    compareMarkitdown: $('compareMarkitdown'), compareBrowser: $('compareBrowser'),
-    compareMarkitdownStats: $('compareMarkitdownStats'), compareBrowserStats: $('compareBrowserStats'),
-    btnUseMarkItDown: $('btnUseMarkItDown'), btnUseBrowser: $('btnUseBrowser'),
-    toastContainer: $('toastContainer'),
-  };
+  // DOM and presentation helpers are provided by frontend/modules/ui_dom.js.
+  const UIDomView = UIDom.create();
+  const $ = UIDomView.$;
+  const els = UIDomView.els;
+  const EXT_LABELS = UIDom.EXT_LABELS;
+  const CODE_EXTS = UIDom.CODE_EXTS;
+  const _extClass = UIDom.extClass;
+  const _formatSize = UIDom.formatSize;
+  const _sanitizeMarkdownHtml = UIDom.sanitizeMarkdownHtml;
+  const _escapeHtml = UIDom.escapeHtml;
 
   // ── WORKSPACE UI ──
   let _workspaceHistoryMode = 'versions';
@@ -252,63 +217,6 @@ const UIManager = (() => {
     const a = document.createElement('a');
     a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  // ── FILE TYPE ICON LABELS ──
-  const EXT_LABELS = {
-    pdf:'PDF', docx:'DOCX', doc:'DOC', pptx:'PPTX', xlsx:'XLSX', xls:'XLS',
-    csv:'CSV', json:'JSON', xml:'XML', txt:'TXT', md:'MD', epub:'EPUB', zip:'ZIP',
-    png:'IMG', jpg:'IMG', jpeg:'IMG', gif:'IMG', webp:'IMG', wav:'AUDIO', mp3:'AUDIO', m4a:'AUDIO',
-    py:'PY', js:'JS', ts:'TS', jsx:'JSX', tsx:'TSX',
-    html:'HTML', css:'CSS', scss:'SCSS', sql:'SQL',
-    sh:'SH', rb:'RB', go:'GO', rs:'RS', java:'JAVA',
-    cpp:'C++', c:'C', cs:'C#', php:'PHP', swift:'SWIFT', kt:'KT',
-    yaml:'YAML', yml:'YML', xml:'XML',
-  };
-  const CODE_EXTS = new Set([
-    'py','js','ts','jsx','tsx','html','htm','css','scss','less',
-    'sql','sh','bash','rb','go','rs','java','kt','cpp','c','cs',
-    'php','swift','yaml','yml','xml','toml','ini','r','lua','pl','vue','svelte'
-  ]);
-
-  function _extClass(ext) {
-    if (['xlsx','xls'].includes(ext)) return 'ext-xlsx';
-    if (CODE_EXTS.has(ext)) return `ext-${ext}`;
-    return `ext-${ext}`;
-  }
-
-  function _formatSize(bytes) {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes/1024).toFixed(1) + ' KB';
-    return (bytes/1048576).toFixed(1) + ' MB';
-  }
-
-  // ── HTML / MARKDOWN SAFETY ──
-  function _sanitizeMarkdownHtml(markdown) {
-    const source = String(markdown || '');
-    const rendered = marked.parse(source);
-    if (window.DOMPurify) {
-      return DOMPurify.sanitize(rendered, {
-        USE_PROFILES: { html: true },
-        ADD_ATTR: ['target', 'rel']
-      });
-    }
-    // Fail closed if the sanitizer CDN is unavailable: render Markdown as literal text.
-    const pre = document.createElement('pre');
-    const code = document.createElement('code');
-    code.textContent = source;
-    pre.appendChild(code);
-    return pre.outerHTML;
-  }
-
-  function _escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, char => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[char]));
   }
 
   // ── TOAST ──
