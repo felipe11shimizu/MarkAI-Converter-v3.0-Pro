@@ -1,4 +1,4 @@
-﻿/**
+﻿/** 
  * MarkAI Converter v3.0 Pro
  * Architecture: IIFE-wrapped classes for file:/// compatibility
  * Modules: AppState (Proxy), QueueManager, FileParserStrategy,
@@ -74,7 +74,6 @@ const ConversionController = globalThis.MarkAIConversionController.create({
   },
   workspace: { scheduleSave: () => UIManager.scheduleWorkspaceSave() },
 });
-
 
 // ══════════════════════════════════════════════
 // 8. UI MANAGER — DOM, events, toasts, modals
@@ -182,10 +181,6 @@ const UIManager = (() => {
     QueueUIController.bind();
 
     // URL ingestion is delegated to UrlUIController.
-    els.urlInput.addEventListener('input', () => YouTubeController.updateControls(els.urlInput.value.trim()));
-    els.btnYoutubeTranscribe?.addEventListener('click', () => YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions()));
-    els.btnYoutubeLanguages?.addEventListener('click', () => YouTubeController.listLanguages(els.urlInput.value.trim()));
-    YouTubeController.updateControls(els.urlInput.value.trim());
 
     // Chat format
     els.btnFormatChat.addEventListener('click', () => {
@@ -498,11 +493,14 @@ document.addEventListener('DOMContentLoaded', () => {
     urlService: URLFetcher,
     youtubeController: {
       updateControls: (...args) => YouTubeController.updateControls(...args),
-      transcribe: (...args) => YouTubeController.transcribe(...args)
+      transcribe: (...args) => YouTubeController.transcribe(...args),
+      listLanguages: (...args) => YouTubeController.listLanguages(...args)
     },
     elements: {
       urlInput: document.getElementById('urlInput'),
       btnFetchUrl: document.getElementById('btnFetchUrl'),
+      btnYoutubeTranscribe: document.getElementById('btnYoutubeTranscribe'),
+      btnYoutubeLanguages: document.getElementById('btnYoutubeLanguages'),
       youtubeLanguage: document.getElementById('youtubeLanguage'),
       youtubeTranslate: document.getElementById('youtubeTranslate')
     },
@@ -663,10 +661,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // File ingestion is centralized in QueueUIController.
 });
-
-
-
-
 
 // ══════════════════════════════════════════════
 // VIDEO TASK ANALYZER — screen recording → process steps
