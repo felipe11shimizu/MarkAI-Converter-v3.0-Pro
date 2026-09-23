@@ -69,6 +69,7 @@ assert.equal(typeof workspaceUi.convertAll, 'function');
 
   await workspaceUi.mergeAll();
   assert.ok(calls.includes('status:Fazendo merge…'));
+  assert.ok(calls.includes('save'));
   assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'load'));
 
   await workspaceUi.convertAll();
