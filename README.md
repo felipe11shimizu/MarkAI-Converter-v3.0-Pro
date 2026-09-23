@@ -214,6 +214,7 @@ A modularização foi iniciada sem alterar o contrato funcional da aplicação:
 - `frontend/modules/core_state.js`: estado reativo e gerenciamento da fila.
 - `frontend/modules/markitdown_engine.js`: serviço de comunicação com o backend MarkItDown.
 - `frontend/modules/workspace_store.js`: persistência IndexedDB de projetos, documentos, versões e histórico de IA.
+- `frontend/modules/file_parser.js`: parsers locais de texto, código, PDF, DOCX, CSV, XLSX e JSON, com fallback do MarkItDown.
 - `video_automation_validator.js`: validador de automação já isolado anteriormente.
 - `script.js` permanece como controlador legado compatível, consumindo os módulos por interfaces globais estáveis.
 - CI valida sintaxe dos novos módulos e testes de carregamento/integração básica.
