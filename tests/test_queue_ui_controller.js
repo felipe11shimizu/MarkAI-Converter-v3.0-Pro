@@ -44,7 +44,11 @@ const documentRef = {
   getElementById(id) {
     if (id === 'queueList') return { querySelectorAll() { return []; } };
     return null;
-  }
+  },
+  createElement() {
+    return { click() { calls.push('download-click'); } };
+  },
+  body: { appendChild() {}, removeChild() {} }
 };
 const ui = {
   renderQueue() { calls.push('render'); },
@@ -66,7 +70,15 @@ const workspaceUi = QueueUIController.create({
   getState: () => ({ queue }),
   ui,
   documentRef,
-  windowRef: {},
+  windowRef: {
+    Blob: class Blob { constructor(parts) { this.parts = parts; } },
+    URL: { createObjectURL() { return 'blob:test'; }, revokeObjectURL() { calls.push('revoke'); } },
+    JSZip: class JSZip {
+      constructor() { this.files = []; }
+      file(name, content) { this.files.push([name, content]); }
+      async generateAsync() { calls.push(['zip', this.files]); return {}; }
+    }
+  },
   timers
 });
 
@@ -91,6 +103,12 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
 
   await workspaceUi.convertAll();
   assert.ok(calls.includes('convertAll'));
+
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-download') } });
+  assert.ok(calls.includes('download-click'));
+
+  await workspaceUi.downloadZip();
+  assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'zip'));
 
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-compare') } });
   assert.ok(calls.includes('compare:q1'));
