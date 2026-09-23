@@ -94,6 +94,7 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
   assert.equal(queue.length, 1);
   assert.ok(calls.includes('timer'));
   assert.ok(calls.includes('convert:q1'));
+  queue[0].status = 'done';
   assert.deepEqual(calls.slice(0, 2), ['save', 'render']);
 
   await workspaceUi.mergeAll();
