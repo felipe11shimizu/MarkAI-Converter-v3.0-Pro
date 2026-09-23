@@ -1330,6 +1330,21 @@ function create({
       await windowRef.navigator?.clipboard.writeText(JSON.stringify(_safeJsonData(lastAnalysis), null, 2));
       if (typeof ui.toast === 'function') ui.toast('JSON copiado.', 'success');
     });
+    $('btnDownloadVideoReviewAudit')?.addEventListener('click', () => {
+      if (!lastAnalysis) return;
+      const platform = $('videoAutomationTarget')?.value || 'pyautogui';
+      const manifest = reviewAuditManifest(lastAnalysis, platform);
+      const blob = new windowRef.Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = windowRef.URL.createObjectURL(blob);
+      const a = documentRef.createElement('a');
+      a.href = url;
+      const base = String(lastAnalysis.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+      a.download = base + '-auditoria-revisao.json';
+      a.click();
+      windowRef.URL.revokeObjectURL(url);
+      if (typeof ui.toast === 'function') ui.toast('Auditoria da revisão exportada.', 'success');
+    });
+
     $('btnDownloadVideoJson')?.addEventListener('click', () => {
       if (!lastAnalysis) return;
       const blob = new windowRef.Blob([JSON.stringify(_safeJsonData(lastAnalysis), null, 2)], { type: 'application/json;charset=utf-8' });
