@@ -439,6 +439,65 @@ function create({
     return panel;
   }
 
+  function reviewAuditManifest(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
+    if (data !== lastAnalysis) {
+      lastAnalysis = data;
+      originalAnalysisSnapshot = _snapshot(data);
+      reviewHistory = [];
+    }
+    _ensureReviewState(data);
+
+    const normalizedPlatform = validator.normalizePlatform(platform);
+    const counts = _reviewCounts(data);
+    const validation = _validationCounts(data, normalizedPlatform);
+    const eligibleStepOrders = (Array.isArray(data?.analysis?.etapas) ? data.analysis.etapas : [])
+      .filter(step => step.review_status === 'approved')
+      .filter(step =>
+        step.validacao_automacao?.status === 'ready' ||
+        (step.validacao_automacao?.status === 'warning' && step.validation_overrides?.[normalizedPlatform] === true)
+      )
+      .map((step, index) => step.ordem ?? index + 1);
+
+    return {
+      schema_version: '1.0',
+      generated_at: new Date().toISOString(),
+      filename: data?.filename || null,
+      platform: normalizedPlatform,
+      original_analysis: {
+        preserved: Boolean(originalAnalysisSnapshot),
+        raw_snapshot_exported: false
+      },
+      review: {
+        counts,
+        changes: reviewHistory.map(change => ({
+          timestamp: change.timestamp,
+          stepIndex: change.stepIndex,
+          stepOrder: change.stepOrder,
+          reason: change.reason,
+          beforeStatus: change.before?.review_status || null,
+          afterStatus: change.after?.review_status || null,
+          hasReviewNote: Boolean(String(change.after?.review_note || '').trim())
+        }))
+      },
+      validation: {
+        summary: {
+          total: validation.total,
+          ready: validation.ready,
+          warning: validation.warning,
+          blocked: validation.blocked
+        },
+        approvedBlocked: validation.approvedBlocked,
+        approvedWarningsPendingOverride: validation.approvedWarningsPendingOverride,
+        generationEligible: validation.generationEligible
+      },
+      generation: {
+        policy: 'approved + ready, or approved + warning with explicit platform override',
+        eligibleStepOrders
+      },
+      sensitive_data_policy: 'Sensitive values are not included in this audit manifest; exported automation uses {{DADO_SENSIVEL}}.'
+    };
+  }
+
   function normalizeEvidenceTimeline(data) {
     return evidenceTimeline.normalize(data);
   }
@@ -1271,6 +1330,21 @@ function create({
       await windowRef.navigator?.clipboard.writeText(JSON.stringify(_safeJsonData(lastAnalysis), null, 2));
       if (typeof ui.toast === 'function') ui.toast('JSON copiado.', 'success');
     });
+    $('btnDownloadVideoReviewAudit')?.addEventListener('click', () => {
+      if (!lastAnalysis) return;
+      const platform = $('videoAutomationTarget')?.value || 'pyautogui';
+      const manifest = reviewAuditManifest(lastAnalysis, platform);
+      const blob = new windowRef.Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json;charset=utf-8' });
+      const url = windowRef.URL.createObjectURL(blob);
+      const a = documentRef.createElement('a');
+      a.href = url;
+      const base = String(lastAnalysis.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+      a.download = base + '-auditoria-revisao.json';
+      a.click();
+      windowRef.URL.revokeObjectURL(url);
+      if (typeof ui.toast === 'function') ui.toast('Auditoria da revisão exportada.', 'success');
+    });
+
     $('btnDownloadVideoJson')?.addEventListener('click', () => {
       if (!lastAnalysis) return;
       const blob = new windowRef.Blob([JSON.stringify(_safeJsonData(lastAnalysis), null, 2)], { type: 'application/json;charset=utf-8' });
@@ -1312,7 +1386,7 @@ function create({
 
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
-    generateAutomation, validateAnalysis, automationFilename, isVideo,
+    generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, isVideo,
     normalizeEvidenceTimeline, getOriginalAnalysis, getReviewHistory
   };
 }
