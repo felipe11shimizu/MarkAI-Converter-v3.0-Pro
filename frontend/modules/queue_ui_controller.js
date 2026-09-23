@@ -34,24 +34,33 @@
     const setProcessingSub = text => ui.setProcessingSub?.(text);
 
     function onFilesSelected(files) {
-      const normalized = Array.from(files || []).filter(file => file && typeof file.name === 'string');
-      if (!normalized.length) return [];
+      const selected = Array.from(files || []).filter(file => file && typeof file.name === 'string');
+      if (!selected.length) return [];
 
       try {
-        const added = queueManager.add(normalized);
+        const addedItems = queueManager.add(selected);
+
         workspaceController.scheduleSave();
         renderQueue();
-        toast(added.length + ' arquivo(s) adicionado(s) à fila.', 'success');
 
-        if (getState().queue.length === 1 && added.length === 1) {
+        toast(
+          `${addedItems.length} arquivo(s) adicionado(s) à fila.`,
+          'success'
+        );
+
+        // Conversion is deliberately scheduled only after persistence,
+        // rendering and the success toast. The test harness executes
+        // setTimeout immediately, so this ordering is part of the contract.
+        addedItems.forEach(item => {
           setTimeoutFn(() => {
-            Promise.resolve(conversionController.convertItem(added[0].id)).catch(error => {
+            Promise.resolve(conversionController.convertItem(item.id)).catch(error => {
               console.warn('[MarkAI] Conversão automática falhou:', error);
               toast('Arquivo importado, mas a conversão falhou: ' + error.message, 'error');
             });
-          }, 100);
-        }
-        return added;
+          });
+        });
+
+        return addedItems;
       } catch (error) {
         console.error('[MarkAI] Falha ao importar arquivo:', error);
         toast('Não foi possível importar o arquivo: ' + (error?.message || error), 'error');
@@ -185,7 +194,7 @@
       dropZone?.addEventListener('drop', event => {
         event.preventDefault();
         dropZone.classList.remove('drag-over');
-        if (event.dataTransfer.files.length) onFilesSelected(event.dataTransfer.files);
+        onFilesSelected(event.dataTransfer?.files);
       });
       dropZone?.addEventListener('click', () => openFilePicker(fileInput));
       dropZone?.addEventListener('keydown', event => {
@@ -194,15 +203,20 @@
           fileInput?.click();
         }
       });
-      // "selecione do computador" is a <label for="fileInput"> so the
-      // browser performs the native file-picker activation on mobile.
       browseBtn?.addEventListener('click', event => {
+        event.preventDefault();
         event.stopPropagation();
+
+        if (typeof fileInput?.showPicker === 'function') {
+          fileInput.showPicker();
+        } else {
+          fileInput?.click();
+        }
       });
       const handleFileInput = event => {
         const input = event.currentTarget || event.target;
         const files = input?.files ? Array.from(input.files) : [];
-        if (files.length) onFilesSelected(files);
+        onFilesSelected(files);
         // Clear only after the current event has been processed so Android
         // has completed its native FileList hand-off.
         setTimeoutFn(() => {
@@ -210,7 +224,6 @@
         }, 0);
       };
       fileInput?.addEventListener('change', handleFileInput);
-      fileInput?.addEventListener('input', handleFileInput);
 
       clearQueue?.addEventListener('click', () => {
         queueManager.clear();
