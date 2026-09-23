@@ -22,6 +22,7 @@ function create({
   let lastAnalysis = null;
   let originalAnalysisSnapshot = null;
   let reviewHistory = [];
+  let reviewFinalizedAt = null;
   const $ = id => documentRef ? documentRef.getElementById(id) : null;
   const signalTimeout = injectedSignalTimeout || ((ms) =>
     typeof abortSignal?.timeout === 'function' ? abortSignal.timeout(ms) : undefined
@@ -179,7 +180,7 @@ function create({
 
   function _setReviewStatus(index, status, options = {}) {
     const step = lastAnalysis?.analysis?.etapas?.[index];
-    if (!step || !REVIEW_STATUSES[status]) return;
+    if (!step || !REVIEW_STATUSES[status] || reviewFinalizedAt) return;
     const before = _snapshot(step);
     const platform = _currentAutomationPlatform();
     step.review_status = status;
@@ -195,7 +196,7 @@ function create({
   }
 
   function _approveAllVideoSteps() {
-    if (!lastAnalysis?.analysis?.etapas) return;
+    if (!lastAnalysis?.analysis?.etapas || reviewFinalizedAt) return;
     lastAnalysis.analysis.etapas.forEach((step, index) => {
       const before = _snapshot(step);
       step.review_status = 'approved';
@@ -206,6 +207,7 @@ function create({
   }
 
   function _persistStepEdit(index, values) {
+    if (reviewFinalizedAt) return;
     const step = lastAnalysis?.analysis?.etapas?.[index];
     if (!step) return;
     const before = _snapshot(step);
@@ -349,6 +351,14 @@ function create({
 
     actions.append(approve, pending, ignore);
     editor.appendChild(actions);
+    if (reviewFinalizedAt) {
+      [action.input, details.input, type.input, targetText.input, targetDescription.input,
+        targetControl.input, selector.input, x.input, y.input, shortcut.input, dataField.input,
+        dataValue.input, sensitiveSelect.input, precondition.input, postcondition.input,
+        confidence.input, note.input, approve, pending, ignore].forEach(control => {
+        control.disabled = true;
+      });
+    }
     return editor;
   }
 
@@ -364,6 +374,15 @@ function create({
       validation.ready + ' prontas · ' +
       validation.warning + ' com alertas · ' +
       validation.blocked + ' bloqueadas';
+  }
+
+  function finalizeReview() {
+    if (!lastAnalysis?.analysis || !Array.isArray(lastAnalysis.analysis.etapas)) return false;
+    const counts = _reviewCounts(lastAnalysis);
+    if (counts.pending > 0) return false;
+    if (!reviewFinalizedAt) reviewFinalizedAt = new Date().toISOString();
+    render(lastAnalysis, { open: false });
+    return true;
   }
 
   function _safeJsonData(data) {
@@ -444,6 +463,7 @@ function create({
       lastAnalysis = data;
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
+      reviewFinalizedAt = null;
     }
     _ensureReviewState(data);
 
@@ -468,6 +488,8 @@ function create({
         raw_snapshot_exported: false
       },
       review: {
+        finalized: Boolean(reviewFinalizedAt),
+        finalized_at: reviewFinalizedAt,
         counts,
         changes: reviewHistory.map(change => ({
           timestamp: change.timestamp,
@@ -959,6 +981,7 @@ function create({
       lastAnalysis = data;
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
+      reviewFinalizedAt = null;
     }
     _ensureReviewState(data);
 
@@ -1001,6 +1024,13 @@ function create({
     }
 
     _updateReviewSummary(platform);
+    const finalizeButton = $('btnFinalizeVideoReview');
+    if (finalizeButton) {
+      finalizeButton.disabled = Boolean(reviewFinalizedAt);
+      finalizeButton.textContent = reviewFinalizedAt ? 'Revisão finalizada' : 'Finalizar revisão';
+    }
+    const approveAllButton = $('btnApproveAllVideoSteps');
+    if (approveAllButton) approveAllButton.disabled = Boolean(reviewFinalizedAt);
     _renderReviewHistory();
     _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
@@ -1291,6 +1321,15 @@ function create({
         summary.warning + ' com alertas e ' + summary.blocked + ' bloqueadas.';
       if (typeof ui.toast === 'function') ui.toast(message, summary.blocked ? 'warning' : 'success');
     });
+    $('btnFinalizeVideoReview')?.addEventListener('click', () => {
+      const finalized = finalizeReview();
+      if (typeof ui.toast === 'function') {
+        ui.toast(
+          finalized ? 'Revisão finalizada e bloqueada para novas alterações.' : 'Finalize a revisão somente após tratar todas as etapas pendentes.',
+          finalized ? 'success' : 'warning'
+        );
+      }
+    });
     $('btnApproveAllVideoSteps')?.addEventListener('click', () => {
       _approveAllVideoSteps();
       if (typeof ui.toast === 'function') ui.toast('Todas as etapas foram marcadas como aprovadas; alertas e bloqueios ainda impedem a geração automática.', 'info');
@@ -1375,6 +1414,7 @@ function create({
       lastAnalysis = data;
       originalAnalysisSnapshot = _snapshot(data);
       reviewHistory = [];
+      reviewFinalizedAt = null;
     }
     _ensureReviewState(data);
     return _validateAnalysis(data, platform);
@@ -1386,7 +1426,7 @@ function create({
 
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
-    generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, isVideo,
+    generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
     normalizeEvidenceTimeline, getOriginalAnalysis, getReviewHistory
   };
 }
