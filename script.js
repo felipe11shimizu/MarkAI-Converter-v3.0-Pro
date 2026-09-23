@@ -387,6 +387,10 @@ const UIManager = (() => {
       return isPass;
     },
     closeSettings: () => els.modalSettings.close(),
+    openSettings: () => {
+      SettingsController.sync();
+      els.modalSettings.showModal();
+    },
     bindSettingsEvents: handlers => {
       els.btnSettings.addEventListener('click', () => {
         handlers.open();
