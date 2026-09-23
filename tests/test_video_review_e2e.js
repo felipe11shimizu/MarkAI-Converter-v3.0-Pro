@@ -54,6 +54,13 @@ const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js
   };
 
   const controller = VideoAutomationController.create({
+    getSettings: () => ({
+      markitdownEndpoint: 'http://localhost:8000'
+    }),
+    urlService: {
+      isYouTubeUrl: url =>
+        /youtube\.com|youtu\.be/i.test(String(url || ''))
+    },
     validator: Validator,
     evidenceTimeline: EvidenceTimeline,
     ui: { toast() {} },
