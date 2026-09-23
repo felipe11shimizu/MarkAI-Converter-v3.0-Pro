@@ -2,14 +2,14 @@
 
 const assert = require('node:assert/strict');
 
-require('../frontend/modules/url_fetcher.js');
+const UrlService = require('../frontend/modules/url_fetcher.js');
 
-assert.ok(global.MarkAIUrlService);
-assert.equal(typeof global.MarkAIUrlService.fetch, 'function');
-assert.equal(typeof global.MarkAIUrlService.isYouTubeUrl, 'function');
+assert.ok(UrlService);
+assert.equal(typeof UrlService.fetch, 'function');
+assert.equal(typeof UrlService.isYouTubeUrl, 'function');
 
-assert.equal(global.MarkAIUrlService.isYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), true);
-assert.equal(global.MarkAIUrlService.isYouTubeUrl('https://example.com/video'), false);
-assert.equal(global.MarkAIUrlService.isYouTubeUrl('not-a-url'), false);
+assert.equal(UrlService.isYouTubeUrl('https://www.youtube.com/watch?v=dQw4w9WgXcQ'), true);
+assert.equal(UrlService.isYouTubeUrl('https://example.com/video'), false);
+assert.equal(UrlService.isYouTubeUrl('not-a-url'), false);
 
 console.log('url_fetcher module tests: ok');
