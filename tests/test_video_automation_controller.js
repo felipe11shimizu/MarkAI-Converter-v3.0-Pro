@@ -3,11 +3,13 @@
 const assert = require('node:assert/strict');
 const VideoAutomationController = require('../frontend/modules/video_automation_controller.js');
 const Validator = require('../video_automation_validator.js');
+const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js');
 
 const controller = VideoAutomationController.create({
   getSettings: () => ({ markitdownEndpoint: 'http://localhost:8000' }),
   urlService: { isYouTubeUrl: url => /youtube\\.com|youtu\\.be/i.test(String(url || '')) },
   validator: Validator,
+  evidenceTimeline: EvidenceTimeline,
   ui: { toast: () => {} },
   fetchImpl: async () => {
     throw new Error('fetch should not be called by deterministic tests');
@@ -42,6 +44,12 @@ const data = {
     etapas: [readyStep]
   }
 };
+
+const normalizedTimeline = controller.normalizeEvidenceTimeline(data);
+assert.equal(normalizedTimeline.steps.length, 1);
+assert.deepEqual(normalizedTimeline.steps[0].frameIndices, [1]);
+assert.deepEqual(normalizedTimeline.steps[0].transcriptSegmentIndices, []);
+assert.equal(normalizedTimeline.steps[0].reviewStatus, 'approved');
 
 const validation = controller.validateAnalysis(data, 'pyautogui');
 assert.equal(validation.summary.total, 1);
