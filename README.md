@@ -215,7 +215,8 @@ A modularização foi iniciada sem alterar o contrato funcional da aplicação:
 - `frontend/modules/markitdown_engine.js`: serviço de comunicação com o backend MarkItDown.
 - `frontend/modules/workspace_store.js`: persistência IndexedDB de projetos, documentos, versões e histórico de IA.
 - `frontend/modules/file_parser.js`: parsers locais de texto, código, PDF, DOCX, CSV, XLSX e JSON, com fallback do MarkItDown.
-- `frontend/modules/url_fetcher.js`: ingestão de URLs e identificação de URLs do YouTube.
+- `frontend/modules/url_fetcher.js`
+- `frontend/modules/merge_engine.js`: ingestão de URLs e identificação de URLs do YouTube.
 - `video_automation_validator.js`: validador de automação já isolado anteriormente.
 - `script.js` permanece como controlador legado compatível, consumindo os módulos por interfaces globais estáveis.
 - CI valida sintaxe dos novos módulos e testes de carregamento/integração básica.
@@ -242,3 +243,8 @@ $env:MARKAI_OCR_MODEL="gpt-4o"
 $env:OPENAI_API_KEY="SUA_CHAVE"
 uvicorn backend.app:app --reload --port 8000
 ```
+
+
+### Validação adicional
+- Os módulos UMD extraídos possuem exportação CommonJS para testes Node e exportação global para execução no navegador.
+- `MergeEngine` foi desacoplado do `UIManager` por injeção de `renderQueue`, evitando dependência circular de inicialização.
