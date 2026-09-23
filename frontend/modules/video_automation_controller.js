@@ -470,7 +470,11 @@ function create({
         String(step.actionType || 'other') + (step.action ? ' · ' + step.action : ''),
         step.frameIndices.join(', '),
         step.transcriptSegmentIndices.join(', '),
-        '—',
+        [
+          step.precondition ? 'pré: ' + step.precondition : '',
+          step.postcondition ? 'pós: ' + step.postcondition : '',
+          step.result ? 'resultado: ' + step.result : ''
+        ].filter(Boolean).join(' · ') || '—',
         step.confidence == null ? '—' : Math.round(step.confidence * 100) + '%'
       ];
       cells.forEach((value, cellIndex) => {
