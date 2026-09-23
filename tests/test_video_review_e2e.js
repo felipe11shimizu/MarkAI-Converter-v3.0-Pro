@@ -87,6 +87,8 @@ const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js
         acao: 'Clicar no botão Confirmar',
         tipo_acao: 'click',
         alvo: { texto: 'Confirmar', x: 120, y: 80 },
+        precondicao: 'Tela de confirmação aberta',
+        poscondicao: 'Processo confirmado',
         evidencia: { frame_indices: [2], transcript_segment_indices: [0] },
         confianca: 0.96,
         review_status: 'approved'
