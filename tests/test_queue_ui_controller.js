@@ -107,8 +107,11 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-download') } });
   assert.ok(calls.includes('download-click'));
 
+  queue.push({ id: 'q2', name: 'teste.txt', status: 'done', result: '# segundo' });
   await workspaceUi.downloadZip();
-  assert.ok(calls.some(call => Array.isArray(call) && call[0] === 'zip'));
+  const zipCall = calls.find(call => Array.isArray(call) && call[0] === 'zip');
+  assert.ok(zipCall);
+  assert.deepEqual(zipCall[1].map(file => file[0]), ['teste.md', 'teste (2).md']);
 
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-compare') } });
   assert.ok(calls.includes('compare:q1'));
@@ -117,6 +120,7 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
   assert.ok(calls.includes('preview:q1'));
 
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-remove') } });
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q2', 'qi-btn-remove') } });
   assert.ok(calls.includes('empty:true'));
   assert.ok(calls.filter(call => call === 'save').length >= 2);
 
