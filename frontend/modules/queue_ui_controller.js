@@ -116,19 +116,7 @@
     }
 
     async function convertAll() {
-      const items = queueManager.getOrdered();
-      if (!items.length) {
-        toast('Nenhum arquivo na fila.', 'warning');
-        return;
-      }
-      let last = null;
-      for (const item of items) {
-        if (item.status !== 'done') {
-          await conversionController.convertItem(item.id);
-          last = item.id;
-        }
-      }
-      if (!last) toast('Todos os arquivos já convertidos.', 'info');
+      return conversionController.convertAll();
     }
 
     function downloadItem(item) {
