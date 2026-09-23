@@ -1,10 +1,10 @@
-# MarkAI Converter v3.1 Pro
+# MarkAI Converter v3.6 Pro
 
 Portal web para conversão, organização, edição, pré-visualização e consolidação de documentos em Markdown.
 
 ## Arquitetura híbrida
 
-A versão 3.1 adiciona o **Microsoft MarkItDown** como motor principal opcional no backend, mantendo os conversores JavaScript existentes como fallback automático.
+A versão 3.6 consolida o **Microsoft MarkItDown** como motor principal opcional no backend, mantendo os conversores JavaScript existentes como fallback automático.
 
 Fluxo:
 
