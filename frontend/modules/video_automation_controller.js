@@ -17,6 +17,7 @@ function create({
     windowRef = globalThis,
     abortSignal = globalThis.AbortSignal,
     signalTimeout: injectedSignalTimeout,
+    zipImpl = globalThis.JSZip,
     evidenceTimeline = globalThis.MarkAIVideoEvidenceTimeline
   } = {}) {
   let lastAnalysis = null;
@@ -555,6 +556,33 @@ function create({
 
   function normalizeEvidenceTimeline(data) {
     return evidenceTimeline.normalize(data);
+  }
+
+  async function exportReviewPackage(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
+    if (!data) return false;
+    if (!reviewFinalizedAt) return false;
+    if (finalizedReviewSnapshot && _reviewIntegrityKey(data) !== _reviewIntegrityKey(finalizedReviewSnapshot)) return false;
+    if (typeof zipImpl !== 'function') throw new TypeError('Review package export requires JSZip.');
+    const normalizedPlatform = validator.normalizePlatform(platform);
+    const code = _generateAutomation(normalizedPlatform, data);
+    const audit = reviewAuditManifest(data, normalizedPlatform);
+    const analysis = _safeJsonData(data);
+    const zip = new zipImpl();
+    const base = String(data?.filename || 'video').replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_-]+/g, '_') || 'video';
+    zip.file(_automationFilename(normalizedPlatform, data), code);
+    zip.file(base + '-auditoria-revisao.json', JSON.stringify(audit, null, 2));
+    zip.file(base + '-analise-revisada.json', JSON.stringify(analysis, null, 2));
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = windowRef.URL.createObjectURL(blob);
+    const a = documentRef.createElement('a');
+    a.href = url;
+    a.download = base + '-pacote-revisao.zip';
+    documentRef.body.appendChild(a);
+    a.click();
+    documentRef.body.removeChild(a);
+    windowRef.URL.revokeObjectURL(url);
+    if (typeof ui.toast === 'function') ui.toast('Pacote de revisão exportado: ' + a.download, 'success');
+    return true;
   }
 
   function _formatTimestamp(seconds) {
@@ -1395,6 +1423,15 @@ function create({
       await windowRef.navigator?.clipboard.writeText(code);
       if (typeof ui.toast === 'function') ui.toast('Roteiro de automação copiado.', 'success');
     });
+    $('btnDownloadVideoReviewPackage')?.addEventListener('click', async () => {
+      if (!lastAnalysis) return;
+      try {
+        await exportReviewPackage(lastAnalysis, $('videoAutomationTarget')?.value || 'pyautogui');
+      } catch (error) {
+        if (typeof ui.toast === 'function') ui.toast('Não foi possível exportar o pacote de revisão: ' + error.message, 'error');
+      }
+    });
+
     $('btnDownloadVideoAutomation')?.addEventListener('click', () => {
       if (!lastAnalysis) return;
       const platform = $('videoAutomationTarget')?.value || 'pyautogui';
@@ -1483,7 +1520,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, exportReviewPackage, getOriginalAnalysis, getReviewHistory
   };
 }
 

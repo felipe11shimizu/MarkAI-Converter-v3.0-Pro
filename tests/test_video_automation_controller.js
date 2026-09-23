@@ -5,6 +5,38 @@ const VideoAutomationController = require('../frontend/modules/video_automation_
 const Validator = require('../video_automation_validator.js');
 const EvidenceTimeline = require('../frontend/modules/video_evidence_timeline.js');
 
+(async () => {
+
+class FakeZip {
+  constructor() { this.files = {}; }
+  file(name, content) { this.files[name] = content; }
+  async generateAsync() { return new Blob(['zip']); }
+}
+
+const downloadState = { href: null, name: null };
+const fakeDocument = {
+  createElement(tag) {
+    return {
+      tagName: tag,
+      click() { downloadState.clicked = true; },
+      set href(value) { downloadState.href = value; },
+      get href() { return downloadState.href; },
+      set download(value) { downloadState.name = value; },
+      get download() { return downloadState.name; }
+    };
+  },
+  body: { appendChild() {}, removeChild() {} },
+  getElementById() { return null; }
+};
+const fakeWindow = {
+  Blob,
+  URL: {
+    createObjectURL() { return 'blob:review-package'; },
+    revokeObjectURL() {}
+  },
+  setTimeout() {}
+};
+
 const controller = VideoAutomationController.create({
   getSettings: () => ({ markitdownEndpoint: 'http://localhost:8000' }),
   urlService: { isYouTubeUrl: url => /youtube\\.com|youtu\\.be/i.test(String(url || '')) },
@@ -14,8 +46,9 @@ const controller = VideoAutomationController.create({
   fetchImpl: async () => {
     throw new Error('fetch should not be called by deterministic tests');
   },
-  documentRef: null,
-  windowRef: {}
+  documentRef: fakeDocument,
+  windowRef: fakeWindow,
+  zipImpl: FakeZip
 });
 
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
@@ -55,6 +88,8 @@ const data = {
     etapas: [readyStep]
   }
 };
+
+assert.equal(await controller.exportReviewPackage(data, 'pyautogui'), false);
 
 const auditManifest = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(auditManifest.schema_version, '1.0');
@@ -106,6 +141,10 @@ assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
 
+const packageData = await controller.exportReviewPackage(data, 'pyautogui');
+assert.equal(packageData, true);
+assert.equal(downloadState.name, 'processo-pacote-revisao.zip');
+
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
 assert.equal(finalizedIntegrityAudit.review.integrity_match, true);
@@ -145,3 +184,7 @@ assert.equal(controller.finalizeReview(), true);
 const sensitiveCode = controller.generateAutomation(sensitiveData, 'pyautogui');
 assert.ok(sensitiveCode.includes('{{DADO_SENSIVEL}}'));
 console.log('video_automation_controller module tests: ok');
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
