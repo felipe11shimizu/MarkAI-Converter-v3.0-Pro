@@ -30,8 +30,19 @@ const fakeDocument = {
 };
 const fakeCrypto = {
   subtle: {
-    async digest() {
-      return Uint8Array.from({ length: 32 }, (_, index) => index).buffer;
+    async digest(_algorithm, data) {
+      const bytes = new Uint8Array(data);
+      let state = 0x811c9dc5;
+      for (const byte of bytes) {
+        state ^= byte;
+        state = Math.imul(state, 0x01000193) >>> 0;
+      }
+      const digest = new Uint8Array(32);
+      for (let index = 0; index < digest.length; index++) {
+        state = Math.imul(state ^ (index + 1), 0x01000193) >>> 0;
+        digest[index] = state & 0xff;
+      }
+      return digest.buffer;
     }
   }
 };
@@ -182,6 +193,15 @@ assert.match(packageManifest.integrity.artifacts[0].sha256, /^[0-9a-f]{64}$/);
 assert.equal(packageManifest.integrity.artifacts[0].name, 'processo-automacao-pyautogui.py');
 assert.equal(packageManifest.integrity.artifacts[1].name, 'processo-auditoria-revisao.json');
 assert.equal(packageManifest.integrity.artifacts[2].name, 'processo-analise-revisada.json');
+const packageFiles = FakeZip.last.files;
+const verification = await controller.verifyReviewPackageManifest(packageManifest, packageFiles);
+assert.equal(verification.valid, true);
+assert.equal(verification.artifacts.length, 3);
+assert.equal(verification.artifacts.every(item => item.valid), true);
+const tamperedFiles = { ...packageFiles, [packageManifest.integrity.artifacts[0].name]: packageFiles[packageManifest.integrity.artifacts[0].name] + '\\ntampered' };
+const tamperedVerification = await controller.verifyReviewPackageManifest(packageManifest, tamperedFiles);
+assert.equal(tamperedVerification.valid, false);
+assert.equal(tamperedVerification.artifacts.some(item => item.valid === false), true);
 
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);

@@ -598,6 +598,34 @@ function create({
     };
   }
 
+  async function verifyReviewPackageManifest(manifest, artifacts = {}) {
+    if (!manifest || manifest.schema_version !== '1.0' || manifest.package_type !== 'markai-video-review-package') {
+      return { valid: false, reason: 'Manifesto de pacote de revisão inválido.', artifacts: [] };
+    }
+    const entries = Array.isArray(manifest.integrity?.artifacts) ? manifest.integrity.artifacts : [];
+    if (manifest.integrity?.algorithm !== 'SHA-256' || !entries.length) {
+      return { valid: false, reason: 'Manifesto sem informações de integridade SHA-256.', artifacts: [] };
+    }
+    const results = [];
+    for (const entry of entries) {
+      if (!entry?.name || !/^[0-9a-f]{64}$/.test(String(entry.sha256 || ''))) {
+        results.push({ name: entry?.name || null, valid: false, reason: 'Hash SHA-256 inválido.' });
+        continue;
+      }
+      if (!Object.prototype.hasOwnProperty.call(artifacts, entry.name)) {
+        results.push({ name: entry.name, valid: false, reason: 'Artefato não fornecido para verificação.' });
+        continue;
+      }
+      const actual = await _sha256Text(artifacts[entry.name]);
+      results.push({ name: entry.name, expected: entry.sha256, actual, valid: actual === entry.sha256 });
+    }
+    return {
+      valid: results.length > 0 && results.every(item => item.valid),
+      reason: results.every(item => item.valid) ? 'Integridade SHA-256 confirmada.' : 'Um ou mais artefatos não correspondem ao manifesto.',
+      artifacts: results
+    };
+  }
+
   async function _sha256Text(value) {
     if (!cryptoImpl?.subtle || typeof cryptoImpl.subtle.digest !== 'function') {
       throw new TypeError('Review package export requires Web Crypto SHA-256 support.');
@@ -1597,7 +1625,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageReadiness, reviewPackageManifest, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageReadiness, reviewPackageManifest, verifyReviewPackageManifest, getOriginalAnalysis, getReviewHistory
   };
 }
 
