@@ -97,6 +97,10 @@ const originalStillApproved = controller.getOriginalAnalysis();
 assert.equal(originalStillApproved.analysis.etapas[0].review_status, 'approved');
 
 data.analysis.etapas[0].review_status = 'approved';
+const blockedBeforeFinalization = controller.generateAutomation(data, 'pyautogui');
+assert.match(blockedBeforeFinalization, /Geração bloqueada/);
+assert.doesNotMatch(blockedBeforeFinalization, /import pyautogui/);
+assert.equal(controller.finalizeReview(), true);
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
@@ -120,6 +124,7 @@ sensitiveData.analysis.etapas[0].dados = { sensivel: true, valor: 'segredo', cam
 sensitiveData.analysis.etapas[0].validation_overrides = { pyautogui: true };
 const sensitiveValidation = controller.validateAnalysis(sensitiveData, 'pyautogui');
 assert.equal(sensitiveValidation.summary.warning, 1);
+assert.equal(controller.finalizeReview(), true);
 const sensitiveCode = controller.generateAutomation(sensitiveData, 'pyautogui');
 assert.ok(sensitiveCode.includes('{{DADO_SENSIVEL}}'));
 console.log('video_automation_controller module tests: ok');
