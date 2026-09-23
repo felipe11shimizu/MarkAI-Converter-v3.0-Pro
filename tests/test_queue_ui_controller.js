@@ -19,6 +19,7 @@ const queueManager = {
 
 const controller = {
   async convertItem(id) { calls.push('convert:' + id); },
+  async convertAll() { calls.push('convertAll'); },
   async compareItem(id) { calls.push('compare:' + id); }
 };
 const mergeEngine = {
@@ -73,7 +74,7 @@ assert.equal(typeof workspaceUi.convertAll, 'function');
   assert.ok(calls.some(item => Array.isArray(item) && item[0] === 'load'));
 
   await workspaceUi.convertAll();
-  assert.ok(calls.includes('convert:q1'));
+  assert.ok(calls.includes('convertAll'));
 
   console.log('queue_ui_controller module tests: ok');
 })();
