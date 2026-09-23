@@ -16,6 +16,7 @@ let WorkspaceController = null;
 let YouTubeController = null;
 let EditorController = null;
 let VideoAutomationController = null;
+let SettingsController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -202,7 +203,7 @@ const UIManager = (() => {
   // ── INIT EVENT LISTENERS ──
   function init() {
     AppState.loadSettings();
-    _applySettings();
+    SettingsController.sync();
     _setupMarkdown();
     WorkspaceController.init();
 
@@ -488,46 +489,7 @@ const UIManager = (() => {
       }
     });
 
-    // Settings Modal
-    els.btnSettings.addEventListener('click', () => {
-      _syncSettingsUI();
-      els.modalSettings.showModal();
-    });
-    els.btnCloseSettings.addEventListener('click', () => els.modalSettings.close());
-    els.modalSettings.addEventListener('click', e => { if (e.target === els.modalSettings) els.modalSettings.close(); });
-
-    els.btnSaveSettings.addEventListener('click', () => {
-      const s = AppState.get('settings');
-      s.aiProvider = els.aiProvider.value;
-      s.aiModel = els.aiModel.value;
-      s.apiKey = els.aiApiKey.value;
-      s.markitdownEnabled = els.toggleMarkItDown.checked;
-      s.markitdownEndpoint = els.markitdownEndpoint.value.trim() || 'http://localhost:8000';
-      s.syntaxHL = els.toggleSyntaxHL.checked;
-      s.autoPreview = els.toggleAutoPreview.checked;
-      AppState.set('settings', s);
-      AppState.saveSettings();
-      els.modalSettings.close();
-      toast('✓ Configurações salvas!', 'success');
-    });
-
-    els.btnClearApiKey.addEventListener('click', () => {
-      els.aiApiKey.value = '';
-      const s = AppState.get('settings');
-      s.apiKey = '';
-      AppState.set('settings', s);
-      AppState.saveSettings();
-      toast('Chave removida.', 'info');
-    });
-
-    els.btnToggleKey.addEventListener('click', () => {
-      const isPass = els.aiApiKey.type === 'password';
-      els.aiApiKey.type = isPass ? 'text' : 'password';
-      els.btnToggleKey.querySelector('i').setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
-      lucide.createIcons();
-    });
-
-    els.aiProvider.addEventListener('change', _filterModels);
+    // Settings events are delegated to SettingsController.
 
     // Comparison Modal
     els.btnCloseCompare.addEventListener('click', () => els.modalCompare.close());
@@ -571,35 +533,6 @@ const UIManager = (() => {
     els.btnPreviewRaw.addEventListener('click', () => EditorController.togglePreviewRaw());
   }
 
-  // ── SETTINGS UI ──
-  function _syncSettingsUI() {
-    const s = AppState.get('settings');
-    els.aiProvider.value = s.aiProvider || 'gemini';
-    els.aiModel.value = s.aiModel || 'gemini-1.5-flash';
-    els.aiApiKey.value = s.apiKey || '';
-    els.toggleMarkItDown.checked = s.markitdownEnabled !== false;
-    els.markitdownEndpoint.value = s.markitdownEndpoint || 'http://localhost:8000';
-    els.toggleSyntaxHL.checked = s.syntaxHL !== false;
-    els.toggleAutoPreview.checked = s.autoPreview !== false;
-    _filterModels();
-  }
-
-  function _filterModels() {
-    const provider = els.aiProvider.value;
-    const geminiOpts = els.aiModel.querySelectorAll('option[value^="gemini"]');
-    const openaiOpts = els.aiModel.querySelectorAll('option[value^="gpt"]');
-    geminiOpts.forEach(o => o.style.display = provider === 'gemini' ? '' : 'none');
-    openaiOpts.forEach(o => o.style.display = provider === 'openai' ? '' : 'none');
-    // Select first visible
-    const first = Array.from(els.aiModel.options).find(o => o.style.display !== 'none');
-    if (first && !els.aiModel.value.startsWith(provider === 'gemini' ? 'gemini' : 'gpt')) {
-      els.aiModel.value = first.value;
-    }
-  }
-
-  function _applySettings() {
-    _syncSettingsUI();
-  }
 
   // ── MARKED + HIGHLIGHT CONFIG ──
   function _setupMarkdown() {
@@ -749,7 +682,58 @@ const UIManager = (() => {
     showEmptyWorkspace: _showEmptyWorkspace,
     setWorkspaceStatus: text => { if (els.workspaceStatus) els.workspaceStatus.textContent = String(text ?? ''); },
     setYoutubeControlsVisible: visible => { if (els.youtubeControls) els.youtubeControls.hidden = !visible; },
-    setYoutubeStatusText: text => { if (els.youtubeStatus) els.youtubeStatus.textContent = String(text ?? ''); }
+    setYoutubeStatusText: text => { if (els.youtubeStatus) els.youtubeStatus.textContent = String(text ?? ''); },
+    setSettingsForm: settings => {
+      els.aiProvider.value = settings.aiProvider;
+      els.aiModel.value = settings.aiModel;
+      els.aiApiKey.value = settings.apiKey;
+      els.toggleMarkItDown.checked = settings.markitdownEnabled !== false;
+      els.markitdownEndpoint.value = settings.markitdownEndpoint;
+      els.toggleSyntaxHL.checked = settings.syntaxHL !== false;
+      els.toggleAutoPreview.checked = settings.autoPreview !== false;
+    },
+    readSettingsForm: () => ({
+      aiProvider: els.aiProvider.value,
+      aiModel: els.aiModel.value,
+      apiKey: els.aiApiKey.value,
+      markitdownEnabled: els.toggleMarkItDown.checked,
+      markitdownEndpoint: els.markitdownEndpoint.value.trim() || 'http://localhost:8000',
+      syntaxHL: els.toggleSyntaxHL.checked,
+      autoPreview: els.toggleAutoPreview.checked
+    }),
+    filterAIModels: provider => {
+      const geminiOpts = els.aiModel.querySelectorAll('option[value^="gemini"]');
+      const openaiOpts = els.aiModel.querySelectorAll('option[value^="gpt"]');
+      geminiOpts.forEach(o => o.style.display = provider === 'gemini' ? '' : 'none');
+      openaiOpts.forEach(o => o.style.display = provider === 'openai' ? '' : 'none');
+      const first = Array.from(els.aiModel.options).find(o => o.style.display !== 'none');
+      if (first && !els.aiModel.value.startsWith(provider === 'gemini' ? 'gemini' : 'gpt')) {
+        els.aiModel.value = first.value;
+      }
+    },
+    setApiKeyValue: value => { els.aiApiKey.value = value || ''; },
+    toggleApiKeyVisibility: () => {
+      const isPass = els.aiApiKey.type === 'password';
+      els.aiApiKey.type = isPass ? 'text' : 'password';
+      els.btnToggleKey.querySelector('i').setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
+      lucide.createIcons();
+      return isPass;
+    },
+    closeSettings: () => els.modalSettings.close(),
+    bindSettingsEvents: handlers => {
+      els.btnSettings.addEventListener('click', () => {
+        handlers.open();
+        els.modalSettings.showModal();
+      });
+      els.btnCloseSettings.addEventListener('click', handlers.close);
+      els.modalSettings.addEventListener('click', e => {
+        if (e.target === els.modalSettings) handlers.backdrop();
+      });
+      els.btnSaveSettings.addEventListener('click', handlers.save);
+      els.btnClearApiKey.addEventListener('click', handlers.clearApiKey);
+      els.btnToggleKey.addEventListener('click', handlers.toggleApiKey);
+      els.aiProvider.addEventListener('change', handlers.providerChange);
+    }
   };
 })();
 
@@ -847,9 +831,26 @@ document.addEventListener('DOMContentLoaded', () => {
       toast: (message, type) => UIManager.toast(message, type)
     }
   });
+  
+  SettingsController = globalThis.MarkAISettingsController.create({
+    getSettings: () => AppState.get('settings'),
+    setSettings: settings => AppState.set('settings', settings),
+    saveSettings: () => AppState.saveSettings(),
+    ui: {
+      setSettingsForm: settings => UIManager.setSettingsForm(settings),
+      readSettingsForm: () => UIManager.readSettingsForm(),
+      filterAIModels: provider => UIManager.filterAIModels(provider),
+      setApiKeyValue: value => UIManager.setApiKeyValue(value),
+      toggleApiKeyVisibility: () => UIManager.toggleApiKeyVisibility(),
+      closeSettings: () => UIManager.closeSettings(),
+      bindSettingsEvents: handlers => UIManager.bindSettingsEvents(handlers),
+      toast: (message, type) => UIManager.toast(message, type)
+    }
+  });
 
   // Boot UI
   UIManager.init();
+  SettingsController.bind();
   VideoAutomationController.bind();
 
   // Global drag-over-page prevention (only allow on drop zone)
