@@ -641,6 +641,9 @@ document.addEventListener('DOMContentLoaded', () => {
       setProcessingSub: text => UIManager.setProcessingSub(text),
       setEmptyState: empty => UIManager.setEmptyState(empty),
       toast: (message, type) => UIManager.toast(message, type)
+    },
+    timers: {
+      setTimeout: globalThis.setTimeout
     }
   });
 
