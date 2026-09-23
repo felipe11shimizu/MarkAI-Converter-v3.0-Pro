@@ -97,6 +97,10 @@ const originalStillApproved = controller.getOriginalAnalysis();
 assert.equal(originalStillApproved.analysis.etapas[0].review_status, 'approved');
 
 data.analysis.etapas[0].review_status = 'approved';
+const blockedBeforeFinalization = controller.generateAutomation(data, 'pyautogui');
+assert.match(blockedBeforeFinalization, /Geração bloqueada/);
+assert.doesNotMatch(blockedBeforeFinalization, /import pyautogui/);
+assert.equal(controller.finalizeReview(), true);
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
