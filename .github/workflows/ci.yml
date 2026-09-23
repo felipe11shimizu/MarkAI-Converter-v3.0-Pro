@@ -54,6 +54,7 @@ jobs:
             tests/test_video_evidence_timeline.js
             tests/test_video_automation_validator.js
             tests/test_video_automation_controller.js
+            tests/test_video_review_e2e.js
             tests/test_settings_controller.js
             tests/test_core_state.js
             tests/test_ui_dom.js
