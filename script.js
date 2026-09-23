@@ -53,7 +53,6 @@ const ConversionController = globalThis.MarkAIConversionController.create({
   fileParserStrategy: FileParserStrategy,
   conversionQuality: ConversionQuality,
   getState: () => ({
-    mergeEngine: MergeEngine,
   }),
   setState: patch => Object.entries(patch).forEach(([key, value]) => AppState.set(key, value)),
   ui: {
@@ -628,7 +627,6 @@ document.addEventListener('DOMContentLoaded', () => {
   QueueUIController = globalThis.MarkAIQueueUIController.create({
     queueManager: QueueManager,
     conversionController: ConversionController,
-    mergeEngine: MergeEngine,
     workspaceController: WorkspaceController,
     editorController: EditorController,
     getState: () => ({ queue: AppState.get('queue') }),
@@ -705,23 +703,7 @@ document.addEventListener('DOMContentLoaded', () => {
   SettingsController.bind();
   VideoAutomationController.bind();
 
-  // Global drag-over-page prevention (only allow on drop zone)
-  document.addEventListener('dragover', e => e.preventDefault());
-  document.addEventListener('drop', e => {
-    e.preventDefault();
-    const files = e.dataTransfer?.files;
-    if (files?.length && !e.target.closest('#dropZone')) {
-      const added = QueueManager.add(files);
-      UIManager.renderQueue();
-      UIManager.toast(`${added.length} arquivo(s) adicionado(s)!`, 'success');
-      if (AppState.get('queue').length === 1 && added.length === 1) {
-        const item = AppState.get('queue')[0];
-        if (item) {
-          UIManager.toast('Arquivo adicionado à fila. Clique em Converter para iniciar.', 'info');
-        }
-      }
-    }
-  });
+  // File ingestion is centralized in QueueUIController.
 });
 
 
