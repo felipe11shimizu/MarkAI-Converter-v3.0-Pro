@@ -20,6 +20,7 @@ let SettingsController = null;
 let WorkspaceUIController = null;
 let QueueUIController = null;
 let EditorUIController = null;
+let UrlUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -177,16 +178,8 @@ const UIManager = (() => {
 
     QueueUIController.bind();
 
-    // URL fetch
-    els.btnFetchUrl.addEventListener('click', () => {
-      if (YouTubeController.updateControls(els.urlInput.value.trim())) YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions());
-      else _fetchUrl();
-    });
+    // URL ingestion is delegated to UrlUIController.
     els.urlInput.addEventListener('input', () => YouTubeController.updateControls(els.urlInput.value.trim()));
-    els.urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') {
-      if (YouTubeController.updateControls(els.urlInput.value.trim())) YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions());
-      else _fetchUrl();
-    }});
     els.btnYoutubeTranscribe?.addEventListener('click', () => YouTubeController.transcribe(els.urlInput.value.trim(), _youtubeOptions()));
     els.btnYoutubeLanguages?.addEventListener('click', () => YouTubeController.listLanguages(els.urlInput.value.trim()));
     YouTubeController.updateControls(els.urlInput.value.trim());
@@ -326,27 +319,6 @@ const UIManager = (() => {
   // ── YOUTUBE PRESENTATION ──
   function _youtubeOptions() {
     return { language: els.youtubeLanguage?.value || 'auto', translateTo: els.youtubeTranslate?.value || null };
-  }
-
-  // ── URL FETCH ──
-  async function _fetchUrl() {
-    const url = els.urlInput.value.trim();
-    if (!url) { toast('Digite uma URL válida.', 'warning'); return; }
-    if (!url.startsWith('http')) { toast('URL deve começar com http:// ou https://', 'warning'); return; }
-
-    showProcessing('Buscando URL…', url);
-    setStatus('Buscando URL…', 'busy');
-    try {
-      const md = await URLFetcher.fetch(url);
-      hideProcessing();
-      loadMarkdown(md, 'pagina_web.md');
-      setStatus('URL carregada', 'idle');
-      toast('✓ Conteúdo extraído com sucesso!', 'success');
-    } catch(e) {
-      hideProcessing();
-      setStatus('Erro na URL', 'error');
-      toast(`Erro: ${e.message}`, 'error');
-    }
   }
 
   function setProcessingSub(text) {
@@ -566,6 +538,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  UrlUIController = globalThis.MarkAIUrlUIController.create({
+    urlService: URLFetcher,
+    youtubeController: YouTubeController,
+    elements: {
+      urlInput: document.getElementById('urlInput'),
+      btnFetchUrl: document.getElementById('btnFetchUrl'),
+      youtubeLanguage: document.getElementById('youtubeLanguage'),
+      youtubeTranslate: document.getElementById('youtubeTranslate')
+    },
+    ui: {
+      showProcessing: (label, sub) => UIManager.showProcessing(label, sub),
+      hideProcessing: () => UIManager.hideProcessing(),
+      setStatus: (text, state) => UIManager.setStatus(text, state),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      toast: (message, type) => UIManager.toast(message, type)
+    }
+  });
+
   WorkspaceController = globalThis.MarkAIWorkspaceController.create({
     workspaceStore: WorkspaceStore,
     queueManager: QueueManager,
@@ -664,6 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Boot UI
   UIManager.init();
   EditorUIController.bind();
+  UrlUIController.bind();
   SettingsController.bind();
   VideoAutomationController.bind();
 
