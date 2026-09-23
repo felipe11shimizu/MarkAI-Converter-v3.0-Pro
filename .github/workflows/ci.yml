@@ -41,6 +41,7 @@ jobs:
       - run: node tests/test_file_parser.js
       - run: node tests/test_url_fetcher.js
       - run: node tests/test_merge_engine.js
+      - run: node tests/test_conversion_controller.js
       - run: node tests/test_ai_engine.js
       - run: node tests/test_chat_formatter.js
       - run: node tests/test_conversion_quality.js
