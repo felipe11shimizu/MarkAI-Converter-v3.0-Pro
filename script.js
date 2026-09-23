@@ -426,7 +426,7 @@ const UIManager = (() => {
         const projectId = AppState.get('currentProjectId');
         if (projectId) await WorkspaceStore.saveAIHistory(projectId, { provider: settings.aiProvider, model: settings.aiModel, prompt: customPrompt || 'SYSTEM_PROMPT: formatação e normalização de Markdown', inputMarkdown: md, outputMarkdown: improved, documentName: AppState.get('currentFileName') });
         loadMarkdown(improved, AppState.get('currentFileName'));
-        await _saveWorkspaceVersion('ai');
+        await WorkspaceController.saveVersion('ai');
         toast('✓ Markdown melhorado pela IA!', 'success');
         setStatus('IA concluída', 'idle');
       } catch(e) {
