@@ -38,6 +38,7 @@ jobs:
       - run: node --check frontend/modules/merge_engine.js
       - run: node --check frontend/modules/conversion_controller.js
       - run: node --check frontend/modules/ai_engine.js
+      - run: node --check frontend/modules/ai_ui_controller.js
       - run: node --check frontend/modules/chat_formatter.js
       - run: node --check frontend/modules/conversion_quality.js
       - run: node --check video_automation_validator.js
@@ -61,6 +62,7 @@ jobs:
       - run: node tests/test_merge_engine.js
       - run: node tests/test_conversion_controller.js
       - run: node tests/test_ai_engine.js
+      - run: node tests/test_ai_ui_controller.js
       - run: node tests/test_chat_formatter.js
       - run: node tests/test_conversion_quality.js
       - run: node tests/test_queue_ingestion.js
