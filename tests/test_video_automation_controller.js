@@ -182,6 +182,15 @@ assert.match(packageManifest.integrity.artifacts[0].sha256, /^[0-9a-f]{64}$/);
 assert.equal(packageManifest.integrity.artifacts[0].name, 'processo-automacao-pyautogui.py');
 assert.equal(packageManifest.integrity.artifacts[1].name, 'processo-auditoria-revisao.json');
 assert.equal(packageManifest.integrity.artifacts[2].name, 'processo-analise-revisada.json');
+const packageFiles = FakeZip.last.files;
+const verification = await controller.verifyReviewPackageManifest(packageManifest, packageFiles);
+assert.equal(verification.valid, true);
+assert.equal(verification.artifacts.length, 3);
+assert.equal(verification.artifacts.every(item => item.valid), true);
+const tamperedFiles = { ...packageFiles, [packageManifest.integrity.artifacts[0].name]: packageFiles[packageManifest.integrity.artifacts[0].name] + '\\ntampered' };
+const tamperedVerification = await controller.verifyReviewPackageManifest(packageManifest, tamperedFiles);
+assert.equal(tamperedVerification.valid, false);
+assert.equal(tamperedVerification.artifacts.some(item => item.valid === false), true);
 
 const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
 assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
