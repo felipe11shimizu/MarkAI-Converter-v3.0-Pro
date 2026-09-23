@@ -766,6 +766,43 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Compose application services before UI boot.
+  EditorController = globalThis.MarkAIEditorController.create({
+    getState: () => ({
+      currentMd: AppState.get('currentMd'),
+      currentFileName: AppState.get('currentFileName'),
+      activePanel: AppState.get('activePanel'),
+      settings: AppState.get('settings'),
+      previewItemId: AppState.get('previewItemId')
+    }),
+    setState: patch => Object.entries(patch).forEach(([key, value]) => AppState.set(key, value)),
+    queueManager: QueueManager,
+    fileParserStrategy: FileParserStrategy,
+    sanitizeMarkdownHtml: md => UIDom.sanitizeMarkdownHtml(md),
+    scheduleSave: () => WorkspaceController.scheduleSave(),
+    ui: {
+      setStats: stats => UIManager.setEditorStats(stats),
+      setPreviewHtml: (html, settings) => UIManager.setPreviewHtml(html, settings),
+      setWorkspaceVisible: visible => UIManager.setEditorWorkspaceVisible(visible),
+      setDocumentName: name => UIManager.setEditorDocumentName(name),
+      setEditorValues: md => UIManager.setEditorValues(md),
+      setSplitEditorValue: md => UIManager.setEditorSplitValue(md),
+      setActivePanel: panelId => UIManager.setEditorActivePanel(panelId),
+      syncEditorValues: md => UIManager.syncEditorValues(md),
+      clearEditorsAndPreview: () => UIManager.clearEditorsAndPreview(),
+      setProgress: (pct, show) => UIManager.setProgress(pct, show),
+      setStatus: (text, state) => UIManager.setStatus(text, state),
+      setPreviewFileName: name => UIManager.setPreviewFileName(name),
+      clearPreviewContent: () => UIManager.clearPreviewContent(),
+      showProcessing: (label, sub) => UIManager.showProcessing(label, sub),
+      hideProcessing: () => UIManager.hideProcessing(),
+      renderQueue: () => UIManager.renderQueue(),
+      toast: (message, type) => UIManager.toast(message, type),
+      setPreviewRawLabel: label => UIManager.setPreviewRawLabel(label),
+      setPreviewRawContent: value => UIManager.setPreviewRawContent(value),
+      showPreviewModal: () => UIManager.showPreviewModal()
+    }
+  });
+
   WorkspaceController = globalThis.MarkAIWorkspaceController.create({
     workspaceStore: WorkspaceStore,
     queueManager: QueueManager,
