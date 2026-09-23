@@ -30,8 +30,19 @@ const fakeDocument = {
 };
 const fakeCrypto = {
   subtle: {
-    async digest() {
-      return Uint8Array.from({ length: 32 }, (_, index) => index).buffer;
+    async digest(_algorithm, data) {
+      const bytes = new Uint8Array(data);
+      let state = 0x811c9dc5;
+      for (const byte of bytes) {
+        state ^= byte;
+        state = Math.imul(state, 0x01000193) >>> 0;
+      }
+      const digest = new Uint8Array(32);
+      for (let index = 0; index < digest.length; index++) {
+        state = Math.imul(state ^ (index + 1), 0x01000193) >>> 0;
+        digest[index] = state & 0xff;
+      }
+      return digest.buffer;
     }
   }
 };
