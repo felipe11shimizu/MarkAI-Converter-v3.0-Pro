@@ -166,6 +166,93 @@ const UIManager = (() => {
     if (EditorController) EditorController.switchTab(tab.dataset.panel);
   }
 
+  // ── CORE UI PRESENTATION ──
+  // These methods remain in UIManager because the extracted controllers
+  // depend on them through the UI adapter.
+  function toast(msg, type = 'info', duration = 3500) {
+    const icons = { success: 'check-circle', error: 'alert-circle', info: 'info', warning: 'alert-triangle' };
+    if (!els.toastContainer) return;
+    const el = document.createElement('div');
+    el.className = 'toast ' + (type || 'info');
+    const icon = icons[type] || icons.info;
+    el.innerHTML = '<i data-lucide="' + icon + '"></i><span>' + _escapeHtml(msg) + '</span>';
+    els.toastContainer.appendChild(el);
+    if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons({ el });
+    setTimeout(() => {
+      el.classList.add('removing');
+      el.addEventListener('animationend', () => el.remove(), { once: true });
+    }, duration);
+  }
+
+  function setStatus(text, state = 'idle') {
+    if (els.statusText) els.statusText.textContent = String(text ?? '');
+    if (els.statusDot) {
+      els.statusDot.className = 'status-dot' + (state && state !== 'idle' ? ' ' + state : '');
+    }
+  }
+
+  function setProgress(pct, show = true) {
+    if (els.progressWrap) els.progressWrap.style.display = show ? 'block' : 'none';
+    if (els.progressBar) {
+      const safePct = Math.max(0, Math.min(1, Number(pct) || 0));
+      els.progressBar.style.width = (safePct * 100).toFixed(1) + '%';
+    }
+  }
+
+  function showProcessing(label = 'Processando…', sub = 'Aguarde') {
+    if (els.procLabel) els.procLabel.textContent = String(label);
+    if (els.procSub) els.procSub.textContent = String(sub);
+    if (els.procOverlay) els.procOverlay.style.display = 'flex';
+  }
+
+  function hideProcessing() {
+    if (els.procOverlay) els.procOverlay.style.display = 'none';
+  }
+
+  function renderQueue() {
+    const queue = AppState.get('queue') || [];
+    if (els.queueCount) els.queueCount.textContent = String(queue.length);
+    if (els.queuePanel) els.queuePanel.style.display = queue.length ? 'block' : 'none';
+    if (!els.queueList) return;
+
+    const ordered = QueueManager.getOrdered();
+    const items = ordered.length ? ordered : queue;
+    els.queueList.innerHTML = '';
+
+    items.forEach(item => {
+      const li = document.createElement('li');
+      li.className = 'queue-item ' + (item.status || 'pending');
+      li.dataset.id = item.id;
+      const label = EXT_LABELS[item.ext] || String(item.ext || '').toUpperCase();
+      const name = _escapeHtml(item.name || 'arquivo');
+      li.innerHTML = [
+        '<i data-lucide="grip-vertical" class="qi-drag"></i>',
+        '<input type="checkbox" class="qi-check" data-id="' + item.id + '" title="Selecionar" />',
+        '<div class="qi-icon ' + _extClass(item.ext) + '">' + _escapeHtml(label) + '</div>',
+        '<div class="qi-info">',
+          '<div class="qi-name" title="' + name + '">' + name + '</div>',
+          '<div class="qi-size">' + _formatSize(item.size) + '</div>',
+        '</div>',
+        '<div class="qi-actions">',
+          '<button class="btn btn-ghost btn-icon-xs qi-btn-preview" data-id="' + item.id + '" title="Pré-visualizar"><i data-lucide="eye"></i></button>',
+          '<button class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="' + item.id + '" title="Converter"><i data-lucide="zap"></i></button>',
+          '<button class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="' + item.id + '" title="Comparar motores"><i data-lucide="columns-2"></i></button>',
+          '<button class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="' + item.id + '" title="Baixar Arquivo"><i data-lucide="download"></i></button>',
+          '<button class="btn btn-ghost btn-icon-xs qi-btn-remove" data-id="' + item.id + '" title="Remover"><i data-lucide="x"></i></button>',
+        '</div>',
+        '<i data-lucide="' + _statusIcon(item.status) + '" class="qi-status"></i>'
+      ].join('');
+      els.queueList.appendChild(li);
+    });
+
+    if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons();
+    if (queue.length && globalThis.Sortable) QueueManager.initSortable(els.queueList);
+  }
+
+  function _statusIcon(status) {
+    return { pending: 'clock', converting: 'loader-2', done: 'check-circle', error: 'alert-circle' }[status] || 'clock';
+  }
+
   // ── INIT EVENT LISTENERS ──
   function init() {
     AppState.loadSettings();
