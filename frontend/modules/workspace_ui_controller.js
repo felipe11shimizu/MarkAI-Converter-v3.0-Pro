@@ -85,7 +85,9 @@
       const zip = new windowRef.JSZip();
       zip.file('workspace.json', JSON.stringify(payload, null, 2));
       (payload.documents || []).forEach(item => {
-        if (item.result) zip.file('documents/' + (item.name || item.id) .replace(/[^a-z0-9._-]+/gi, '_') + '.md', item.result);
+        if (!item.result) return;
+        const safeName = (item.name || item.id).replace(/[^a-z0-9._-]+/gi, '_');
+        zip.file('documents/' + safeName + '.md', item.result);
       });
       (payload.versions || []).forEach((item, index) => {
         zip.file('versions/' + String(index + 1).padStart(4, '0') + '-' + (item.name || 'documento.md').replace(/[^a-z0-9._-]+/gi, '_'), item.markdown || '');
