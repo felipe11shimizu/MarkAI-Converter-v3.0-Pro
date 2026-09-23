@@ -251,27 +251,6 @@ const UIManager = (() => {
   }
 
   // ── INIT EVENT LISTENERS ──
-  async function _initWorkspace() {
-    if (!window.indexedDB) {
-      if (els.workspaceStatus) els.workspaceStatus.textContent = 'IndexedDB indisponível';
-      return;
-    }
-    try {
-      const project = await WorkspaceStore.init();
-      AppState.set('currentProjectId', project.id);
-      const queue = await WorkspaceStore.loadQueue(project.id);
-      AppState.set('queue', queue);
-      renderQueue();
-      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Projeto: ' + project.name;
-      const current = queue.find(i => i.status === 'done' && i.result);
-      if (current) loadMarkdown(current.result, current.name.replace(/\.[^.]+$/, '') + '.md');
-      await _refreshWorkspaceProjects();
-    } catch (e) {
-      console.warn('[MarkAI] Workspace init failed:', e);
-      if (els.workspaceStatus) els.workspaceStatus.textContent = 'Workspace offline';
-    }
-  }
-
   function init() {
     AppState.loadSettings();
     _applySettings();
@@ -358,7 +337,7 @@ const UIManager = (() => {
     els.btnClearQueue.addEventListener('click', () => {
       QueueManager.clear();
       renderQueue();
-      _scheduleWorkspaceSave();
+      WorkspaceController.scheduleSave();
       toast('Fila limpa.', 'info');
     });
 
@@ -438,7 +417,7 @@ const UIManager = (() => {
       if (btn.classList.contains('qi-btn-remove')) {
         QueueManager.remove(id);
         renderQueue();
-        _scheduleWorkspaceSave();
+        WorkspaceController.scheduleSave();
         if (!AppState.get('queue').length) {
           els.emptyState.style.display = 'flex';
           els.workspaceContent.style.display = 'none';
@@ -508,8 +487,8 @@ const UIManager = (() => {
       }
       if (AppState.get('activePanel') === 'panelSplit') _renderPreview(md);
     }
-    els.markdownEditor.addEventListener('input', e => { _onEditorInput(els.markdownEditor, e); _scheduleWorkspaceSave(); });
-    els.markdownEditorSplit.addEventListener('input', e => { _onEditorInput(els.markdownEditorSplit, e); _scheduleWorkspaceSave(); });
+    els.markdownEditor.addEventListener('input', e => { _onEditorInput(els.markdownEditor, e); WorkspaceController.scheduleSave(); });
+    els.markdownEditorSplit.addEventListener('input', e => { _onEditorInput(els.markdownEditorSplit, e); WorkspaceController.scheduleSave(); });
     // Copy
     els.btnCopy.addEventListener('click', async () => {
       try {
@@ -551,7 +530,7 @@ const UIManager = (() => {
       _updateStats('');
       setProgress(0, false);
       setStatus('Pronto', 'idle');
-      _scheduleWorkspaceSave();
+      WorkspaceController.scheduleSave();
     });
 
     // AI Enhance
@@ -732,7 +711,7 @@ const UIManager = (() => {
   // ── FILE SELECTION ──
   function _onFilesSelected(files) {
     const added = QueueManager.add(files);
-      _scheduleWorkspaceSave();
+      WorkspaceController.scheduleSave();
     renderQueue();
     toast(`${added.length} arquivo(s) adicionado(s) à fila.`, 'success');
 
