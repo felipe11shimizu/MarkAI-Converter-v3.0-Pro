@@ -18,45 +18,11 @@ const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
 
 // File parser strategy is provided by frontend/modules/file_parser.js.
 const FileParserStrategy = globalThis.MarkAIFileParser;
-
-// ══════════════════════════════════════════════
-// 4. MERGE ENGINE
-// ══════════════════════════════════════════════
-const MergeEngine = (() => {
-  async function merge(onProgress) {
-    const items = QueueManager.getOrdered();
-    if (!items.length) throw new Error('Fila vazia.');
-    let combined = `# Documento Combinado\n\n`;
-    combined += `*Gerado por MarkAI Converter v3.0 Pro*\n`;
-    combined += `*${new Date().toLocaleString('pt-BR')}*\n\n`;
-    combined += `**Arquivos:** ${items.length}\n\n---\n\n`;
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (onProgress) onProgress((i + 0.5) / items.length, item.name);
-      let result = item.result;
-      if (!result) {
-        QueueManager.update(item.id, { status: 'converting' });
-        UIManager.renderQueue();
-        try {
-          result = await FileParserStrategy.parse(item);
-          QueueManager.update(item.id, { status: 'done', result });
-          UIManager.renderQueue();
-        } catch(e) {
-          QueueManager.update(item.id, { status: 'error' });
-          UIManager.renderQueue();
-          result = `_Erro ao converter: ${item.name}_`;
-        }
-      }
-      combined += `---\n\n## ${i + 1}. ${item.name}\n\n`;
-      combined += result.trim() + '\n\n';
-      if (onProgress) onProgress((i + 1) / items.length, item.name);
-    }
-    return combined.trimEnd();
-  }
-
-  return { merge };
-})();
+const MergeEngine = globalThis.MarkAIMergeEngine.create({
+  queueManager: QueueManager,
+  fileParserStrategy: FileParserStrategy,
+  renderQueue: () => UIManager.renderQueue(),
+});
 
 // URL ingestion service is provided by frontend/modules/url_fetcher.js.
 const URLFetcher = globalThis.MarkAIUrlService;
