@@ -34,7 +34,7 @@ A arquitetura atual possui, entre outros:
 9. Antes de remover ou substituir comportamento existente, identificar a cobertura de teste correspondente.
 
 ## Próxima etapa
-**Fase 8 — Auditoria pós-Fase 7 e planejamento técnico.**
+**Fase 8 — Auditoria pós-PR8 e correção dos contratos restantes.**
 
 ### Objetivos da auditoria
 - mapear funcionalidades existentes;
