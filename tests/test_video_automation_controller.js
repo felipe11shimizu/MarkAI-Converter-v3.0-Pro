@@ -84,12 +84,14 @@ controller.validateAnalysis(data, 'pyautogui');
 const originalStillApproved = controller.getOriginalAnalysis();
 assert.equal(originalStillApproved.analysis.etapas[0].review_status, 'approved');
 
+data.analysis.etapas[0].review_status = 'approved';
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
 
 const sensitiveData = JSON.parse(JSON.stringify(data));
+sensitiveData.analysis.etapas[0].review_status = 'approved';
 sensitiveData.analysis.etapas[0].tipo_acao = 'type';
 sensitiveData.analysis.etapas[0].alvo = { x: 10, y: 20 };
 sensitiveData.analysis.etapas[0].dados = { sensivel: true, valor: 'segredo', campo: 'senha' };
@@ -98,5 +100,4 @@ const sensitiveValidation = controller.validateAnalysis(sensitiveData, 'pyautogu
 assert.equal(sensitiveValidation.summary.warning, 1);
 const sensitiveCode = controller.generateAutomation(sensitiveData, 'pyautogui');
 assert.ok(sensitiveCode.includes('{{DADO_SENSIVEL}}'));
-
 console.log('video_automation_controller module tests: ok');
