@@ -41,6 +41,7 @@ jobs:
       - run: node --check frontend/modules/ai_ui_controller.js
       - run: node --check frontend/modules/chat_formatter.js
       - run: node --check frontend/modules/conversion_quality.js
+      - run: node --check frontend/modules/video_evidence_timeline.js
       - run: node --check video_automation_validator.js
       - run: node --check frontend/modules/video_automation_controller.js
       - run: node --check frontend/modules/settings_controller.js
@@ -50,6 +51,7 @@ jobs:
           set -Eeuo pipefail
 
           tests=(
+            tests/test_video_evidence_timeline.js
             tests/test_video_automation_validator.js
             tests/test_video_automation_controller.js
             tests/test_settings_controller.js
