@@ -106,6 +106,23 @@ assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
 assert.doesNotMatch(code, /DADO_SENSIVEL/);
 
+const finalizedIntegrityAudit = controller.reviewAuditManifest(data, 'pyautogui');
+assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
+assert.equal(finalizedIntegrityAudit.review.integrity_match, true);
+
+data.analysis.etapas[0].acao = 'alteração externa após finalização';
+const integrityBlocked = controller.generateAutomation(data, 'pyautogui');
+assert.match(integrityBlocked, /revisão finalizada foi alterada/);
+assert.doesNotMatch(integrityBlocked, /pyautogui\.click\(120, 80\)/);
+const tamperedAudit = controller.reviewAuditManifest(data, 'pyautogui');
+assert.equal(tamperedAudit.review.integrity_protected, true);
+assert.equal(tamperedAudit.review.integrity_match, false);
+
+data.analysis.etapas[0].acao = 'Clicar no botão';
+controller.validateAnalysis(data, 'pyautogui');
+const restoredCode = controller.generateAutomation(data, 'pyautogui');
+assert.match(restoredCode, /pyautogui\.click\(120, 80\)/);
+
 const pendingReviewData = JSON.parse(JSON.stringify(data));
 pendingReviewData.analysis.etapas[0].review_status = 'pending';
 controller.validateAnalysis(pendingReviewData, 'pyautogui');
