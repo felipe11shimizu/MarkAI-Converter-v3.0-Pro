@@ -22,6 +22,7 @@ let QueueUIController = null;
 let EditorUIController = null;
 let UrlUIController = null;
 let AIUIController = null;
+let ComparisonUIController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -230,33 +231,7 @@ const UIManager = (() => {
 
     // Settings events are delegated to SettingsController.
 
-    // Comparison Modal
-    els.btnCloseCompare.addEventListener('click', () => els.modalCompare.close());
-    els.modalCompare.addEventListener('click', e => { if (e.target === els.modalCompare) els.modalCompare.close(); });
-    els.btnUseMarkItDown.addEventListener('click', () => {
-      const s = AppState.get('compareState');
-      const item = s?.id ? QueueManager.getById(s.id) : null;
-      if (!s?.markitdown || !item) { toast('Resultado MarkItDown indisponível.', 'warning'); return; }
-      QueueManager.update(item.id, { status:'done', result:s.markitdown, engine:'markitdown' });
-      renderQueue(); loadMarkdown(s.markitdown, item.name.replace(/\.[^.]+$/, '') + '.md');
-      els.modalCompare.close();
-    });
-    els.btnUseBrowser.addEventListener('click', () => {
-      const s = AppState.get('compareState');
-      const item = s?.id ? QueueManager.getById(s.id) : null;
-      if (!s?.browser || !item) { toast('Resultado local indisponível.', 'warning'); return; }
-      QueueManager.update(item.id, { status:'done', result:s.browser, engine:'browser' });
-      renderQueue(); loadMarkdown(s.browser, item.name.replace(/\.[^.]+$/, '') + '.md');
-      els.modalCompare.close();
-    });
-
-    els.btnCompare.addEventListener('click', () => {
-      const current = AppState.get('currentFileName') || '';
-      const base = current.replace(/\.[^.]+$/, '');
-      const item = QueueManager.getOrdered().find(i => i.name.replace(/\.[^.]+$/, '') === base) || QueueManager.getOrdered().find(i => i.result);
-      if (!item) { toast('Nenhum arquivo disponível para comparação.', 'warning'); return; }
-      ConversionController.compareItem(item.id);
-    });
+    ComparisonUIController.bind();
 
     // Preview Modal
     els.btnClosePreview.addEventListener('click', () => els.modalPreview.close());
@@ -650,6 +625,29 @@ document.addEventListener('DOMContentLoaded', () => {
   EditorUIController.bind();
   UrlUIController.bind();
   AIUIController.bind();
+
+
+  ComparisonUIController = globalThis.MarkAIComparisonUIController.create({
+    queueManager: QueueManager,
+    conversionController: ConversionController,
+    getState: () => ({
+      currentFileName: AppState.get('currentFileName'),
+      compareState: AppState.get('compareState')
+    }),
+    ui: {
+      renderQueue: () => UIManager.renderQueue(),
+      loadMarkdown: (md, name) => UIManager.loadMarkdown(md, name),
+      toast: (message, type) => UIManager.toast(message, type)
+    },
+    elements: {
+      btnCloseCompare: document.getElementById('btnCloseCompare'),
+      modalCompare: document.getElementById('modalCompare'),
+      btnUseMarkItDown: document.getElementById('btnUseMarkItDown'),
+      btnUseBrowser: document.getElementById('btnUseBrowser'),
+      btnCompare: document.getElementById('btnCompare')
+    }
+  });
+
   SettingsController.bind();
   VideoAutomationController.bind();
 
