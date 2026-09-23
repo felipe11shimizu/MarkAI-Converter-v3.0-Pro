@@ -93,6 +93,28 @@ function createHarness() {
   assert.deepEqual(calls.at(-1), ['convert', 'q1']);
 }
 
+// File-picker activation must work on mobile browsers and fall back to click().
+{
+  const { elements } = createHarness();
+  let showPickerCalls = 0;
+  let clickCalls = 0;
+  elements.fileInput.showPicker = () => { showPickerCalls += 1; };
+  elements.fileInput.click = () => { clickCalls += 1; };
+  elements.browseBtn.dispatch('click', {
+    preventDefault() {},
+    stopPropagation() {}
+  });
+  assert.equal(showPickerCalls, 1);
+  assert.equal(clickCalls, 0);
+
+  delete elements.fileInput.showPicker;
+  elements.browseBtn.dispatch('click', {
+    preventDefault() {},
+    stopPropagation() {}
+  });
+  assert.equal(clickCalls, 1);
+}
+
 // File-picker ingestion must use the same centralized path.
 {
   const { calls, queue, elements } = createHarness();

@@ -150,6 +150,23 @@
       }
     }
 
+    function openFilePicker(fileInput) {
+      if (!fileInput) return false;
+      try {
+        if (typeof fileInput.showPicker === 'function') {
+          fileInput.showPicker();
+          return true;
+        }
+      } catch (error) {
+        console.warn('[MarkAI] showPicker indisponível, usando fallback:', error);
+      }
+      if (typeof fileInput.click === 'function') {
+        fileInput.click();
+        return true;
+      }
+      return false;
+    }
+
     function bind() {
       const dropZone = $('dropZone');
       const fileInput = $('fileInput');
@@ -170,7 +187,7 @@
         dropZone.classList.remove('drag-over');
         if (event.dataTransfer.files.length) onFilesSelected(event.dataTransfer.files);
       });
-      dropZone?.addEventListener('click', () => fileInput?.click());
+      dropZone?.addEventListener('click', () => openFilePicker(fileInput));
       dropZone?.addEventListener('keydown', event => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
@@ -178,8 +195,9 @@
         }
       });
       browseBtn?.addEventListener('click', event => {
+        event.preventDefault();
         event.stopPropagation();
-        fileInput?.click();
+        openFilePicker(fileInput);
       });
       fileInput?.addEventListener('change', event => {
         if (event.target.files.length) onFilesSelected(event.target.files);
@@ -199,7 +217,7 @@
       queueList?.addEventListener('click', handleQueueAction);
     }
 
-    return { bind, onFilesSelected, mergeAll, downloadZip, convertAll, handleQueueAction };
+    return { bind, onFilesSelected, openFilePicker, mergeAll, downloadZip, convertAll, handleQueueAction };
   }
 
   return { create };
