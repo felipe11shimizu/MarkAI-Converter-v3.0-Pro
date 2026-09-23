@@ -28,6 +28,7 @@ jobs:
       - run: node --check frontend/modules/file_parser.js
       - run: node --check frontend/modules/url_fetcher.js
       - run: node --check frontend/modules/chat_formatter.js
+      - run: node --check frontend/modules/conversion_quality.js
       - run: node --check video_automation_validator.js
       - run: node tests/test_video_automation_validator.js
       - run: node tests/test_core_state.js
@@ -35,3 +36,4 @@ jobs:
       - run: node tests/test_file_parser.js
       - run: node tests/test_url_fetcher.js
       - run: node tests/test_chat_formatter.js
+      - run: node tests/test_conversion_quality.js
