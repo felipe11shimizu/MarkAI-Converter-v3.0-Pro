@@ -369,7 +369,9 @@ const UIManager = (() => {
     });
   }
 
-  // Queue UI interactions are delegated to QueueUIController.\n\n  // ── YOUTUBE PRESENTATION ──
+  // Queue UI interactions are delegated to QueueUIController.
+
+  // ── YOUTUBE PRESENTATION ──
   function _youtubeOptions() {
     return { language: els.youtubeLanguage?.value || 'auto', translateTo: els.youtubeTranslate?.value || null };
   }
@@ -426,7 +428,11 @@ const UIManager = (() => {
         els.workspaceContent.style.height = '100%';
       }
     },
-    setEmptyState: empty => {\n      els.emptyState.style.display = empty ? 'flex' : 'none';\n      els.workspaceContent.style.display = empty ? 'none' : 'flex';\n    },\n    setEditorDocumentName: name => {
+    setEmptyState: empty => {
+      els.emptyState.style.display = empty ? 'flex' : 'none';
+      els.workspaceContent.style.display = empty ? 'none' : 'flex';
+    },
+    setEditorDocumentName: name => {
       els.docName.textContent = name || 'documento.md';
       els.docName.title = name || 'documento.md';
     },
