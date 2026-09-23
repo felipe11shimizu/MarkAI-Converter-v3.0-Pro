@@ -106,7 +106,7 @@ assert.match(
 
 assert.match(
   script,
-  /openSettings:s*()s*=>s*{s*SettingsController.sync();s*els.modalSettings.showModal();s*}/,
+  /openSettings:\s*\(\)\s*=>\s*\{\s*SettingsController\.sync\(\);\s*els\.modalSettings\.showModal\(\);\s*\}/,
   'Settings opener contract must remain intact'
 );
 
