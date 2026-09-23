@@ -558,10 +558,13 @@ function create({
     return evidenceTimeline.normalize(data);
   }
 
+  function isReviewPackageReady(data = lastAnalysis) {
+    return Boolean(data && reviewFinalizedAt) &&
+      (!finalizedReviewSnapshot || _reviewIntegrityKey(data) === _reviewIntegrityKey(finalizedReviewSnapshot));
+  }
+
   async function exportReviewPackage(data = lastAnalysis, platform = _currentAutomationPlatform(data)) {
-    if (!data) return false;
-    if (!reviewFinalizedAt) return false;
-    if (finalizedReviewSnapshot && _reviewIntegrityKey(data) !== _reviewIntegrityKey(finalizedReviewSnapshot)) return false;
+    if (!isReviewPackageReady(data)) return false;
     if (typeof zipImpl !== 'function') throw new TypeError('Review package export requires JSZip.');
     const normalizedPlatform = validator.normalizePlatform(platform);
     const code = _generateAutomation(normalizedPlatform, data);
@@ -1107,6 +1110,14 @@ function create({
     }
     const approveAllButton = $('btnApproveAllVideoSteps');
     if (approveAllButton) approveAllButton.disabled = Boolean(reviewFinalizedAt);
+    const packageButton = $('btnDownloadVideoReviewPackage');
+    if (packageButton) {
+      const packageReady = isReviewPackageReady(lastAnalysis);
+      packageButton.disabled = !packageReady;
+      packageButton.title = packageReady
+        ? 'Exportar pacote auditável da revisão finalizada'
+        : 'Finalize a revisão para habilitar o pacote auditável';
+    }
     _renderReviewHistory();
     _renderEvidenceTimeline(data);
     _renderEvidenceMatrix(data);
@@ -1520,7 +1531,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, exportReviewPackage, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, getOriginalAnalysis, getReviewHistory
   };
 }
 

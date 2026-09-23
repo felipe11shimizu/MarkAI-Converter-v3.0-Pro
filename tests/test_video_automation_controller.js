@@ -89,6 +89,7 @@ const data = {
   }
 };
 
+assert.equal(controller.isReviewPackageReady(data), false);
 assert.equal(await controller.exportReviewPackage(data, 'pyautogui'), false);
 
 const auditManifest = controller.reviewAuditManifest(data, 'pyautogui');
@@ -136,6 +137,7 @@ const blockedBeforeFinalization = controller.generateAutomation(data, 'pyautogui
 assert.match(blockedBeforeFinalization, /Geração bloqueada/);
 assert.doesNotMatch(blockedBeforeFinalization, /import pyautogui/);
 assert.equal(controller.finalizeReview(), true);
+assert.equal(controller.isReviewPackageReady(data), true);
 const code = controller.generateAutomation(data, 'pyautogui');
 assert.match(code, /import pyautogui/);
 assert.match(code, /pyautogui\.click\(120, 80\)/);
@@ -150,6 +152,7 @@ assert.equal(finalizedIntegrityAudit.review.integrity_protected, true);
 assert.equal(finalizedIntegrityAudit.review.integrity_match, true);
 
 data.analysis.etapas[0].acao = 'alteração externa após finalização';
+assert.equal(controller.isReviewPackageReady(data), false);
 const integrityBlocked = controller.generateAutomation(data, 'pyautogui');
 assert.match(integrityBlocked, /revisão finalizada foi alterada/);
 assert.doesNotMatch(integrityBlocked, /pyautogui\.click\(120, 80\)/);
