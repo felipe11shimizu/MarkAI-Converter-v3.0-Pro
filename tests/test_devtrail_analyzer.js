@@ -19,6 +19,10 @@ assert.match(result.classification.observed[0].statement, /input/);
 assert.ok(result.classification.derived.length >= 2);
 assert.equal(result.classification.to_confirm.length, 0);
 assert.equal(result.requirements[0].selector, 'placa');
+assert.equal(result.execution_flow.length, 2);
+assert.equal(result.execution_flow[1].network_calls[0].endpoint, '/v1/veiculos');
+assert.equal(result.execution_flow[1].outcome, 'sucesso_rede');
+assert.equal(result.replay_playbook[1].target, '[data-testid="btn-consultar"]');
 
 const md = analyzer.convertToMarkdown(result);
 assert.match(md, /## Inteligência do processo/);
@@ -26,6 +30,8 @@ assert.match(md, /### Observado/);
 assert.match(md, /### Derivado/);
 assert.match(md, /### A confirmar/);
 assert.match(md, /### Especificação de automação/);
+assert.match(md, /### Fluxo temporal e dependências/);
+assert.match(md, /### Playbook de automação/);
 assert.match(md, /RF02/);
 
 console.log('devtrail analyzer tests: ok');
