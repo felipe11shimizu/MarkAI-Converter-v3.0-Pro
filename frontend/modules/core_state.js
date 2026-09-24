@@ -90,6 +90,7 @@ const QueueManager = (() => {
       size: file.size,
       status: 'pending',
       result: null,
+      mergeMarker: true,
     }));
     AppState.set('queue', [...existing, ...newItems]);
     return newItems;
@@ -110,28 +111,67 @@ const QueueManager = (() => {
   }
 
   function getOrdered() {
-    const listEl = document.getElementById('queueList');
-    if (!listEl) return AppState.get('queue');
-    const ids = Array.from(listEl.querySelectorAll('.queue-item')).map(el => el.dataset.id);
-    const map = {};
-    AppState.get('queue').forEach(i => { map[i.id] = i; });
-    return ids.map(id => map[id]).filter(Boolean);
+    return AppState.get('queue').slice();
+  }
+
+  function reorder(ids) {
+    const queue = AppState.get('queue');
+    const map = new Map(queue.map(item => [item.id, item]));
+    const ordered = [];
+
+    for (const id of Array.isArray(ids) ? ids : []) {
+      const item = map.get(id);
+      if (item) {
+        ordered.push(item);
+        map.delete(id);
+      }
+    }
+
+    // Preserve any item not represented in the DOM/ID list instead of
+    // silently dropping it from the canonical queue state.
+    for (const item of queue) {
+      if (map.has(item.id)) ordered.push(item);
+    }
+
+    AppState.set('queue', ordered);
+    return ordered;
+  }
+
+  function move(id, direction) {
+    const queue = AppState.get('queue').slice();
+    const index = queue.findIndex(item => item.id === id);
+    if (index < 0) return queue;
+
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= queue.length) return queue;
+
+    [queue[index], queue[target]] = [queue[target], queue[index]];
+    AppState.set('queue', queue);
+    return queue;
   }
 
   function clear() { AppState.set('queue', []); }
 
-  function initSortable(listEl) {
+  function initSortable(listEl, onOrderChanged) {
     if (_sortable) _sortable.destroy();
+    if (!listEl || !globalThis.Sortable) return null;
+
     _sortable = Sortable.create(listEl, {
       animation: 180,
       ghostClass: 'sortable-ghost',
       chosenClass: 'sortable-chosen',
       handle: '.qi-drag',
       easing: 'cubic-bezier(0.4,0,0.2,1)',
+      onEnd() {
+        const ids = Array.from(listEl.querySelectorAll('.queue-item')).map(el => el.dataset.id);
+        reorder(ids);
+        if (typeof onOrderChanged === 'function') onOrderChanged();
+      }
     });
+    return _sortable;
   }
 
-  return { add, remove, update, getById, getOrdered, clear, initSortable };
+  return { add, remove, update, getById, getOrdered, reorder, move, clear, initSortable };
 })();
 
 
