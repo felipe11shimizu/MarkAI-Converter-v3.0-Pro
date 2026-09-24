@@ -719,6 +719,7 @@ document.addEventListener('DOMContentLoaded', () => {
       exportMd: document.getElementById('btnDevTrailExportMd'),
       exportReplay: document.getElementById('btnDevTrailExportReplay'),
       exportReplayValidation: document.getElementById('btnDevTrailExportReplayValidation'),
+      exportAudit: document.getElementById('btnDevTrailExportAudit'),
     exportPackage: document.getElementById('btnDevTrailExportPackage'),
       markdown: document.getElementById('devtrailMarkdown'),
       json: document.getElementById('devtrailJson'),
