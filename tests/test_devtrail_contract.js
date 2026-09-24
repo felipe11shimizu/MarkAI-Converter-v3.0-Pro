@@ -48,4 +48,5 @@ assert.match(controller, /DEVTRAIL_STATUS/);
 assert.match(controller, /targetTabId/);
 
 console.log('devtrail contract tests: ok');
-\nassert.match(analyzer, /MarkAIDevTrailAnalyzer/);
+
+assert.match(analyzer, /MarkAIDevTrailAnalyzer/);
