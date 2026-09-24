@@ -9,7 +9,7 @@
 
 const FileParserStrategy = (() => {
   const MARKITDOWN_ONLY_EXTS = new Set([
-    'pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'
+    'epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'
   ]);
 
   const CODE_LANGS = {
@@ -323,6 +323,96 @@ const FileParserStrategy = (() => {
     return md.trimEnd();
   }
 
+  // ── PPTX ──
+  function _decodeXmlText(value) {
+    return String(value || '')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&');
+  }
+
+  function _extractPptxParagraphs(xmlText) {
+    const paragraphs = [];
+    const parser = typeof DOMParser === 'function' ? new DOMParser() : null;
+
+    if (parser) {
+      const xml = parser.parseFromString(xmlText, 'application/xml');
+      const nodes = xml.getElementsByTagNameNS(
+        'http://schemas.openxmlformats.org/drawingml/2006/main',
+        'p'
+      );
+      for (const paragraph of Array.from(nodes)) {
+        const texts = paragraph.getElementsByTagNameNS(
+          'http://schemas.openxmlformats.org/drawingml/2006/main',
+          't'
+        );
+        const text = Array.from(texts).map(node => node.textContent || '').join('').trim();
+        if (text) paragraphs.push(text);
+      }
+      return paragraphs;
+    }
+
+    // Lightweight fallback for unit tests/non-browser environments.
+    const matches = String(xmlText || '').match(/<a:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/a:p>/g) || [];
+    for (const paragraph of matches) {
+      const texts = Array.from(
+        paragraph.matchAll(/<a:t(?:\\s[^>]*)?>([\\s\\S]*?)<\\/a:t>/g)
+      ).map(match => _decodeXmlText(match[1]));
+      const text = texts.join('').trim();
+      if (text) paragraphs.push(text);
+    }
+    return paragraphs;
+  }
+
+  async function parsePptx(file, onProgress) {
+    if (!globalThis.JSZip) {
+      throw new Error('JSZip não carregado. Não foi possível processar o PPTX no navegador.');
+    }
+
+    const buffer = await file.arrayBuffer();
+    const zip = await globalThis.JSZip.loadAsync(buffer);
+    const slideEntries = Object.keys(zip.files)
+      .map(name => {
+        const match = name.match(/^ppt\\/slides\\/slide(\\d+)\\.xml$/);
+        return match ? { name, number: Number(match[1]) } : null;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.number - b.number);
+
+    if (!slideEntries.length) {
+      throw new Error('PPTX inválido ou sem slides.');
+    }
+
+    const title = file.name.replace(/\\.[^.]+$/, '');
+    let md = `# ${title}
+
+**Arquivo:** \`${file.name}\` | **Slides:** ${slideEntries.length}
+
+`;
+
+    for (let i = 0; i < slideEntries.length; i++) {
+      const entry = slideEntries[i];
+      const xml = await zip.files[entry.name].async('string');
+      const paragraphs = _extractPptxParagraphs(xml);
+
+      md += `## Slide ${entry.number}
+
+`;
+      if (paragraphs.length) {
+        md += paragraphs.map(text => `- ${text}`).join('\\n') + '\\n\\n';
+      } else {
+        md += '_Sem texto extraível neste slide._\\n\\n';
+      }
+
+      if (onProgress) onProgress((i + 1) / slideEntries.length);
+      await _yieldTick();
+    }
+
+    return md.trimEnd();
+  }
+
   // ── JSON ──
   async function parseJson(file) {
     const text = await file.text();
@@ -364,6 +454,7 @@ const FileParserStrategy = (() => {
     if (ext === 'pdf') return parsePdf(file, onProgress);
     if (ext === 'docx' || ext === 'doc') return parseDocx(file);
     if (ext === 'xlsx' || ext === 'xls') return parseXlsx(file);
+    if (ext === 'pptx') return parsePptx(file, onProgress);
     if (ext === 'csv') return parseCsv(file);
     if (ext === 'json') return parseJson(file);
     if (MARKITDOWN_ONLY_EXTS.has(ext)) throw new Error(`O formato .${ext} requer o backend Microsoft MarkItDown ativo.`);
@@ -386,7 +477,7 @@ const FileParserStrategy = (() => {
     return parseBrowser(item, onProgress);
   }
 
-  return { parse, parseBrowser };
+  return { parse, parseBrowser, parsePptx };
 })();
 
 
