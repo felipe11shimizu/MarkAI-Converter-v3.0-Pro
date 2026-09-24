@@ -49,6 +49,18 @@
       elements.start?.addEventListener('click', start); elements.pause?.addEventListener('click', pauseResume); elements.stop?.addEventListener('click', stop); elements.refresh?.addEventListener('click', refreshTabs);
       elements.exportJson?.addEventListener('click', () => state.json && download('devtrail-session.json', JSON.stringify(state.json, null, 2), 'application/json;charset=utf-8'));
       elements.exportMd?.addEventListener('click', () => state.markdown && download('devtrail-session.md', state.markdown, 'text/markdown;charset=utf-8'));
+      elements.tabMarkdown?.addEventListener('click', () => {
+        if (elements.markdown) elements.markdown.hidden = false;
+        if (elements.json) elements.json.hidden = true;
+        elements.tabMarkdown?.classList.add('active');
+        elements.tabJson?.classList.remove('active');
+      });
+      elements.tabJson?.addEventListener('click', () => {
+        if (elements.markdown) elements.markdown.hidden = true;
+        if (elements.json) elements.json.hidden = false;
+        elements.tabJson?.classList.add('active');
+        elements.tabMarkdown?.classList.remove('active');
+      });
       render(); emit('DEVTRAIL_PING'); refreshTabs();
     }
     return { bind, refreshTabs, getState: () => ({ ...state }) };
