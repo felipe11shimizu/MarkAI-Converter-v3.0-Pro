@@ -22,6 +22,7 @@
       if (elements.areaStatus) elements.areaStatus.textContent = state.area ? `Área: ${Math.round(state.area.width)}×${Math.round(state.area.height)} px em (${Math.round(state.area.x)}, ${Math.round(state.area.y)})` : 'Área: página inteira';
       if (elements.exportJson) elements.exportJson.disabled = !state.json;
       if (elements.exportMd) elements.exportMd.disabled = !state.json;
+      if (elements.exportPackage) elements.exportPackage.disabled = !state.json;
       if (elements.json) elements.json.value = state.json ? JSON.stringify(state.json, null, 2) : '';
       if (elements.markdown) elements.markdown.value = state.markdown || '';
     }
@@ -83,6 +84,7 @@
       elements.start?.addEventListener('click', start); elements.pause?.addEventListener('click', pauseResume); elements.stop?.addEventListener('click', stop); elements.refresh?.addEventListener('click', refreshTabs); elements.area?.addEventListener('click', pickArea); elements.areaClear?.addEventListener('click', clearArea);
       elements.exportJson?.addEventListener('click', () => state.json && download('devtrail-session.json', JSON.stringify(state.json, null, 2), 'application/json;charset=utf-8'));
       elements.exportMd?.addEventListener('click', () => state.markdown && download('devtrail-session.md', state.markdown, 'text/markdown;charset=utf-8'));
+      elements.exportPackage?.addEventListener('click', () => { if (!state.json || !globalThis.MarkAIDevTrailPackage?.build) return; const pkg = globalThis.MarkAIDevTrailPackage.build(state.json, state.analysis, state.quality, globalThis.MarkAIDevTrailSpecification?.generate ? globalThis.MarkAIDevTrailSpecification.generate(state.json, state.analysis) : null, state.readiness); download('devtrail-rpa-package.json', JSON.stringify(pkg, null, 2), 'application/json;charset=utf-8'); });
       elements.tabMarkdown?.addEventListener('click', () => {
         if (elements.markdown) elements.markdown.hidden = false;
         if (elements.json) elements.json.hidden = true;
