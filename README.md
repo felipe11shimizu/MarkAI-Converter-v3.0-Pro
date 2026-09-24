@@ -30,6 +30,25 @@ A partir da v3.3, a ingestão de URLs também passa pelo backend MarkItDown. O f
 - Cache em memória é aplicado ao transcript por vídeo/idioma/tradução, controlado por \`MARKAI_YOUTUBE_CACHE_TTL_SECONDS\`.
 - Para ambientes em que o IP de execução sofre bloqueios do YouTube, proxies HTTP/HTTPS podem ser configurados por \`MARKAI_YOUTUBE_HTTP_PROXY\` e \`MARKAI_YOUTUBE_HTTPS_PROXY\`.
 
+## Organizador de fila e juntada
+
+A fila de conversão é também a fila de composição do documento final. A ordem exibida é a ordem usada em **Juntar Todos (Merge)** e é persistida no Workspace.
+
+- arraste os arquivos pelo ícone de movimento para alterar a ordem;
+- use as setas de cada item para mover um arquivo para cima ou para baixo;
+- cada item pode ser marcado ou desmarcado como arquivo distinto na juntada;
+- a opção **Marcar arquivos distintos** adiciona, por padrão, marcadores HTML estáveis de início/fim, a posição do arquivo e o nome de origem;
+- os marcadores permitem identificar posteriormente os limites dos documentos originais mesmo depois que o conteúdo tiver sido consolidado em um único Markdown.
+
+Exemplo de marcador:
+
+```html
+<!-- MARKAI:FILE_START index="2" total="4" name="anexo.pdf" -->
+## Arquivo 2 de 4 — anexo.pdf
+...
+<!-- MARKAI:FILE_END index="2" name="anexo.pdf" -->
+```
+
 ## O que o MarkItDown acrescenta
 
 O MarkItDown é uma biblioteca Python da Microsoft voltada à conversão de arquivos para Markdown para uso em LLMs e análise de conteúdo. A documentação oficial informa suporte a PDF, PowerPoint, Word, Excel, imagens, áudio, HTML, CSV, JSON, XML, ZIP, EPUB e outros formatos. 
