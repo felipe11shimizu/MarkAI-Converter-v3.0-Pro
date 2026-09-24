@@ -6,7 +6,7 @@
   const EVENT_SOURCE = 'markai-devtrail';
   const CONTROL_TYPES = new Set([
     'DEVTRAIL_PING', 'DEVTRAIL_LIST_TABS', 'DEVTRAIL_START',
-    'DEVTRAIL_PAUSE', 'DEVTRAIL_RESUME', 'DEVTRAIL_STOP'
+    'DEVTRAIL_PAUSE', 'DEVTRAIL_RESUME', 'DEVTRAIL_STOP', 'DEVTRAIL_PICK_AREA', 'DEVTRAIL_CLEAR_AREA'
   ]);
   const sensitiveName = /^(authorization|cookie|set-cookie|proxy-authorization|x-api-key|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|password|passwd|senha|token)$/i;
   const passwordType = /password/i;
@@ -92,6 +92,80 @@
   }
 
   let inputTimer = null;
+  let areaOverlay = null;
+  let areaStart = null;
+
+  function removeAreaOverlay() {
+    areaOverlay?.remove();
+    areaOverlay = null;
+    areaStart = null;
+  }
+
+  function beginAreaSelection() {
+    removeAreaOverlay();
+    const overlay = document.createElement('div');
+    overlay.id = '__markai_devtrail_area_overlay__';
+    Object.assign(overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '2147483647', cursor: 'crosshair',
+      background: 'rgba(0,0,0,.18)', border: '2px solid #22d3ee', boxSizing: 'border-box'
+    });
+    const hint = document.createElement('div');
+    hint.textContent = 'DevTrail: arraste para definir a área visual de captura · Esc cancela';
+    Object.assign(hint.style, {
+      position: 'fixed', top: '16px', left: '50%', transform: 'translateX(-50%)',
+      padding: '8px 12px', borderRadius: '8px', background: 'rgba(15,23,42,.95)',
+      color: '#fff', font: '600 13px system-ui', pointerEvents: 'none'
+    });
+    overlay.appendChild(hint);
+    document.documentElement.appendChild(overlay);
+    areaOverlay = overlay;
+
+    const box = document.createElement('div');
+    Object.assign(box.style, {
+      position: 'fixed', display: 'none', border: '2px solid #22d3ee',
+      background: 'rgba(34,211,238,.12)', boxShadow: '0 0 0 9999px rgba(0,0,0,.35)',
+      pointerEvents: 'none'
+    });
+    overlay.appendChild(box);
+
+    const finish = (x, y) => {
+      if (!areaStart) return removeAreaOverlay();
+      const left = Math.max(0, Math.min(areaStart.x, x));
+      const top = Math.max(0, Math.min(areaStart.y, y));
+      const width = Math.min(innerWidth - left, Math.abs(x - areaStart.x));
+      const height = Math.min(innerHeight - top, Math.abs(y - areaStart.y));
+      removeAreaOverlay();
+      if (width < 20 || height < 20) return;
+      const area = { x: left, y: top, width, height, devicePixelRatio: window.devicePixelRatio || 1 };
+      post('DEVTRAIL_AREA_SELECTED', { area });
+      chrome.runtime.sendMessage({ type: 'DEVTRAIL_AREA_SELECTED', payload: { area } }).catch(() => {});
+    };
+
+    overlay.addEventListener('mousedown', event => {
+      if (event.button !== 0) return;
+      areaStart = { x: event.clientX, y: event.clientY };
+      box.style.display = 'block';
+      box.style.left = areaStart.x + 'px';
+      box.style.top = areaStart.y + 'px';
+      box.style.width = '0px';
+      box.style.height = '0px';
+    });
+    overlay.addEventListener('mousemove', event => {
+      if (!areaStart) return;
+      const left = Math.min(areaStart.x, event.clientX);
+      const top = Math.min(areaStart.y, event.clientY);
+      box.style.left = left + 'px';
+      box.style.top = top + 'px';
+      box.style.width = Math.abs(event.clientX - areaStart.x) + 'px';
+      box.style.height = Math.abs(event.clientY - areaStart.y) + 'px';
+    });
+    overlay.addEventListener('mouseup', event => finish(event.clientX, event.clientY));
+    const onKey = event => {
+      if (event.key === 'Escape') { document.removeEventListener('keydown', onKey, true); removeAreaOverlay(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+  }
+
   function scheduleInput(el) {
     clearTimeout(inputTimer);
     inputTimer = setTimeout(() => emit('input', el, { valor_entrada: inputValue(el) }), 500);
@@ -124,7 +198,13 @@
 
   window.addEventListener('message', event => {
     if (event.source !== window || event.data?.source !== EVENT_SOURCE || !CONTROL_TYPES.has(event.data.type)) return;
-    chrome.runtime.sendMessage({ type: event.data.type, payload: event.data.payload || {} }).catch(() => {});
+    const type = event.data.type;
+    if (type === 'DEVTRAIL_PICK_AREA') beginAreaSelection();
+    if (type === 'DEVTRAIL_CLEAR_AREA') {
+      post('DEVTRAIL_AREA_CLEARED');
+      chrome.runtime.sendMessage({ type: 'DEVTRAIL_CLEAR_AREA', payload: {} }).catch(() => {});
+    }
+    chrome.runtime.sendMessage({ type, payload: event.data.payload || {} }).catch(() => {});
   });
   chrome.runtime.onMessage.addListener(message => {
     if (message?.type?.startsWith('DEVTRAIL_')) post(message.type, message.payload || {});

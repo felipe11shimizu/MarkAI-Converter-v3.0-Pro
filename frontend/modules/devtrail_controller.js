@@ -5,7 +5,7 @@
   'use strict';
   const MAX_SESSION_MS = 15 * 60 * 1000;
   function create({ elements, formatters, windowObj = globalThis.window, documentObj = globalThis.document, clock = () => Date.now(), setIntervalImpl = globalThis.setInterval, clearIntervalImpl = globalThis.clearInterval, setTimeoutImpl = globalThis.setTimeout }) {
-    let state = { status: 'idle', startedAt: null, json: null, markdown: '' };
+    let state = { status: 'idle', startedAt: null, json: null, markdown: '', area: null };
     let ticker = null;
     function emit(type, payload = {}) { windowObj.postMessage({ source: 'markai-devtrail', type, payload }, '*'); }
     function download(filename, content, type) { const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const a = documentObj.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeoutImpl(() => URL.revokeObjectURL(url), 1000); }
@@ -17,6 +17,9 @@
       if (elements.start) elements.start.disabled = ['starting', 'recording', 'paused'].includes(state.status);
       if (elements.pause) { elements.pause.disabled = !['recording', 'paused'].includes(state.status); elements.pause.textContent = state.status === 'paused' ? 'Retomar' : 'Pausar'; }
       if (elements.stop) elements.stop.disabled = !['recording', 'paused'].includes(state.status);
+      if (elements.area) elements.area.disabled = !elements.target?.value || ['starting', 'recording', 'paused'].includes(state.status);
+      if (elements.areaClear) elements.areaClear.disabled = !state.area || ['starting', 'recording', 'paused'].includes(state.status);
+      if (elements.areaStatus) elements.areaStatus.textContent = state.area ? `Área: ${Math.round(state.area.width)}×${Math.round(state.area.height)} px em (${Math.round(state.area.x)}, ${Math.round(state.area.y)})` : 'Área: página inteira';
       if (elements.exportJson) elements.exportJson.disabled = !state.json;
       if (elements.exportMd) elements.exportMd.disabled = !state.json;
       if (elements.json) elements.json.value = state.json ? JSON.stringify(state.json, null, 2) : '';
@@ -33,7 +36,9 @@
       } else if (type === 'DEVTRAIL_PAUSED') { state.status = 'paused'; render();
       } else if (type === 'DEVTRAIL_RESUMED') { state.status = 'recording'; render();
       } else if (type === 'DEVTRAIL_SESSION_FINALIZED') { state.json = payload.json || null; state.markdown = state.json ? formatters.convertJsonToMarkdown(state.json) : ''; state.status = 'finalized'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } render();
-      } else if (type === 'DEVTRAIL_ERROR') { state.status = 'error'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } if (elements.extensionStatus) elements.extensionStatus.textContent = payload.message || 'Erro na extensão'; render(); }
+      } else if (type === 'DEVTRAIL_AREA_SELECTED') { state.area = payload.area || null; render(); }
+      else if (type === 'DEVTRAIL_AREA_CLEARED') { state.area = null; render(); }
+      else if (type === 'DEVTRAIL_ERROR') { state.status = 'error'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } if (elements.extensionStatus) elements.extensionStatus.textContent = payload.message || 'Erro na extensão'; render(); }
     }
     function start() {
       if (!elements.target?.value) { if (elements.extensionStatus) elements.extensionStatus.textContent = 'Nenhuma aba HTTP/HTTPS disponível.'; return; }
@@ -42,11 +47,16 @@
       emit('DEVTRAIL_START', { targetTabId: Number(elements.target.value), targetUrl: option?.dataset?.url || '', viewport: { largura: windowObj.innerWidth, altura: windowObj.innerHeight } });
     }
     function pauseResume() { emit(state.status === 'paused' ? 'DEVTRAIL_RESUME' : 'DEVTRAIL_PAUSE'); }
+    function pickArea() {
+      if (!elements.target?.value) { if (elements.extensionStatus) elements.extensionStatus.textContent = 'Atualize as abas e selecione uma aba alvo primeiro.'; return; }
+      emit('DEVTRAIL_PICK_AREA', { targetTabId: Number(elements.target.value) });
+    }
+    function clearArea() { emit('DEVTRAIL_CLEAR_AREA'); state.area = null; render(); }
     function stop() { emit('DEVTRAIL_STOP'); }
     function refreshTabs() { emit('DEVTRAIL_LIST_TABS'); }
     function bind() {
       windowObj.addEventListener('message', handleMessage);
-      elements.start?.addEventListener('click', start); elements.pause?.addEventListener('click', pauseResume); elements.stop?.addEventListener('click', stop); elements.refresh?.addEventListener('click', refreshTabs);
+      elements.start?.addEventListener('click', start); elements.pause?.addEventListener('click', pauseResume); elements.stop?.addEventListener('click', stop); elements.refresh?.addEventListener('click', refreshTabs); elements.area?.addEventListener('click', pickArea); elements.areaClear?.addEventListener('click', clearArea);
       elements.exportJson?.addEventListener('click', () => state.json && download('devtrail-session.json', JSON.stringify(state.json, null, 2), 'application/json;charset=utf-8'));
       elements.exportMd?.addEventListener('click', () => state.markdown && download('devtrail-session.md', state.markdown, 'text/markdown;charset=utf-8'));
       elements.tabMarkdown?.addEventListener('click', () => {

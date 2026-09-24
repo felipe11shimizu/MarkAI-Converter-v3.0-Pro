@@ -10,6 +10,7 @@
 
   let session = null;
   let timer = null;
+  const pendingAreas = new Map();
 
   const now = () => Date.now();
   const clip = (value, limit) => {
@@ -35,6 +36,20 @@
     if (session?.portalTabId == null) return;
     chrome.tabs.sendMessage(session.portalTabId, { type, payload }).catch(() => {});
   }
+  async function ensureContentScript(tabId) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!/^https?:/i.test(tab.url || '')) return false;
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  async function injectIntoOpenWebTabs() {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.filter(t => /^https?:/i.test(t.url || '')).map(t => ensureContentScript(t.id)));
+  }
+
   async function attach(tabId) {
     await chrome.debugger.attach({ tabId }, '1.3');
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
@@ -44,6 +59,25 @@
   async function detach(tabId) {
     try { await chrome.debugger.detach({ tabId }); } catch (_) {}
   }
+  async function captureVisualEvidence() {
+    if (!session || session.paused || !session.area || session.visualCaptures.length >= 30) return;
+    const nowMs = now();
+    if (nowMs - session.lastVisualCaptureAt < 700) return;
+    session.lastVisualCaptureAt = nowMs;
+    const area = session.area;
+    const clipRect = {
+      x: Math.max(0, Number(area.x) || 0),
+      y: Math.max(0, Number(area.y) || 0),
+      width: Math.max(20, Number(area.width) || 20),
+      height: Math.max(20, Number(area.height) || 20),
+      scale: 1
+    };
+    try {
+      const result = await chrome.debugger.sendCommand({ tabId: session.targetTabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: 55, clip: clipRect, captureBeyondViewport: false });
+      if (result?.data) session.visualCaptures.push({ timestamp_epoch_ms: nowMs, formato: 'image/jpeg', qualidade: 55, imagem_base64: result.data });
+    } catch (_) {}
+  }
+
   function pushNetwork(event) {
     if (!session || session.paused || isNoise(event.url)) return;
     session.network.push({
@@ -106,9 +140,16 @@
         url_alvo: finished.targetUrl,
         resolucao_tela: finished.viewport,
         motivo_finalizacao: reason,
-        versao_schema: '1.0'
+        versao_schema: '1.1'
       },
       steps,
+      area_captura: finished.area || null,
+      capturas_visuais: finished.visualCaptures.map(c => ({
+        timestamp_relativo_ms: Math.max(0, c.timestamp_epoch_ms - finished.startedAt),
+        formato: c.formato,
+        qualidade: c.qualidade,
+        imagem_base64: c.imagem_base64
+      })),
       diagnostics: finished.diagnostics.map(d => ({
         tipo_evento: d.tipo_evento,
         timestamp_relativo_ms: Math.max(0, d.timestamp_epoch_ms - finished.startedAt),
@@ -119,7 +160,12 @@
 
     await chrome.storage.local.set({ devtrail_last_session: result });
     await detach(finished.targetTabId);
-    sendToPortal('DEVTRAIL_SESSION_FINALIZED', { json: result });
+    if (finished.portalTabId != null) {
+      chrome.tabs.sendMessage(finished.portalTabId, {
+        type: 'DEVTRAIL_SESSION_FINALIZED',
+        payload: { json: result }
+      }).catch(() => {});
+    }
     chrome.tabs.sendMessage(finished.targetTabId, { type: 'DEVTRAIL_STOPPED', payload: { reason } }).catch(() => {});
   }
 
@@ -136,6 +182,9 @@
       targetTabId,
       targetUrl: payload.targetUrl || '',
       viewport: payload.viewport || { largura: null, altura: null },
+      area: pendingAreas.get(targetTabId) || null,
+      visualCaptures: [],
+      lastVisualCaptureAt: 0,
       domEvents: [],
       network: [],
       diagnostics: [],
@@ -151,6 +200,7 @@
       if (!session) return;
       chrome.tabs.sendMessage(targetTabId, { type: 'DEVTRAIL_CAPTURE_STARTED', payload: { session_id: session.sessionId } }).catch(() => {});
       sendToPortal('DEVTRAIL_CAPTURE_STARTED', {
+        area: session.area,
         session_id: session.sessionId,
         targetTabId,
         targetUrl: session.targetUrl,
@@ -177,6 +227,9 @@
     sendToPortal('DEVTRAIL_RESUMED');
   }
 
+  chrome.runtime.onInstalled.addListener(() => { injectIntoOpenWebTabs().catch(() => {}); });
+  chrome.runtime.onStartup.addListener(() => { injectIntoOpenWebTabs().catch(() => {}); });
+
   chrome.runtime.onMessage.addListener((message, sender) => {
     const type = message?.type;
     const payload = message?.payload || {};
@@ -185,14 +238,31 @@
       return;
     }
     if (type === 'DEVTRAIL_LIST_TABS') {
-      chrome.tabs.query({}).then(tabs => {
-        const safeTabs = tabs.filter(t => /^https?:/i.test(t.url || '')).map(t => ({
+      chrome.tabs.query({}).then(async tabs => {
+        const webTabs = tabs.filter(t => /^https?:/i.test(t.url || ''));
+        await Promise.all(webTabs.map(t => ensureContentScript(t.id)));
+        const safeTabs = webTabs.map(t => ({
           id: t.id,
           title: clip(t.title || t.url || 'Aba', 120),
           url: clip(t.url || '', 500)
         }));
         chrome.tabs.sendMessage(sender.tab.id, { type: 'DEVTRAIL_TABS', payload: { tabs: safeTabs } }).catch(() => {});
       });
+      return;
+    }
+    if (type === 'DEVTRAIL_AREA_SELECTED') {
+      const area = payload.area || null;
+      if (area && Number(area.width) > 0 && Number(area.height) > 0) {
+        pendingAreas.set(sender.tab.id, area);
+        if (session && session.targetTabId === sender.tab.id) session.area = area;
+        sendToPortal('DEVTRAIL_AREA_SELECTED', { area });
+      }
+      return;
+    }
+    if (type === 'DEVTRAIL_CLEAR_AREA') {
+      pendingAreas.delete(sender.tab.id);
+      if (session && session.targetTabId === sender.tab.id) session.area = null;
+      sendToPortal('DEVTRAIL_AREA_CLEARED');
       return;
     }
     if (type === 'DEVTRAIL_START') { start(payload, sender.tab.id); return; }
@@ -202,6 +272,7 @@
     if (type === 'DEVTRAIL_DOM_EVENT' && session && sender.tab?.id === session.targetTabId) {
       if (session.paused) return;
       session.domEvents.push(payload.event);
+      captureVisualEvidence();
       if (session.domEvents.length > 1000) session.domEvents.shift();
     }
   });
@@ -278,6 +349,7 @@
     else if (session && tabId === session.portalTabId) session.portalTabId = null;
   });
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (tab.status === 'complete' && /^https?:/i.test(tab.url || '')) ensureContentScript(tabId).catch(() => {});
     if (!session || tabId !== session.targetTabId || !changeInfo.url) return;
     session.targetUrl = tab.url || changeInfo.url || session.targetUrl;
     chrome.tabs.sendMessage(tabId, { type: 'DEVTRAIL_CAPTURE_STARTED', payload: { session_id: session.sessionId } }).catch(() => {});
