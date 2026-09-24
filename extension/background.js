@@ -196,6 +196,9 @@
     sendToPortal('DEVTRAIL_RESUMED');
   }
 
+  chrome.runtime.onInstalled.addListener(() => { injectIntoOpenWebTabs().catch(() => {}); });
+  chrome.runtime.onStartup.addListener(() => { injectIntoOpenWebTabs().catch(() => {}); });
+
   chrome.runtime.onMessage.addListener((message, sender) => {
     const type = message?.type;
     const payload = message?.payload || {};
@@ -204,14 +207,31 @@
       return;
     }
     if (type === 'DEVTRAIL_LIST_TABS') {
-      chrome.tabs.query({}).then(tabs => {
-        const safeTabs = tabs.filter(t => /^https?:/i.test(t.url || '')).map(t => ({
+      chrome.tabs.query({}).then(async tabs => {
+        const webTabs = tabs.filter(t => /^https?:/i.test(t.url || ''));
+        await Promise.all(webTabs.map(t => ensureContentScript(t.id)));
+        const safeTabs = webTabs.map(t => ({
           id: t.id,
           title: clip(t.title || t.url || 'Aba', 120),
           url: clip(t.url || '', 500)
         }));
         chrome.tabs.sendMessage(sender.tab.id, { type: 'DEVTRAIL_TABS', payload: { tabs: safeTabs } }).catch(() => {});
       });
+      return;
+    }
+    if (type === 'DEVTRAIL_AREA_SELECTED') {
+      const area = payload.area || null;
+      if (area && Number(area.width) > 0 && Number(area.height) > 0) {
+        pendingAreas.set(sender.tab.id, area);
+        if (session && session.targetTabId === sender.tab.id) session.area = area;
+        sendToPortal('DEVTRAIL_AREA_SELECTED', { area });
+      }
+      return;
+    }
+    if (type === 'DEVTRAIL_CLEAR_AREA') {
+      pendingAreas.delete(sender.tab.id);
+      if (session && session.targetTabId === sender.tab.id) session.area = null;
+      sendToPortal('DEVTRAIL_AREA_CLEARED');
       return;
     }
     if (type === 'DEVTRAIL_START') { start(payload, sender.tab.id); return; }
@@ -297,6 +317,7 @@
     else if (session && tabId === session.portalTabId) session.portalTabId = null;
   });
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (tab.status === 'complete' && /^https?:/i.test(tab.url || '')) ensureContentScript(tabId).catch(() => {});
     if (!session || tabId !== session.targetTabId || !changeInfo.url) return;
     session.targetUrl = tab.url || changeInfo.url || session.targetUrl;
     chrome.tabs.sendMessage(tabId, { type: 'DEVTRAIL_CAPTURE_STARTED', payload: { session_id: session.sessionId } }).catch(() => {});
