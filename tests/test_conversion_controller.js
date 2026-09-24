@@ -3,7 +3,11 @@ const assert = require('assert');
 const Controller = require('../frontend/modules/conversion_controller.js');
 
 (async () => {
-  const items = [{ id: '1', name: 'a.txt', ext: 'txt', file: {} }, { id: '2', name: 'b.txt', ext: 'txt', file: {} }];
+  const items = [
+    { id: '1', name: 'a.txt', ext: 'txt', file: {} },
+    { id: '2', name: 'b.txt', ext: 'txt', file: {} },
+    { id: '3', name: 'apresentacao.pptx', ext: 'pptx', file: {} }
+  ];
   const calls = [];
   const queue = {
     getById: id => items.find(x => x.id === id),
@@ -33,6 +37,11 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   assert.ok(calls.some(x => x[0] === 'load'));
   await controller.convertAll();
   assert.strictEqual(items[1].status, 'done');
+
+  const compareResult = await controller.compareItem('3');
+  assert.deepStrictEqual(compareResult, { markitdown: '# remote', browser: '# local', diff: 3 });
+  assert.ok(calls.some(x => x[0] === 'compare'));
+
   const mergeResult = await controller.mergeAll({ markFiles: false });
   assert.deepStrictEqual(mergeResult, { markdown: '# merged', fileName: 'documento_combinado.md' });
   assert.ok(calls.some(x => x[0] === 'load' && x[1] === '# merged'));
