@@ -47,6 +47,40 @@ function makeStore() {
   };
 }
 
+async function testInitPreservesFilesAddedDuringIndexedDBLoad() {
+  const store = makeStore();
+  let releaseLoad;
+  const loading = new Promise(resolve => { releaseLoad = resolve; });
+  store.loadQueue = async () => {
+    await loading;
+    return [];
+  };
+
+  const state = { currentProjectId: null, queue: [] };
+  const controller = WorkspaceController.create({
+    workspaceStore: store,
+    getState: () => ({ ...state }),
+    setState: patch => Object.assign(state, patch),
+    ui: {
+      setWorkspaceStatus: () => {},
+      renderQueue: () => {},
+      refreshProjects: () => {},
+      renderHistory: () => {}
+    }
+  });
+
+  const initPromise = controller.init();
+  state.queue = [
+    { id: 'mobile-1', name: 'primeiro.pdf', status: 'pending' },
+    { id: 'mobile-2', name: 'segundo.docx', status: 'pending' }
+  ];
+  releaseLoad();
+  await initPromise;
+
+  assert.equal(state.queue.length, 2);
+  assert.deepEqual(state.queue.map(item => item.name), ['primeiro.pdf', 'segundo.docx']);
+}
+
 async function testInitPropagatesStoreError() {
   const expectedError = new Error('IndexedDB unavailable');
   const failingController = WorkspaceController.create({
@@ -121,5 +155,6 @@ const controller = WorkspaceController.create({
   controller.scheduleSave();
   assert.ok(events.some(e => e[0] === 'timer'));
   await testInitPropagatesStoreError();
+  await testInitPreservesFilesAddedDuringIndexedDBLoad();
   console.log('workspace_controller module tests: ok');
 })();
