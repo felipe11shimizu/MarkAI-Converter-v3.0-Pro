@@ -28,6 +28,7 @@ const engine = create({
 (async () => {
   const progress = [];
   const output = await engine.merge((value, name) => progress.push([value, name]));
+  assert.match(output, /Gerado por MarkAI Converter v3\.6 Pro/);
   assert.match(output, /MARKAI:FILE_START/);
   assert.match(output, /## Arquivo 1 de 2 — a\.txt/);
   assert.match(output, /# A/);
