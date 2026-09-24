@@ -255,6 +255,11 @@ const UIManager = (() => {
 
   // ── INIT EVENT LISTENERS ──
   function init() {
+    // File ingestion is the critical first UI contract. Bind it before
+    // optional presentation/dependency initialization so a failure in a
+    // third-party library cannot disable native file selection.
+    QueueUIController.bind();
+
     AppState.loadSettings();
     SettingsController.sync();
     _setupMarkdown();
@@ -265,7 +270,6 @@ const UIManager = (() => {
 
     WorkspaceUIController.bind();
 
-    QueueUIController.bind();
 
     // URL ingestion is delegated to UrlUIController.
 
@@ -284,7 +288,7 @@ const UIManager = (() => {
         await navigator.clipboard.writeText(AppState.get('currentMd'));
         const origHTML = els.btnCopy.innerHTML;
         els.btnCopy.innerHTML = '<i data-lucide="check"></i><span>Copiado!</span>';
-        lucide.createIcons();
+        globalThis.lucide?.createIcons?.();
         setTimeout(() => { els.btnCopy.innerHTML = origHTML; lucide.createIcons(); }, 2000);
         toast('Markdown copiado!', 'success');
       } catch(e) {
