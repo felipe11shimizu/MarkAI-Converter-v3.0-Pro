@@ -12,9 +12,21 @@
     } catch (_) { return safe(url); }
   }
   function unique(values) { return [...new Set(values.filter(Boolean))]; }
+  function cssAttributeValue(value) {
+    return safe(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  }
+  function cssId(value) {
+    return safe(value).replace(/([\\.#:[\],>+~*'"()= ])/g, '\\$1');
+  }
   function selectorFor(element) {
     const s = element?.seletores || {};
-    return s.testid || s.cy || s.id || s.name || s.css || s.xpath || '';
+    if (s.id) return '#' + cssId(s.id);
+    if (s.testid) return '[data-testid="' + cssAttributeValue(s.testid) + '"]';
+    if (s.cy) return '[data-cy="' + cssAttributeValue(s.cy) + '"]';
+    if (s.name) return '[name="' + cssAttributeValue(s.name) + '"]';
+    if (s.css) return s.css;
+    if (s.xpath) return s.xpath;
+    return '';
   }
   function maskValue(value) {
     const text = safe(value);
