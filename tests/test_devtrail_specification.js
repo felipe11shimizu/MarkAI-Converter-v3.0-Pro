@@ -39,7 +39,10 @@ const spec = generate(session);
 assert.equal(spec.schema_version, '1.0');
 assert.equal(spec.functional_requirements.length, 2);
 assert.equal(spec.functional_requirements[0].selector, '#placa');
-assert.equal(spec.functional_requirements[1].selector, 'btn-consultar');
+assert.equal(
+  spec.functional_requirements[1].selector,
+  '[data-testid="btn-consultar"]'
+);
 assert.equal(spec.api_contracts[0].endpoint, 'GET /api/veiculos/consulta');
 assert.equal(spec.source.network_calls, 1);
 assert.ok(spec.automation_sequence.length === 2);
