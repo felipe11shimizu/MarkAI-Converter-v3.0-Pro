@@ -42,3 +42,7 @@ assert.match(md, /"id": 10/);
 assert.match(md, /0m 12s 500ms/);
 
 console.log('devtrail formatter tests: ok');
+
+assert.match(md, /# Relato Técnico da Atividade/);
+assert.match(md, /## 6\. Especificação para desenvolvimento\/RPA/);
+assert.match(md, /RF01|RF02/);
