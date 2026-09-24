@@ -12,7 +12,7 @@
   const passwordType = /password/i;
 
   function post(type, payload = {}) {
-    window.postMessage({ source: EVENT_SOURCE, type, ...payload }, '*');
+    window.postMessage({ source: EVENT_SOURCE, type, payload }, '*');
   }
   function redactValue(value, name = '') {
     if (sensitiveName.test(String(name || ''))) return '[REDACTED]';
