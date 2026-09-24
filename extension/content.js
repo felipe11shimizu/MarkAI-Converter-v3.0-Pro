@@ -1,5 +1,7 @@
 (function () {
   'use strict';
+  if (globalThis.__MARKAI_DEVTRAIL_LOADED__) return;
+  globalThis.__MARKAI_DEVTRAIL_LOADED__ = true;
 
   const EVENT_SOURCE = 'markai-devtrail';
   const CONTROL_TYPES = new Set([
