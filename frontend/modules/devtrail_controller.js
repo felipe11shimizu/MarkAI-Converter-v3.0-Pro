@@ -31,7 +31,26 @@
       if (type === 'DEVTRAIL_READY') { if (elements.extensionStatus) elements.extensionStatus.textContent = payload.extension ? 'Extensão conectada' : 'Aguardando extensão'; }
       else if (type === 'DEVTRAIL_TABS') {
         const tabs = Array.isArray(payload.tabs) ? payload.tabs : [];
-        if (elements.target) { elements.target.replaceChildren(); tabs.forEach(tab => { const option = documentObj.createElement('option'); option.value = String(tab.id); option.dataset.url = tab.url || ''; option.textContent = (tab.title || 'Aba') + ' — ' + (tab.url || ''); elements.target.appendChild(option); }); }
+        if (elements.target) {
+          elements.target.replaceChildren();
+          tabs.forEach(tab => {
+            const option = documentObj.createElement('option');
+            option.value = String(tab.id);
+            option.dataset.url = tab.url || '';
+            option.textContent = (tab.title || 'Aba') + ' — ' + (tab.url || '');
+            elements.target.appendChild(option);
+          });
+          if (tabs.length && !elements.target.value) elements.target.value = String(tabs[0].id);
+        }
+        if (elements.extensionStatus) {
+          elements.extensionStatus.textContent = tabs.length
+            ? 'Extensão conectada · ' + tabs.length + ' aba(s) HTTP/HTTPS encontrada(s).'
+            : 'Extensão conectada · nenhuma aba HTTP/HTTPS encontrada.';
+        }
+        render();
+      }
+      else if (type === 'DEVTRAIL_STATUS') {
+        if (elements.extensionStatus) elements.extensionStatus.textContent = payload.message || 'Extensão conectada.';
       } else if (type === 'DEVTRAIL_CAPTURE_STARTED') { state.status = 'recording'; state.startedAt = payload.startedAt || clock(); state.json = null; state.markdown = ''; if (!ticker) ticker = setIntervalImpl(render, 250); render();
       } else if (type === 'DEVTRAIL_PAUSED') { state.status = 'paused'; render();
       } else if (type === 'DEVTRAIL_RESUMED') { state.status = 'recording'; render();
@@ -51,7 +70,12 @@
       if (!elements.target?.value) { if (elements.extensionStatus) elements.extensionStatus.textContent = 'Atualize as abas e selecione uma aba alvo primeiro.'; return; }
       emit('DEVTRAIL_PICK_AREA', { targetTabId: Number(elements.target.value) });
     }
-    function clearArea() { emit('DEVTRAIL_CLEAR_AREA'); state.area = null; render(); }
+    function clearArea() {
+      const targetTabId = Number(elements.target?.value);
+      emit('DEVTRAIL_CLEAR_AREA', Number.isInteger(targetTabId) ? { targetTabId } : {});
+      state.area = null;
+      render();
+    }
     function stop() { emit('DEVTRAIL_STOP'); }
     function refreshTabs() { emit('DEVTRAIL_LIST_TABS'); }
     function bind() {
