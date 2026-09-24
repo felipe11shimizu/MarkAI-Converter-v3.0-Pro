@@ -456,22 +456,22 @@ const UIManager = (() => {
     setYoutubeControlsVisible: visible => { if (els.youtubeControls) els.youtubeControls.hidden = !visible; },
     setYoutubeStatusText: text => { if (els.youtubeStatus) els.youtubeStatus.textContent = String(text ?? ''); },
     setSettingsForm: settings => {
-      els.aiProvider.value = settings.aiProvider;
-      els.aiModel.value = settings.aiModel;
-      els.aiApiKey.value = settings.apiKey;
-      els.toggleMarkItDown.checked = settings.markitdownEnabled !== false;
-      els.markitdownEndpoint.value = settings.markitdownEndpoint;
-      els.toggleSyntaxHL.checked = settings.syntaxHL !== false;
-      els.toggleAutoPreview.checked = settings.autoPreview !== false;
+      if (els.aiProvider) els.aiProvider.value = settings.aiProvider;
+      if (els.aiModel) els.aiModel.value = settings.aiModel;
+      if (els.aiApiKey) els.aiApiKey.value = settings.apiKey;
+      if (els.toggleMarkItDown) els.toggleMarkItDown.checked = settings.markitdownEnabled !== false;
+      if (els.markitdownEndpoint) els.markitdownEndpoint.value = settings.markitdownEndpoint;
+      if (els.toggleSyntaxHL) els.toggleSyntaxHL.checked = settings.syntaxHL !== false;
+      if (els.toggleAutoPreview) els.toggleAutoPreview.checked = settings.autoPreview !== false;
     },
     readSettingsForm: () => ({
-      aiProvider: els.aiProvider.value,
-      aiModel: els.aiModel.value,
-      apiKey: els.aiApiKey.value,
-      markitdownEnabled: els.toggleMarkItDown.checked,
-      markitdownEndpoint: els.markitdownEndpoint.value.trim() || (globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000'),
-      syntaxHL: els.toggleSyntaxHL.checked,
-      autoPreview: els.toggleAutoPreview.checked
+      aiProvider: els.aiProvider?.value ?? 'gemini',
+      aiModel: els.aiModel?.value ?? 'gemini-1.5-flash',
+      apiKey: els.aiApiKey?.value ?? '',
+      markitdownEnabled: els.toggleMarkItDown ? els.toggleMarkItDown.checked : true,
+      markitdownEndpoint: els.markitdownEndpoint?.value.trim() || (globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000'),
+      syntaxHL: els.toggleSyntaxHL ? els.toggleSyntaxHL.checked : true,
+      autoPreview: els.toggleAutoPreview ? els.toggleAutoPreview.checked : true
     }),
     filterAIModels: provider => {
       const geminiOpts = els.aiModel.querySelectorAll('option[value^="gemini"]');
