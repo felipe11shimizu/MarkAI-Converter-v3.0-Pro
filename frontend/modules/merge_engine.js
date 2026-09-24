@@ -24,7 +24,7 @@
       if (!items.length) throw new Error('Fila vazia.');
       const markFiles = options.markFiles !== false;
       let combined = '# Documento Combinado\n\n';
-      combined += '*Gerado por MarkAI Converter v3.0 Pro*\n';
+      combined += '*Gerado por MarkAI Converter v3.6 Pro*\n';
       combined += '*'+new Date().toLocaleString('pt-BR')+'*\n\n';
       combined += '**Arquivos:** '+items.length+'\n\n---\n\n';
 
