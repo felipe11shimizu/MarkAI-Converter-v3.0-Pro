@@ -44,6 +44,7 @@ assert.match(index, /btnDevTrailArea/);
 assert.match(index, /devtrailAreaStatus/);
 assert.match(style, /devtrail-area-row/);
 const analyzer = fs.readFileSync(path.join(root, 'frontend', 'modules', 'devtrail_analyzer.js'), 'utf8');
+const specification = fs.readFileSync(path.join(root, 'frontend', 'modules', 'devtrail_specification.js'), 'utf8');
 const controller = fs.readFileSync(path.join(root, 'frontend', 'modules', 'devtrail_controller.js'), 'utf8');
 assert.match(controller, /DEVTRAIL_STATUS/);
 assert.match(controller, /targetTabId/);
@@ -51,3 +52,6 @@ assert.match(controller, /targetTabId/);
 console.log('devtrail contract tests: ok');
 
 assert.match(analyzer, /MarkAIDevTrailAnalyzer/);
+assert.match(specification, /MarkAIDevTrailSpecification/);
+assert.match(specification, /functional_requirements/);
+assert.match(index, /devtrail_specification\.js/);
