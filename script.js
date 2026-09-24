@@ -717,6 +717,7 @@ document.addEventListener('DOMContentLoaded', () => {
       areaStatus: document.getElementById('devtrailAreaStatus'),
       exportJson: document.getElementById('btnDevTrailExportJson'),
       exportMd: document.getElementById('btnDevTrailExportMd'),
+      exportReplay: document.getElementById('btnDevTrailExportReplay'),
     exportPackage: document.getElementById('btnDevTrailExportPackage'),
       markdown: document.getElementById('devtrailMarkdown'),
       json: document.getElementById('devtrailJson'),
