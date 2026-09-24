@@ -65,7 +65,7 @@
       if (!last) ui.toast('Todos os arquivos já convertidos.', 'info');
     }
 
-    async function mergeAll() {
+    async function mergeAll(options = {}) {
       const items = queueManager.getOrdered();
       if (!items.length) {
         ui.toast('Nenhum arquivo na fila.', 'warning');
@@ -76,7 +76,7 @@
       try {
         const markdown = await mergeEngine.merge((p, name) => {
           ui.setProcessingSub('Convertendo: ' + name);
-        });
+        }, options);
         const fileName = 'documento_combinado.md';
         if (workspace) workspace.scheduleSave();
         ui.hideProcessing();
