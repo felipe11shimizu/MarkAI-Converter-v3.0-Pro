@@ -255,7 +255,7 @@ const UIManager = (() => {
     if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons();
     if (queue.length && globalThis.Sortable) {
       QueueManager.initSortable(els.queueList, () => {
-        workspaceController?.scheduleSave?.();
+        WorkspaceController?.scheduleSave?.();
         renderQueue();
         setStatus('Ordem da fila atualizada', 'idle');
       });
