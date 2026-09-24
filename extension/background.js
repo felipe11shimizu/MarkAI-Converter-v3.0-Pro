@@ -59,6 +59,25 @@
   async function detach(tabId) {
     try { await chrome.debugger.detach({ tabId }); } catch (_) {}
   }
+  async function captureVisualEvidence() {
+    if (!session || session.paused || !session.area || session.visualCaptures.length >= 30) return;
+    const nowMs = now();
+    if (nowMs - session.lastVisualCaptureAt < 700) return;
+    session.lastVisualCaptureAt = nowMs;
+    const area = session.area;
+    const clipRect = {
+      x: Math.max(0, Number(area.x) || 0),
+      y: Math.max(0, Number(area.y) || 0),
+      width: Math.max(20, Number(area.width) || 20),
+      height: Math.max(20, Number(area.height) || 20),
+      scale: 1
+    };
+    try {
+      const result = await chrome.debugger.sendCommand({ tabId: session.targetTabId }, 'Page.captureScreenshot', { format: 'jpeg', quality: 55, clip: clipRect, captureBeyondViewport: false });
+      if (result?.data) session.visualCaptures.push({ timestamp_epoch_ms: nowMs, formato: 'image/jpeg', qualidade: 55, imagem_base64: result.data });
+    } catch (_) {}
+  }
+
   function pushNetwork(event) {
     if (!session || session.paused || isNoise(event.url)) return;
     session.network.push({
@@ -121,9 +140,16 @@
         url_alvo: finished.targetUrl,
         resolucao_tela: finished.viewport,
         motivo_finalizacao: reason,
-        versao_schema: '1.0'
+        versao_schema: '1.1'
       },
       steps,
+      area_captura: finished.area || null,
+      capturas_visuais: finished.visualCaptures.map(c => ({
+        timestamp_relativo_ms: Math.max(0, c.timestamp_epoch_ms - finished.startedAt),
+        formato: c.formato,
+        qualidade: c.qualidade,
+        imagem_base64: c.imagem_base64
+      })),
       diagnostics: finished.diagnostics.map(d => ({
         tipo_evento: d.tipo_evento,
         timestamp_relativo_ms: Math.max(0, d.timestamp_epoch_ms - finished.startedAt),
@@ -241,6 +267,7 @@
     if (type === 'DEVTRAIL_DOM_EVENT' && session && sender.tab?.id === session.targetTabId) {
       if (session.paused) return;
       session.domEvents.push(payload.event);
+      captureVisualEvidence();
       if (session.domEvents.length > 1000) session.domEvents.shift();
     }
   });
