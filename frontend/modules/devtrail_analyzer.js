@@ -8,6 +8,17 @@
   function path(url) { try { return new URL(url).pathname || '/'; } catch (_) { return safe(url); } }
   function unique(values) { return [...new Set(values.filter(Boolean))]; }
 
+  function eventTime(step) { return Number(step?.timestamp_relativo_ms) || 0; }
+  function networkForStep(step) { return Array.isArray(step?.chamadas_rede) ? step.chamadas_rede : []; }
+  function outcomeFor(step) {
+    const calls = networkForStep(step);
+    const statuses = calls.map(call => Number(call.status)).filter(Number.isFinite);
+    if (statuses.some(status => status >= 500)) return 'erro_servidor';
+    if (statuses.some(status => status >= 400)) return 'erro_cliente';
+    if (statuses.some(status => status >= 200 && status < 400)) return 'sucesso_rede';
+    return calls.length ? 'rede_sem_status' : 'sem_rede_associada';
+  }
+
   function analyze(data) {
     const session = typeof data === 'string' ? JSON.parse(data) : (data || {});
     const steps = Array.isArray(session.steps) ? session.steps : [];
@@ -33,6 +44,32 @@
     if (steps.some(s => s.tipo_evento === 'click') && !calls.length) confirm.push({ id: 'CONF01', type: 'confirm', statement: 'Confirmar se os cliques acionam chamadas de backend não capturadas ou lógica local.' });
     if (diagnostics.length) confirm.push({ id: 'CONF02', type: 'confirm', statement: 'Validar os diagnósticos registrados e seu impacto no fluxo antes de automatizar.' });
     if (!steps.length) confirm.push({ id: 'CONF03', type: 'confirm', statement: 'Executar nova sessão com interação efetiva para produzir evidência suficiente.' });
+    const executionFlow = steps.map((step, index) => {
+      const next = steps[index + 1];
+      const calls = networkForStep(step);
+      const s = step.elemento?.seletores || {};
+      const selector = s.id ? '#' + s.id : s.testid ? '[data-testid="' + s.testid + '"]' : s.cy ? '[data-cy="' + s.cy + '"]' : s.name ? '[name="' + s.name + '"]' : s.css || s.xpath || 'seletor não identificado';
+      return {
+        order: index + 1,
+        step_id: step.step_id ?? index + 1,
+        timestamp_relativo_ms: eventTime(step),
+        event: safe(step.tipo_evento),
+        label: safe(step.elemento?.texto_visivel || step.elemento?.tag || 'elemento'),
+        selector,
+        input: safe(step.valor_entrada),
+        network_calls: calls.map(call => ({ method: safe(call.metodo || 'GET').toUpperCase(), endpoint: path(call.url), status: call.status ?? null, response_time_ms: call.tempo_resposta_ms ?? null })),
+        outcome: outcomeFor(step),
+        wait_until_next_step_ms: next ? Math.max(0, eventTime(next) - eventTime(step)) : null
+      };
+    });
+    const replay = executionFlow.map(item => ({
+      order: item.order,
+      action: item.event,
+      target: item.selector,
+      expected: item.network_calls.length ? item.network_calls.map(call => call.method + ' ' + call.endpoint + ' [' + (call.status ?? '?') + ']').join('; ') : 'validar alteração visual/estado da tela',
+      wait_after_ms: item.wait_until_next_step_ms
+    }));
+
     const requirements = steps.map((step, i) => {
       const e = step.elemento || {}, s = e.seletores || {};
       const selector = s.testid || s.cy || s.id || s.name || s.css || s.xpath || 'seletor não identificado';
@@ -44,7 +81,9 @@
       metrics: { steps: steps.length, network_calls: calls.length, diagnostics: diagnostics.length, endpoints: endpoints.length, selectors: selectors.length },
       endpoints,
       selectors,
-      requirements
+      requirements,
+      execution_flow: executionFlow,
+      replay_playbook: replay
     };
   }
 
@@ -66,6 +105,14 @@
     lines.push('', '### Especificação de automação', '', '| ID | Ação | Elemento | Seletor |', '|---|---|---|---|');
     (a.requirements || []).forEach(r => lines.push('| ' + r.id + ' | ' + r.action + ' | ' + r.label.replace(/\|/g, '\\|') + ' | ' + r.selector.replace(/\|/g, '\\|') + ' |'));
     if (!(a.requirements || []).length) lines.push('| — | — | Nenhuma etapa capturada | — |');
+    lines.push('', '### Fluxo temporal e dependências', '',
+      '| Ordem | Evento | Seletor | Rede | Resultado | Espera |',
+      '|---|---|---|---|---|---|');
+    (a.execution_flow || []).forEach(item => lines.push('| ' + item.order + ' | ' + item.event + ' | ' + item.selector.replace(/\|/g, '\\|') + ' | ' + (item.network_calls.length ? item.network_calls.map(c => c.method + ' ' + c.endpoint).join('<br>') : '—') + ' | ' + item.outcome + ' | ' + (item.wait_until_next_step_ms ?? '—') + ' ms |'));
+    if (!(a.execution_flow || []).length) lines.push('| — | — | — | — | — | — |');
+    lines.push('', '### Playbook de automação', '');
+    (a.replay_playbook || []).forEach(item => lines.push(item.order + '. **' + item.action + '** -> ' + item.target + ' — esperado: ' + item.expected + (item.wait_after_ms != null ? ' — aguardar ~' + item.wait_after_ms + ' ms' : '')));
+    if (!(a.replay_playbook || []).length) lines.push('- Nenhuma etapa reproduzível foi identificada.');
     lines.push('', '### Inventário técnico', '',
       '- **Passos:** ' + (a.metrics?.steps || 0),
       '- **Chamadas de rede:** ' + (a.metrics?.network_calls || 0),

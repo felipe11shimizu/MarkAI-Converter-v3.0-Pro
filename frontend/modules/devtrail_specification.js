@@ -45,7 +45,8 @@
     const steps = Array.isArray(session.steps) ? session.steps : [];
     const calls = steps.flatMap(step => Array.isArray(step.chamadas_rede) ? step.chamadas_rede : []);
     const diagnostics = Array.isArray(session.diagnostics) ? session.diagnostics : [];
-    const a = analysis || (root.MarkAIDevTrailAnalyzer?.analyze ? root.MarkAIDevTrailAnalyzer.analyze(session) : null);
+    const analyzer = globalThis.MarkAIDevTrailAnalyzer;
+    const a = analysis || (analyzer?.analyze ? analyzer.analyze(session) : null);
     const requirements = steps.map((step, index) => {
       const element = step.elemento || {};
       return {
