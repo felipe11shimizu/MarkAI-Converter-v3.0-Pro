@@ -18,9 +18,17 @@ assert.equal(AppState.get('currentFileName'), 'documento.md');
 assert.deepEqual(AppState.get('queue'), []);
 
 const file = { name: 'teste.md', size: 10 };
-const added = QueueManager.add([file]);
-assert.equal(added.length, 1);
+const added = QueueManager.add([file, { name: 'outro.pdf', size: 20 }, { name: 'terceiro.docx', size: 30 }]);
+assert.equal(added.length, 3);
 assert.equal(QueueManager.getById(added[0].id).name, 'teste.md');
+assert.equal(QueueManager.getById(added[0].id).mergeMarker, true);
+
+QueueManager.move(added[2].id, 'up');
+assert.deepEqual(QueueManager.getOrdered().map(item => item.name), ['teste.md', 'terceiro.docx', 'outro.pdf']);
+
+QueueManager.reorder([added[1].id, added[0].id, added[2].id]);
+assert.deepEqual(QueueManager.getOrdered().map(item => item.name), ['outro.pdf', 'teste.md', 'terceiro.docx']);
+
 QueueManager.clear();
 assert.deepEqual(AppState.get('queue'), []);
 

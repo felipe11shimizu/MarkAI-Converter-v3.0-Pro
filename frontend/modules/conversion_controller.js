@@ -65,7 +65,7 @@
       if (!last) ui.toast('Todos os arquivos já convertidos.', 'info');
     }
 
-    async function mergeAll() {
+    async function mergeAll(options = {}) {
       const items = queueManager.getOrdered();
       if (!items.length) {
         ui.toast('Nenhum arquivo na fila.', 'warning');
@@ -76,7 +76,7 @@
       try {
         const markdown = await mergeEngine.merge((p, name) => {
           ui.setProcessingSub('Convertendo: ' + name);
-        });
+        }, options);
         const fileName = 'documento_combinado.md';
         if (workspace) workspace.scheduleSave();
         ui.hideProcessing();
@@ -95,7 +95,7 @@
     async function compareItem(id) {
       const item = queueManager.getById(id);
       if (!item) return null;
-      const unsupported = ['pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'];
+      const unsupported = ['doc','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'];
       if (unsupported.includes(item.ext)) {
         ui.toast('Este formato não possui parser local para comparação.', 'warning');
         return null;

@@ -28,20 +28,33 @@
     const showEmptyWorkspace = () => ui.showEmptyWorkspace?.();
 
     let saveTimer = null;
+    let saveChain = Promise.resolve();
     const setTimeoutFn = timers.setTimeout || globalThis.setTimeout;
     const clearTimeoutFn = timers.clearTimeout || globalThis.clearTimeout;
 
     async function syncQueue() {
       const projectId = getState().currentProjectId;
       if (!projectId) return;
-      try {
-        await workspaceStore.saveQueue(projectId, getState().queue || []);
-        setWorkspaceStatus('Salvo localmente · ' + new Date().toLocaleTimeString('pt-BR'));
-      } catch (error) {
-        console.warn('[MarkAI] Workspace save failed:', error);
-        setWorkspaceStatus('Erro ao salvar workspace');
-        throw error;
-      }
+
+      // Snapshot immediately, then serialize IndexedDB writes. Without this
+      // chain, multiple conversions finishing close together could overlap
+      // the "delete all + rewrite queue" persistence cycle and lose ordering.
+      const queueSnapshot = (getState().queue || []).slice();
+      saveChain = saveChain.catch(() => {}).then(async () => {
+        try {
+          await workspaceStore.saveQueue(projectId, queueSnapshot);
+          if (getState().currentProjectId === projectId) {
+            setWorkspaceStatus('Salvo localmente · ' + new Date().toLocaleTimeString('pt-BR'));
+          }
+        } catch (error) {
+          console.warn('[MarkAI] Workspace save failed:', error);
+          if (getState().currentProjectId === projectId) {
+            setWorkspaceStatus('Erro ao salvar workspace');
+          }
+          throw error;
+        }
+      });
+      return saveChain;
     }
 
     function scheduleSave(delay = 600) {

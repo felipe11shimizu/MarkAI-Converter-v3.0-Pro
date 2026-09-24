@@ -48,6 +48,7 @@ const requiredElements = [
   'fileInput',
   'dropZone',
   'queueList',
+  'mergeMarkFiles',
   'urlInput',
   'btnFetchUrl',
   'btnYoutubeTranscribe',

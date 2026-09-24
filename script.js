@@ -219,26 +219,33 @@ const UIManager = (() => {
     const items = ordered.length ? ordered : queue;
     els.queueList.innerHTML = '';
 
-    items.forEach(item => {
+    items.forEach((item, index) => {
       const li = document.createElement('li');
       li.className = 'queue-item ' + (item.status || 'pending');
       li.dataset.id = item.id;
       const label = EXT_LABELS[item.ext] || String(item.ext || '').toUpperCase();
       const name = _escapeHtml(item.name || 'arquivo');
+      const markerEnabled = item.mergeMarker !== false;
+      const first = index === 0;
+      const last = index === items.length - 1;
       li.innerHTML = [
-        '<i data-lucide="grip-vertical" class="qi-drag"></i>',
+        '<i data-lucide="grip-vertical" class="qi-drag" title="Arraste para alterar a ordem"></i>',
+        '<div class="qi-order" title="Ordem da juntada">' + (index + 1) + '</div>',
         '<input type="checkbox" class="qi-check" data-id="' + item.id + '" title="Selecionar" />',
         '<div class="qi-icon ' + _extClass(item.ext) + '">' + _escapeHtml(label) + '</div>',
         '<div class="qi-info">',
           '<div class="qi-name" title="' + name + '">' + name + '</div>',
-          '<div class="qi-size">' + _formatSize(item.size) + '</div>',
+          '<div class="qi-size">' + _formatSize(item.size) + (markerEnabled ? ' · marcado' : '') + '</div>',
         '</div>',
         '<div class="qi-actions">',
-          '<button class="btn btn-ghost btn-icon-xs qi-btn-preview" data-id="' + item.id + '" title="Pré-visualizar"><i data-lucide="eye"></i></button>',
-          '<button class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="' + item.id + '" title="Converter"><i data-lucide="zap"></i></button>',
-          '<button class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="' + item.id + '" title="Comparar motores"><i data-lucide="columns-2"></i></button>',
-          '<button class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="' + item.id + '" title="Baixar Arquivo"><i data-lucide="download"></i></button>',
-          '<button class="btn btn-ghost btn-icon-xs qi-btn-remove" data-id="' + item.id + '" title="Remover"><i data-lucide="x"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-up" data-id="' + item.id + '" title="Mover para cima" ' + (first ? 'disabled' : '') + '><i data-lucide="chevron-up"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-down" data-id="' + item.id + '" title="Mover para baixo" ' + (last ? 'disabled' : '') + '><i data-lucide="chevron-down"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-marker' + (markerEnabled ? ' active' : '') + '" data-id="' + item.id + '" title="' + (markerEnabled ? 'Remover marcação na juntada' : 'Marcar como arquivo independente na juntada') + '" aria-pressed="' + markerEnabled + '"><i data-lucide="' + (markerEnabled ? 'bookmark-check' : 'bookmark') + '"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-preview" data-id="' + item.id + '" title="Pré-visualizar"><i data-lucide="eye"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="' + item.id + '" title="Converter"><i data-lucide="zap"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="' + item.id + '" title="Comparar motores"><i data-lucide="columns-2"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="' + item.id + '" title="Baixar Arquivo"><i data-lucide="download"></i></button>',
+          '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-remove" data-id="' + item.id + '" title="Remover"><i data-lucide="x"></i></button>',
         '</div>',
         '<i data-lucide="' + _statusIcon(item.status) + '" class="qi-status"></i>'
       ].join('');
@@ -246,7 +253,13 @@ const UIManager = (() => {
     });
 
     if (globalThis.lucide?.createIcons) globalThis.lucide.createIcons();
-    if (queue.length && globalThis.Sortable) QueueManager.initSortable(els.queueList);
+    if (queue.length && globalThis.Sortable) {
+      QueueManager.initSortable(els.queueList, () => {
+        WorkspaceController?.scheduleSave?.();
+        renderQueue();
+        setStatus('Ordem da fila atualizada', 'idle');
+      });
+    }
   }
 
   function _statusIcon(status) {
