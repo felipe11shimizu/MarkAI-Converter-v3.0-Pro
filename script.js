@@ -24,6 +24,7 @@ let UrlUIController = null;
 let AIUIController = null;
 let ComparisonUIController = null;
 let FileActionsUIController = null;
+let DevTrailController = null;
 
 // MarkItDown service is provided by frontend/modules/markitdown_engine.js.
 const MarkItDownEngine = globalThis.MarkAIConversion.MarkItDownEngine;
@@ -701,6 +702,26 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
+  DevTrailController = globalThis.MarkAIDevTrailController.create({
+    elements: {
+      target: document.getElementById('devtrailTarget'),
+      timer: document.getElementById('devtrailTimer'),
+      status: document.getElementById('devtrailExtensionStatus'),
+      extensionStatus: document.getElementById('devtrailExtensionStatus'),
+      start: document.getElementById('btnDevTrailStart'),
+      pause: document.getElementById('btnDevTrailPause'),
+      stop: document.getElementById('btnDevTrailStop'),
+      refresh: document.getElementById('btnDevTrailRefresh'),
+      exportJson: document.getElementById('btnDevTrailExportJson'),
+      exportMd: document.getElementById('btnDevTrailExportMd'),
+      markdown: document.getElementById('devtrailMarkdown'),
+      json: document.getElementById('devtrailJson'),
+      tabMarkdown: document.getElementById('devtrailTabMarkdown'),
+      tabJson: document.getElementById('devtrailTabJson')
+    },
+    formatters: globalThis.MarkAIDevTrailFormatters
+  });
+
   SettingsController = globalThis.MarkAISettingsController.create({
     getSettings: () => AppState.get('settings'),
     setSettings: settings => AppState.set('settings', settings),
@@ -747,6 +768,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   SettingsController.bind();
   VideoAutomationController.bind();
+  DevTrailController.bind();
+
+  document.getElementById('btnDevTrail')?.addEventListener('click', () => {
+    document.getElementById('devtrailPanel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
 
   FileActionsUIController = globalThis.MarkAIFileActionsUIController.create({
     getState: () => ({
