@@ -1396,3 +1396,17 @@ body::before {
 
 .video-review-package-status { display: inline-flex; align-items: center; margin-left: 0.5rem; }
 .video-review-package-status.ready { font-weight: 600; }
+
+
+/* ─── DEVTRAIL TELEMETRY RECORDER ─── */
+.devtrail-panel { overflow:hidden; }
+.devtrail-controls { display:grid; gap:.45rem; }
+.devtrail-actions { display:flex; flex-wrap:wrap; gap:.35rem; }
+.devtrail-actions .btn { flex:1 1 auto; }
+.devtrail-result-tabs { display:flex; gap:.25rem; margin-top:.7rem; border-bottom:1px solid var(--border); }
+.devtrail-output { width:100%; min-height:220px; max-height:38vh; resize:vertical; margin-top:.6rem; font:.7rem/1.5 var(--font-mono); }
+.devtrail-export-actions { display:flex; gap:.35rem; flex-wrap:wrap; margin-top:.5rem; }
+.devtrail-panel .form-hint { margin-top:.35rem; }
+@media (max-width:600px) {
+  .devtrail-actions .btn { flex-basis:45%; }
+}
