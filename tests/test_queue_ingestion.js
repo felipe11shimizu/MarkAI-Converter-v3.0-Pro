@@ -93,26 +93,20 @@ function createHarness() {
   assert.deepEqual(calls.at(-1), ['convert', 'q1']);
 }
 
-// File-picker activation must work on mobile browsers and fall back to click().
+// File-picker activation must preserve the native <label for="fileInput">
+// contract. The controller must not replace the browser's activation with
+// showPicker()/click(), because mobile browsers need to dispatch the native
+// file-input change event after selection.
 {
   const { elements } = createHarness();
-  let showPickerCalls = 0;
-  let clickCalls = 0;
-  elements.fileInput.showPicker = () => { showPickerCalls += 1; };
-  elements.fileInput.click = () => { clickCalls += 1; };
+  let preventDefaultCalls = 0;
+  let stopPropagationCalls = 0;
   elements.browseBtn.dispatch('click', {
-    preventDefault() {},
-    stopPropagation() {}
+    preventDefault() { preventDefaultCalls += 1; },
+    stopPropagation() { stopPropagationCalls += 1; }
   });
-  assert.equal(showPickerCalls, 1);
-  assert.equal(clickCalls, 0);
-
-  delete elements.fileInput.showPicker;
-  elements.browseBtn.dispatch('click', {
-    preventDefault() {},
-    stopPropagation() {}
-  });
-  assert.equal(clickCalls, 1);
+  assert.equal(preventDefaultCalls, 0);
+  assert.equal(stopPropagationCalls, 1);
 }
 
 // File-picker ingestion must use the same centralized path.
