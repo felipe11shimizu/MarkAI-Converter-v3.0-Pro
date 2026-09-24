@@ -15,6 +15,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
     convert: async () => ({ markdown: '# remote', meta: { engine: 'test' } })
   };
   const parser = { parseBrowser: async () => '# local' };
+  let mergeOptions = null;
   const quality = { metrics: x => ({ characters:x.length, lines:1, headings:1, tables:0, links:0 }), diffScore: () => 3 };
   const ui = {
     renderQueue(){}, setStatus(){}, setProgress(){}, loadMarkdown(md){ calls.push(['load',md]); },
@@ -23,7 +24,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   };
   const controller = Controller.create({
     queueManager: queue, markItDownEngine: markitdown, fileParserStrategy: parser,
-    conversionQuality: quality, mergeEngine: { merge: async () => '# merged' }, getState: () => ({}),
+    conversionQuality: quality, mergeEngine: { merge: async (_progress, options) => { mergeOptions = options; return '# merged'; } }, getState: () => ({}),
     setState: patch => calls.push(['state', patch]), ui, workspace: { scheduleSave() { calls.push(['save']); } }
   });
   const result = await controller.convertItem('1');
@@ -32,9 +33,10 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   assert.ok(calls.some(x => x[0] === 'load'));
   await controller.convertAll();
   assert.strictEqual(items[1].status, 'done');
-  const mergeResult = await controller.mergeAll();
+  const mergeResult = await controller.mergeAll({ markFiles: false });
   assert.deepStrictEqual(mergeResult, { markdown: '# merged', fileName: 'documento_combinado.md' });
   assert.ok(calls.some(x => x[0] === 'load' && x[1] === '# merged'));
   assert.ok(calls.some(x => x[0] === 'save'));
+  assert.deepStrictEqual(mergeOptions, { markFiles: false });
   console.log('conversion_controller tests passed');
 })().catch(err => { console.error(err); process.exit(1); });
