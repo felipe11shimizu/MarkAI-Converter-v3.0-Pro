@@ -160,7 +160,12 @@
 
     await chrome.storage.local.set({ devtrail_last_session: result });
     await detach(finished.targetTabId);
-    sendToPortal('DEVTRAIL_SESSION_FINALIZED', { json: result });
+    if (finished.portalTabId != null) {
+      chrome.tabs.sendMessage(finished.portalTabId, {
+        type: 'DEVTRAIL_SESSION_FINALIZED',
+        payload: { json: result }
+      }).catch(() => {});
+    }
     chrome.tabs.sendMessage(finished.targetTabId, { type: 'DEVTRAIL_STOPPED', payload: { reason } }).catch(() => {});
   }
 
