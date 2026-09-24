@@ -105,6 +105,14 @@
     lines.push('', '### Especificação de automação', '', '| ID | Ação | Elemento | Seletor |', '|---|---|---|---|');
     (a.requirements || []).forEach(r => lines.push('| ' + r.id + ' | ' + r.action + ' | ' + r.label.replace(/\|/g, '\\|') + ' | ' + r.selector.replace(/\|/g, '\\|') + ' |'));
     if (!(a.requirements || []).length) lines.push('| — | — | Nenhuma etapa capturada | — |');
+    lines.push('', '### Fluxo temporal e dependências', '',
+      '| Ordem | Evento | Seletor | Rede | Resultado | Espera |',
+      '|---|---|---|---|---|---|');
+    (a.execution_flow || []).forEach(item => lines.push('| ' + item.order + ' | ' + item.event + ' | ' + item.selector.replace(/\|/g, '\\|') + ' | ' + (item.network_calls.length ? item.network_calls.map(c => c.method + ' ' + c.endpoint).join('<br>') : '—') + ' | ' + item.outcome + ' | ' + (item.wait_until_next_step_ms ?? '—') + ' ms |'));
+    if (!(a.execution_flow || []).length) lines.push('| — | — | — | — | — | — |');
+    lines.push('', '### Playbook de automação', '');
+    (a.replay_playbook || []).forEach(item => lines.push(item.order + '. **' + item.action + '** -> ' + item.target + ' — esperado: ' + item.expected + (item.wait_after_ms != null ? ' — aguardar ~' + item.wait_after_ms + ' ms' : '')));
+    if (!(a.replay_playbook || []).length) lines.push('- Nenhuma etapa reproduzível foi identificada.');
     lines.push('', '### Inventário técnico', '',
       '- **Passos:** ' + (a.metrics?.steps || 0),
       '- **Chamadas de rede:** ' + (a.metrics?.network_calls || 0),
