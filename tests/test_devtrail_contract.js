@@ -22,6 +22,7 @@ assert.match(background, /Runtime\.exceptionThrown/);
 assert.match(background, /15 \* 60 \* 1000/);
 assert.match(background, /target_tab_closed/);
 assert.match(content, /data-testid/);
+assert.match(content, /window\.postMessage\(\{ source: EVENT_SOURCE, type, payload \}, '\\*'\)/);
 assert.match(content, /CSS\.escape/);
 assert.match(content, /setTimeout\(\(\) => emit\('input'/);
 assert.match(content, /password/i);
