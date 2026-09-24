@@ -1410,3 +1410,16 @@ body::before {
 @media (max-width:600px) {
   .devtrail-actions .btn { flex-basis:45%; }
 }
+
+
+.devtrail-area-row {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  flex-wrap: wrap;
+  margin-top: .55rem;
+}
+.devtrail-area-row .form-hint {
+  flex: 1 1 180px;
+  min-width: 0;
+}
