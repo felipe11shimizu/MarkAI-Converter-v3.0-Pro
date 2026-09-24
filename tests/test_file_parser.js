@@ -9,6 +9,7 @@ for (const method of ['parse', 'parseBrowser']) {
   assert.equal(typeof FileParser[method], 'function', method + ' should be exported');
 }
 
+(async () => {
 // PPTX browser fallback should extract slide text without the MarkItDown backend.
 {
   const originalJSZip = globalThis.JSZip;
@@ -48,3 +49,7 @@ for (const method of ['parse', 'parseBrowser']) {
 }
 
 console.log('file_parser module tests: ok');
+})().catch(error => {
+  console.error(error);
+  process.exitCode = 1;
+});
