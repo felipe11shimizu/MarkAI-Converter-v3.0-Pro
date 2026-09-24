@@ -11,6 +11,7 @@ const backend = fs.readFileSync(path.join(root, 'backend', 'app.py'), 'utf8');
 
 assert.match(index, /MarkAI Converter v3\.6 Pro/);
 assert.match(index, /id="fileInput"/);
+assert.match(index, /id="mergeMarkFiles"/);
 assert.match(index, /id="dropZone"/);
 assert.match(index, /id="btnDownload"/);
 assert.match(index, /id="btnReset"/);
