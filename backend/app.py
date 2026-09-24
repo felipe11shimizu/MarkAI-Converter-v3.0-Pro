@@ -83,7 +83,7 @@ origins = [
     origin.strip()
     for origin in os.getenv(
         "MARKAI_CORS_ORIGINS",
-        "http://localhost:3000,http://localhost:5173,http://localhost:8000",
+        "http://localhost:3000,http://localhost:5173,http://localhost:8000,https://felipe11shimizu.github.io",
     ).split(",")
     if origin.strip()
 ]
