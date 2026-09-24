@@ -295,10 +295,13 @@
       return;
     }
     if (type === 'DEVTRAIL_CLEAR_AREA') {
-      const targetTabId = sender.tab?.id;
+      const requestedTarget = Number(payload.targetTabId);
+      const targetTabId = Number.isInteger(requestedTarget) ? requestedTarget : sender.tab?.id;
+      const portalTabId = session?.targetTabId === targetTabId ? session.portalTabId : (sender.tab?.id === targetTabId ? portalByTargetTab.get(targetTabId) : sender.tab?.id);
       if (targetTabId != null) pendingAreas.delete(targetTabId);
       if (session && session.targetTabId === targetTabId) session.area = null;
-      sendToPortal('DEVTRAIL_AREA_CLEARED', { targetTabId }, session?.targetTabId === targetTabId ? session.portalTabId : portalByTargetTab.get(targetTabId));
+      if (sender.tab?.id !== targetTabId) sendToTab(targetTabId, 'DEVTRAIL_CLEAR_AREA', { targetTabId });
+      sendToPortal('DEVTRAIL_AREA_CLEARED', { targetTabId }, portalTabId);
       return;
     }
     if (type === 'DEVTRAIL_PICK_AREA') {
