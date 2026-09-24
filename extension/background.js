@@ -146,8 +146,8 @@
     chrome.tabs.get(targetTabId).then(tab => {
       if (!session) return;
       session.targetUrl = tab.url || session.targetUrl;
-      return attach(targetTabId);
-    }).then(() => {
+      return chrome.scripting.executeScript({ target: { tabId: targetTabId }, files: ['content.js'] });
+    }).then(() => attach(targetTabId)).then(() => {
       if (!session) return;
       chrome.tabs.sendMessage(targetTabId, { type: 'DEVTRAIL_CAPTURE_STARTED', payload: { session_id: session.sessionId } }).catch(() => {});
       sendToPortal('DEVTRAIL_CAPTURE_STARTED', {
