@@ -199,18 +199,33 @@
   window.addEventListener('message', event => {
     if (event.source !== window || event.data?.source !== EVENT_SOURCE || !CONTROL_TYPES.has(event.data.type)) return;
     const type = event.data.type;
-    if (type === 'DEVTRAIL_PICK_AREA') beginAreaSelection();
     if (type === 'DEVTRAIL_CLEAR_AREA') {
       post('DEVTRAIL_AREA_CLEARED');
-      chrome.runtime.sendMessage({ type: 'DEVTRAIL_CLEAR_AREA', payload: {} }).catch(() => {});
     }
     chrome.runtime.sendMessage({ type, payload: event.data.payload || {} }).catch(() => {});
   });
   chrome.runtime.onMessage.addListener(message => {
-    if (message?.type?.startsWith('DEVTRAIL_')) post(message.type, message.payload || {});
+    if (!message?.type?.startsWith('DEVTRAIL_')) return;
+    if (message.type === 'DEVTRAIL_PICK_AREA') {
+      beginAreaSelection();
+      return;
+    }
+    if (message.type === 'DEVTRAIL_CLEAR_AREA') {
+      removeAreaOverlay();
+      post('DEVTRAIL_AREA_CLEARED', message.payload || {});
+      return;
+    }
+    post(message.type, message.payload || {});
   });
 
-  post('DEVTRAIL_READY', {
-    page: { url: location.href, title: document.title, viewport: { largura: innerWidth, altura: innerHeight } }
-  });
+  const readyPage = {
+    url: location.href,
+    title: document.title,
+    viewport: { largura: innerWidth, altura: innerHeight }
+  };
+  post('DEVTRAIL_READY', { page: readyPage });
+  chrome.runtime.sendMessage({
+    type: 'DEVTRAIL_CONTENT_READY',
+    payload: { page: readyPage }
+  }).catch(() => {});
 })();
