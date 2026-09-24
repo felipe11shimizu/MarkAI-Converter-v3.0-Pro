@@ -333,3 +333,31 @@ Princípios:
 8. Migração incremental: cada extração mantém a aplicação executável e adiciona teste de contrato antes da próxima extração.
 
 O primeiro passo dessa arquitetura foi concluído com a extração de frontend/modules/ui_dom.js, removendo referências DOM e helpers de apresentação do núcleo do UIManager sem alterar o fluxo funcional.
+
+## DevTrail Telemetry Recorder
+
+O DevTrail substitui gravações de vídeo por telemetria estruturada para documentação de tarefas e preparação de automações.
+
+### Componentes
+
+- `extension/manifest.json`: extensão Chrome/Edge Manifest V3.
+- `extension/content.js`: captura DOM, seletores, entradas com debounce de 500 ms e teclas especiais.
+- `extension/background.js`: captura CDP Network/Runtime, associa chamadas de rede às etapas, mascara dados sensíveis e aplica limite rígido de 15 minutos.
+- `frontend/modules/devtrail_controller.js`: controles do portal, contador, pausa/retomada, finalização e exportação.
+- `frontend/modules/devtrail_formatters.js`: conversão do JSON da sessão para Markdown semântico.
+
+### Instalação da extensão
+
+1. Abra `chrome://extensions` ou `edge://extensions`.
+2. Ative **Modo do desenvolvedor**.
+3. Selecione **Carregar sem compactação**.
+4. Escolha a pasta `extension/` deste repositório.
+5. Recarregue o portal MarkAI Converter.
+
+A extensão precisa de permissão de depuração para capturar eventos CDP. O DevTrail não grava tela, canvas ou vídeo.
+
+### Segurança da telemetria
+
+O recorder mascara `Authorization`, cookies, tokens, chaves de API, senhas e campos equivalentes. Campos `password` nunca têm o valor real capturado. Respostas binárias, imagens, fontes, CSS e endpoints de analytics são filtrados.
+
+Cada sessão termina manualmente, ao fechar a aba alvo, ao perder o debugger ou automaticamente após 15 minutos. A última sessão também é persistida no armazenamento local da extensão para tolerar a perda da página de controle.
