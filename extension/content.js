@@ -6,7 +6,7 @@
   const EVENT_SOURCE = 'markai-devtrail';
   const CONTROL_TYPES = new Set([
     'DEVTRAIL_PING', 'DEVTRAIL_LIST_TABS', 'DEVTRAIL_START',
-    'DEVTRAIL_PAUSE', 'DEVTRAIL_RESUME', 'DEVTRAIL_STOP', 'DEVTRAIL_PICK_AREA', 'DEVTRAIL_CLEAR_AREA'
+    'DEVTRAIL_PAUSE', 'DEVTRAIL_RESUME', 'DEVTRAIL_STOP', 'DEVTRAIL_PICK_AREA', 'DEVTRAIL_CLEAR_AREA', 'DEVTRAIL_DOM_EVENT'
   ]);
   const sensitiveName = /^(authorization|cookie|set-cookie|proxy-authorization|x-api-key|api[-_]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|password|passwd|senha|token)$/i;
   const passwordType = /password/i;
