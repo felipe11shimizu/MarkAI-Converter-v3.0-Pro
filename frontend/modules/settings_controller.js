@@ -25,7 +25,7 @@
       aiModel: 'gemini-1.5-flash',
       apiKey: '',
       markitdownEnabled: true,
-      markitdownEndpoint: 'http://localhost:8000',
+      markitdownEndpoint: globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000',
       syntaxHL: true,
       autoPreview: true
     };
