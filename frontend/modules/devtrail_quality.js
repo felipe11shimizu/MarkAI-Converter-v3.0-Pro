@@ -28,7 +28,8 @@
   function analyze(session, analysis) {
     const data = typeof session === 'string' ? JSON.parse(session) : (session || {});
     const steps = Array.isArray(data.steps) ? data.steps : [];
-    const a = analysis || (root.MarkAIDevTrailAnalyzer?.analyze ? root.MarkAIDevTrailAnalyzer.analyze(data) : null);
+    const analyzer = globalThis.MarkAIDevTrailAnalyzer;
+    const a = analysis || (analyzer?.analyze ? analyzer.analyze(data) : null);
     const flow = Array.isArray(a?.execution_flow) ? a.execution_flow : [];
     const checks = [];
     const gaps = [];
