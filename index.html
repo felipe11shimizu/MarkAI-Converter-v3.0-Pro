@@ -102,7 +102,7 @@
             <span class="badge-count video-badge">IA</span>
           </div>
           <input type="file" id="videoInput" accept=".mp4,.mov,.webm,.mkv,.avi,video/*" style="display:none" />
-          <button class="btn btn-accent btn-full" id="btnVideoAnalyze"><i data-lucide="scan-search"></i>Analisar tarefas</button>
+          <label class="btn btn-accent btn-full" id="btnVideoAnalyze" for="videoInput" role="button" tabindex="0"><i data-lucide="scan-search"></i>Analisar tarefas</label>
           <textarea class="input-textarea video-prompt" id="videoPrompt" rows="3" placeholder="Opcional: diga o que deseja identificar. Ex.: descreva o passo a passo do RPA e os sistemas utilizados."></textarea>
           <p class="form-hint">Arraste um vídeo para a área de importação ou use este botão. O sistema identifica etapas, ações, telas, decisões e resultados.</p>
         </div>
@@ -398,7 +398,7 @@
           <div class="form-group">
             <label class="form-label" for="markitdownEndpoint">Endpoint MarkItDown</label>
             <input type="url" class="input-field" id="markitdownEndpoint" value="http://localhost:8000" placeholder="http://localhost:8000" />
-            <p class="form-hint">Ex.: http://localhost:8000. O app verifica automaticamente se o serviço está disponível.</p>
+            <p class="form-hint">Local: http://localhost:8000. No portal publicado, use a URL pública do backend (ex.: https://seu-backend.exemplo.com). Em celular, localhost aponta para o próprio celular.</p>
           </div>
         </div>
         <div class="settings-section">

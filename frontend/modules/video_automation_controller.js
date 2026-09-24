@@ -1440,7 +1440,12 @@ function create({
         signal: signalTimeout(300000)
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.detail || ('Falha HTTP ' + response.status));
+      if (!response.ok) {
+        const detail = typeof data.detail === 'object'
+          ? (data.detail.message || data.detail.code)
+          : data.detail;
+        throw new Error(detail || ('Falha HTTP ' + response.status));
+      }
       render(data);
       if (typeof ui.toast === 'function') ui.toast('Análise de vídeo concluída.', 'success');
     } catch (error) {
@@ -1463,7 +1468,8 @@ function create({
     const button = $('btnVideoAnalyze');
     const drop = $('dropZone');
 
-    button?.addEventListener('click', () => input?.click());
+    // videoInput is activated by the native <label for="videoInput"> in index.html.
+    // Do not synthesize input.click(): mobile browsers may reject it as a non-native picker activation.
     input?.addEventListener('change', () => {
       const file = input.files?.[0];
       if (isVideo(file)) analyze(file);

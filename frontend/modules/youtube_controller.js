@@ -11,12 +11,20 @@
     const request = async (path, payload, timeout = timeoutMs) => {
       const settings = getSettings() || {};
       const endpoint = (settings.markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
-      const response = await fetchImpl(endpoint + path, {
+      let response;
+      try {
+        response = await fetchImpl(endpoint + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
         signal: AbortSignal.timeout(timeout)
-      });
+        });
+      } catch (error) {
+        const reason = error?.name === 'AbortError' || /timeout/i.test(error?.message || '')
+          ? 'tempo limite excedido'
+          : 'conexão recusada';
+        throw new Error('Backend MarkItDown indisponível em ' + endpoint + ' (' + reason + '). Verifique o endpoint em Configurações.');
+      }
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         const detail = typeof body.detail === 'object'

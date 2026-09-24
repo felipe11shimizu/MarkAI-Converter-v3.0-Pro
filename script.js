@@ -455,7 +455,7 @@ const UIManager = (() => {
       aiModel: els.aiModel.value,
       apiKey: els.aiApiKey.value,
       markitdownEnabled: els.toggleMarkItDown.checked,
-      markitdownEndpoint: els.markitdownEndpoint.value.trim() || 'http://localhost:8000',
+      markitdownEndpoint: els.markitdownEndpoint.value.trim() || (globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000'),
       syntaxHL: els.toggleSyntaxHL.checked,
       autoPreview: els.toggleAutoPreview.checked
     }),

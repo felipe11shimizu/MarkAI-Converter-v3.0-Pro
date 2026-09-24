@@ -50,6 +50,20 @@ Referência oficial: https://github.com/microsoft/markitdown
 - Correção do cálculo de classe de extensão.
 - Novos formatos disponibilizados na seleção de arquivos para aproveitar o MarkItDown.
 
+## Portal publicado e acesso por celular
+
+O portal é uma aplicação estática; recursos de **URL, YouTube e análise de vídeo** dependem do backend FastAPI. O valor padrão `http://localhost:8000` funciona somente quando o navegador e o backend estão na mesma máquina.
+
+Para usar o portal publicado em outro dispositivo, configure o endpoint público em **Configurações → Motor de Conversão**. Também é possível abrir o portal com o parâmetro `?backend=https://SEU-BACKEND`; esse valor é usado como padrão quando não existe configuração salva no navegador.
+
+Exemplo:
+
+```
+https://SEU-USUARIO.github.io/MarkAI-Converter-v3.0-Pro/?backend=https://SEU-BACKEND
+```
+
+O backend público deve permitir a origem do portal em `MARKAI_CORS_ORIGINS`. Para análise visual de YouTube, além disso, é necessário habilitar `MARKAI_YOUTUBE_VISUAL_ENABLED=true` e configurar uma chave de IA para a análise de vídeo.
+
 ## Executar o backend
 
 Requer Python 3.10+.
