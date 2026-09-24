@@ -8,20 +8,29 @@ const queue = [];
 const timers = { setTimeout(fn) { calls.push('timer'); fn(); } };
 const queueManager = {
   add(files) {
-    const item = { id: 'q1', name: files[0].name, status: 'queued', result: '# resultado' };
+    const item = { id: 'q1', name: files[0].name, status: 'queued', result: '# resultado', mergeMarker: true };
     queue.push(item);
     return [item];
   },
   getOrdered() { return queue.slice(); },
   getById(id) { return queue.find(item => item.id === id) || null; },
+  update(id, patch) { Object.assign(queue.find(item => item.id === id), patch); },
+  move(id, direction) {
+    const index = queue.findIndex(item => item.id === id);
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (index >= 0 && target >= 0 && target < queue.length) {
+      [queue[index], queue[target]] = [queue[target], queue[index]];
+    }
+  },
   remove(id) { const i = queue.findIndex(item => item.id === id); if (i >= 0) queue.splice(i, 1); },
   clear() { queue.length = 0; }
 };
 
+let mergeOptions = null;
 const controller = {
   async convertItem(id) { calls.push('convert:' + id); },
   async convertAll() { calls.push('convertAll'); },
-  async mergeAll() { calls.push('mergeAll'); },
+  async mergeAll(options) { mergeOptions = options; calls.push('mergeAll'); },
   async compareItem(id) { calls.push('compare:' + id); }
 };
 const mergeEngine = {
@@ -44,6 +53,7 @@ function button(id, ...classes) {
 const documentRef = {
   getElementById(id) {
     if (id === 'queueList') return { querySelectorAll() { return []; } };
+    if (id === 'mergeMarkFiles') return { checked: true };
     return null;
   },
   createElement() {
@@ -99,9 +109,16 @@ assert.equal(typeof workspaceUi.handleQueueAction, 'function');
 
   await workspaceUi.mergeAll();
   assert.ok(calls.includes('mergeAll'));
+  assert.deepStrictEqual(mergeOptions, { markFiles: true });
 
   await workspaceUi.convertAll();
   assert.ok(calls.includes('convertAll'));
+
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-marker') } });
+  assert.equal(queue[0].mergeMarker, false);
+
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-up') } });
+  workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-down') } });
 
   workspaceUi.handleQueueAction({ target: { closest: () => button('q1', 'qi-btn-download') } });
   assert.ok(calls.includes('download-click'));
