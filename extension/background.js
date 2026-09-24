@@ -10,6 +10,7 @@
 
   let session = null;
   let timer = null;
+  const pendingAreas = new Map();
 
   const now = () => Date.now();
   const clip = (value, limit) => {
@@ -35,6 +36,20 @@
     if (session?.portalTabId == null) return;
     chrome.tabs.sendMessage(session.portalTabId, { type, payload }).catch(() => {});
   }
+  async function ensureContentScript(tabId) {
+    try {
+      const tab = await chrome.tabs.get(tabId);
+      if (!/^https?:/i.test(tab.url || '')) return false;
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      return true;
+    } catch (_) { return false; }
+  }
+
+  async function injectIntoOpenWebTabs() {
+    const tabs = await chrome.tabs.query({});
+    await Promise.all(tabs.filter(t => /^https?:/i.test(t.url || '')).map(t => ensureContentScript(t.id)));
+  }
+
   async function attach(tabId) {
     await chrome.debugger.attach({ tabId }, '1.3');
     await chrome.debugger.sendCommand({ tabId }, 'Network.enable');
@@ -136,6 +151,9 @@
       targetTabId,
       targetUrl: payload.targetUrl || '',
       viewport: payload.viewport || { largura: null, altura: null },
+      area: pendingAreas.get(targetTabId) || null,
+      visualCaptures: [],
+      lastVisualCaptureAt: 0,
       domEvents: [],
       network: [],
       diagnostics: [],
@@ -151,6 +169,7 @@
       if (!session) return;
       chrome.tabs.sendMessage(targetTabId, { type: 'DEVTRAIL_CAPTURE_STARTED', payload: { session_id: session.sessionId } }).catch(() => {});
       sendToPortal('DEVTRAIL_CAPTURE_STARTED', {
+        area: session.area,
         session_id: session.sessionId,
         targetTabId,
         targetUrl: session.targetUrl,
