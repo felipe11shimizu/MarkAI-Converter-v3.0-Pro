@@ -52,6 +52,9 @@ const requiredElements = [
   'btnFetchUrl',
   'btnYoutubeTranscribe',
   'btnYoutubeLanguages',
+  'btnYoutubeAnalyze',
+  'videoInput',
+  'btnVideoAnalyze',
   'btnEnhanceAI',
   'workspaceProjectSelect',
   'btnCompare',
@@ -97,6 +100,12 @@ for (const contract of bootstrapContracts) {
     `Bootstrap contract missing: ${contract}`
   );
 }
+
+assert.match(
+  index,
+  /<label[^>]*id=["']btnVideoAnalyze["'][^>]*for=["']videoInput["']/,
+  'Video picker must use native label activation'
+);
 
 assert.match(
   script,
