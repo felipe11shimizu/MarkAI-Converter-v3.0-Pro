@@ -45,6 +45,7 @@
           <span class="status-dot" id="statusDot"></span>
           <span class="status-text" id="statusText">Pronto</span>
         </div>
+        <button class="btn btn-ghost btn-sm" id="btnDevTrail"><i data-lucide="radio"></i><span>DevTrail</span></button>
         <button class="btn btn-ghost btn-sm" id="btnSettings">
           <i data-lucide="settings-2"></i><span>Configurações</span>
         </button>
@@ -115,6 +116,34 @@
           <label class="btn btn-accent btn-full" id="btnVideoAnalyze" for="videoInput" role="button" tabindex="0"><i data-lucide="scan-search"></i>Analisar tarefas</label>
           <textarea class="input-textarea video-prompt" id="videoPrompt" rows="3" placeholder="Opcional: diga o que deseja identificar. Ex.: descreva o passo a passo do RPA e os sistemas utilizados."></textarea>
           <p class="form-hint">Arraste um vídeo para a área de importação ou use este botão. O sistema identifica etapas, ações, telas, decisões e resultados.</p>
+        </div>
+        <div class="panel devtrail-panel" id="devtrailPanel">
+          <div class="panel-header">
+            <span class="panel-title"><i data-lucide="radio"></i>DevTrail Telemetria</span>
+            <span class="badge-count" id="devtrailTimer">15:00</span>
+          </div>
+          <div class="devtrail-controls">
+            <label class="form-label" for="devtrailTarget">Aba alvo</label>
+            <select class="input-field input-field-sm" id="devtrailTarget" aria-label="Aba alvo"></select>
+            <div class="devtrail-actions">
+              <button class="btn btn-primary btn-sm" id="btnDevTrailStart"><i data-lucide="play"></i>Iniciar</button>
+              <button class="btn btn-secondary btn-sm" id="btnDevTrailPause"><i data-lucide="pause"></i>Pausar</button>
+              <button class="btn btn-ghost btn-sm" id="btnDevTrailStop"><i data-lucide="square"></i>Finalizar</button>
+              <button class="btn btn-ghost btn-sm" id="btnDevTrailRefresh"><i data-lucide="refresh-cw"></i>Atualizar abas</button>
+            </div>
+            <span class="form-hint" id="devtrailExtensionStatus">Aguardando extensão Chrome/Edge.</span>
+          </div>
+          <div class="devtrail-result-tabs">
+            <button class="workspace-tab active" id="devtrailTabMarkdown" type="button">Markdown</button>
+            <button class="workspace-tab" id="devtrailTabJson" type="button">JSON</button>
+          </div>
+          <textarea class="code-editor devtrail-output" id="devtrailMarkdown" readonly placeholder="A trilha sem vídeo aparecerá aqui após a finalização."></textarea>
+          <textarea class="code-editor devtrail-output" id="devtrailJson" readonly hidden></textarea>
+          <div class="devtrail-export-actions">
+            <button class="btn btn-secondary btn-sm" id="btnDevTrailExportJson" disabled><i data-lucide="file-json"></i>Exportar JSON</button>
+            <button class="btn btn-secondary btn-sm" id="btnDevTrailExportMd" disabled><i data-lucide="download"></i>Exportar Markdown</button>
+          </div>
+          <p class="form-hint">Captura DOM, rede e erros de console sem gravar vídeo. Limite rígido de 15 minutos.</p>
         </div>
         <div class="panel" id="urlPanel">
           <div class="panel-header"><span class="panel-title"><i data-lucide="globe"></i>Importar URL</span></div>
@@ -237,6 +266,19 @@
       </div>
     </div>
   </div>
+
+  <dialog class="modal modal-lg" id="modalDevTrail">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="radio"></i>DevTrail Telemetry Recorder</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseDevTrail" type="button"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint">A extensão MV3 precisa estar instalada no Chrome/Edge. Escolha a aba HTTP/HTTPS que será observada.</p>
+        <div id="devtrailPanel"></div>
+      </div>
+    </div>
+  </dialog>
 
   <dialog class="modal modal-lg" id="modalWorkspace">
     <div class="modal-card">
@@ -507,6 +549,8 @@
   <script src="video_automation_validator.js"></script>
   <script src="frontend/modules/video_automation_controller.js"></script>
   <script src="frontend/modules/settings_controller.js"></script>
+  <script src="frontend/modules/devtrail_formatters.js"></script>
+  <script src="frontend/modules/devtrail_controller.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
