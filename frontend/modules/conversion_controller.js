@@ -95,7 +95,7 @@
     async function compareItem(id) {
       const item = queueManager.getById(id);
       if (!item) return null;
-      const unsupported = ['pptx','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'];
+      const unsupported = ['doc','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'];
       if (unsupported.includes(item.ext)) {
         ui.toast('Este formato não possui parser local para comparação.', 'warning');
         return null;
