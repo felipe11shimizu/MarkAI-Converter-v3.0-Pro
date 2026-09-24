@@ -69,7 +69,10 @@
     }
 
     async function mergeAll() {
-      return conversionController.mergeAll();
+      const markerControl = $('mergeMarkFiles');
+      return conversionController.mergeAll({
+        markFiles: markerControl ? markerControl.checked : true
+      });
     }
 
     async function downloadZip() {
@@ -165,6 +168,20 @@
         void conversionController.compareItem(id);
       } else if (btn.classList.contains('qi-btn-download')) {
         downloadItem(queueManager.getById(id));
+      } else if (btn.classList.contains('qi-btn-up')) {
+        queueManager.move?.(id, 'up');
+        renderQueue();
+        workspaceController.scheduleSave();
+      } else if (btn.classList.contains('qi-btn-down')) {
+        queueManager.move?.(id, 'down');
+        renderQueue();
+        workspaceController.scheduleSave();
+      } else if (btn.classList.contains('qi-btn-marker')) {
+        const item = queueManager.getById(id);
+        if (!item) return;
+        queueManager.update(id, { mergeMarker: item.mergeMarker === false });
+        renderQueue();
+        workspaceController.scheduleSave();
       } else if (btn.classList.contains('qi-btn-preview')) {
         editorController?.previewItem(id);
       }
