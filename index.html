@@ -150,9 +150,12 @@
             <button class="btn btn-secondary btn-sm" id="btnDevTrailExportReplay" disabled><i data-lucide="route"></i>Exportar plano de reprodução</button>
             <button class="btn btn-secondary btn-sm" id="btnDevTrailExportReplayValidation"><i data-lucide="shield-check"></i>Validação</button>
             <button class="btn btn-secondary btn-sm" id="btnDevTrailExportAudit"><i data-lucide="clipboard-check"></i>Auditoria</button>
+            <button class="btn btn-secondary btn-sm" id="btnDevTrailSetBaseline"><i data-lucide="git-compare"></i>Definir baseline</button>
+            <button class="btn btn-secondary btn-sm" id="btnDevTrailExportDrift" disabled><i data-lucide="git-compare-arrows"></i>Drift / Regressão</button>
             <button class="btn btn-secondary btn-sm" id="btnDevTrailExportPackage" disabled><i data-lucide="package"></i>Exportar pacote RPA</button>
           </div>
           <p class="form-hint">Captura DOM, rede e erros de console sem gravar vídeo. Limite rígido de 15 minutos.</p>
+          <p class="form-hint" id="devtrailDriftStatus">Nenhuma linha de base definida.</p>
         </div>
         <div class="panel" id="urlPanel">
           <div class="panel-header"><span class="panel-title"><i data-lucide="globe"></i>Importar URL</span></div>
@@ -551,6 +554,7 @@
   <script src="frontend/modules/devtrail_replay_plan.js"></script>
   <script src="frontend/modules/devtrail_replay_validator.js"></script>
   <script src="frontend/modules/devtrail_audit.js"></script>
+  <script src="frontend/modules/devtrail_drift.js"></script>
   <script src="frontend/modules/devtrail_quality.js"></script>
   <script src="frontend/modules/devtrail_readiness.js"></script>
   <script src="frontend/modules/devtrail_package.js"></script>
@@ -558,4 +562,3 @@
   <script src="script.js"></script>
 </body>
 </html>
-
