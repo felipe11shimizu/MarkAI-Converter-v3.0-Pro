@@ -355,10 +355,10 @@ const FileParserStrategy = (() => {
     }
 
     // Lightweight fallback for unit tests/non-browser environments.
-    const matches = String(xmlText || '').match(/<a:p(?:\\s[^>]*)?>[\\s\\S]*?<\\/a:p>/g) || [];
+    const matches = String(xmlText || '').match(/<a:p(?:\s[^>]*)?>[\s\S]*?<\/a:p>/g) || [];
     for (const paragraph of matches) {
       const texts = Array.from(
-        paragraph.matchAll(/<a:t(?:\\s[^>]*)?>([\\s\\S]*?)<\\/a:t>/g)
+        paragraph.matchAll(/<a:t(?:\s[^>]*)?>([\s\S]*?)<\/a:t>/g)
       ).map(match => _decodeXmlText(match[1]));
       const text = texts.join('').trim();
       if (text) paragraphs.push(text);
@@ -375,7 +375,7 @@ const FileParserStrategy = (() => {
     const zip = await globalThis.JSZip.loadAsync(buffer);
     const slideEntries = Object.keys(zip.files)
       .map(name => {
-        const match = name.match(/^ppt\\/slides\\/slide(\\d+)\\.xml$/);
+        const match = name.match(/^ppt\/slides\/slide(\d+)\.xml$/);
         return match ? { name, number: Number(match[1]) } : null;
       })
       .filter(Boolean)
@@ -385,7 +385,7 @@ const FileParserStrategy = (() => {
       throw new Error('PPTX inválido ou sem slides.');
     }
 
-    const title = file.name.replace(/\\.[^.]+$/, '');
+    const title = file.name.replace(/\.[^.]+$/, '');
     let md = `# ${title}
 
 **Arquivo:** \`${file.name}\` | **Slides:** ${slideEntries.length}
@@ -401,9 +401,9 @@ const FileParserStrategy = (() => {
 
 `;
       if (paragraphs.length) {
-        md += paragraphs.map(text => `- ${text}`).join('\\n') + '\\n\\n';
+        md += paragraphs.map(text => `- ${text}`).join('\n') + '\n\n';
       } else {
-        md += '_Sem texto extraível neste slide._\\n\\n';
+        md += ' _Sem texto extraível neste slide._\n\n';
       }
 
       if (onProgress) onProgress((i + 1) / slideEntries.length);
