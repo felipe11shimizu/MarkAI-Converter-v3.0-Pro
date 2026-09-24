@@ -46,6 +46,7 @@ jobs:
       - run: node --check frontend/modules/video_automation_controller.js
       - run: node --check frontend/modules/settings_controller.js
       - run: node --check frontend/modules/devtrail_formatters.js
+      - run: node --check frontend/modules/devtrail_analyzer.js
       - run: node --check frontend/modules/devtrail_controller.js
       - run: node --check extension/content.js
       - run: node --check extension/background.js
@@ -85,6 +86,7 @@ jobs:
             tests/test_conversion_quality.js
             tests/test_queue_ingestion.js
             tests/test_devtrail_formatters.js
+            tests/test_devtrail_analyzer.js
             tests/test_devtrail_controller.js
             tests/test_devtrail_contract.js
           )

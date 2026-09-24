@@ -5,7 +5,7 @@
   'use strict';
   const MAX_SESSION_MS = 15 * 60 * 1000;
   function create({ elements, formatters, windowObj = globalThis.window, documentObj = globalThis.document, clock = () => Date.now(), setIntervalImpl = globalThis.setInterval, clearIntervalImpl = globalThis.clearInterval, setTimeoutImpl = globalThis.setTimeout }) {
-    let state = { status: 'idle', startedAt: null, json: null, markdown: '', area: null };
+    let state = { status: 'idle', startedAt: null, json: null, markdown: '', area: null, analysis: null };
     let ticker = null;
     function emit(type, payload = {}) { windowObj.postMessage({ source: 'markai-devtrail', type, payload }, '*'); }
     function download(filename, content, type) { const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const a = documentObj.createElement('a'); a.href = url; a.download = filename; a.click(); setTimeoutImpl(() => URL.revokeObjectURL(url), 1000); }
@@ -54,7 +54,7 @@
       } else if (type === 'DEVTRAIL_CAPTURE_STARTED') { state.status = 'recording'; state.startedAt = payload.startedAt || clock(); state.json = null; state.markdown = ''; if (!ticker) ticker = setIntervalImpl(render, 250); render();
       } else if (type === 'DEVTRAIL_PAUSED') { state.status = 'paused'; render();
       } else if (type === 'DEVTRAIL_RESUMED') { state.status = 'recording'; render();
-      } else if (type === 'DEVTRAIL_SESSION_FINALIZED') { state.json = payload.json || null; state.markdown = state.json ? formatters.convertJsonToMarkdown(state.json) : ''; state.status = 'finalized'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } render();
+      } else if (type === 'DEVTRAIL_SESSION_FINALIZED') { state.json = payload.json || null; state.markdown = state.json ? formatters.convertJsonToMarkdown(state.json) : ''; if (state.json && globalThis.MarkAIDevTrailAnalyzer?.analyze) { const analysis = globalThis.MarkAIDevTrailAnalyzer.analyze(state.json); state.analysis = analysis; state.markdown += '\n' + globalThis.MarkAIDevTrailAnalyzer.convertToMarkdown(analysis); } state.status = 'finalized'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } render();
       } else if (type === 'DEVTRAIL_AREA_SELECTED') { state.area = payload.area || null; render(); }
       else if (type === 'DEVTRAIL_AREA_CLEARED') { state.area = null; render(); }
       else if (type === 'DEVTRAIL_ERROR') { state.status = 'error'; if (ticker) { clearIntervalImpl(ticker); ticker = null; } if (elements.extensionStatus) elements.extensionStatus.textContent = payload.message || 'Erro na extensão'; render(); }
