@@ -9,7 +9,7 @@
 
 const FileParserStrategy = (() => {
   const MARKITDOWN_ONLY_EXTS = new Set([
-    'epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'
+    'doc','epub','zip','png','jpg','jpeg','gif','webp','wav','mp3','m4a'
   ]);
 
   const CODE_LANGS = {
