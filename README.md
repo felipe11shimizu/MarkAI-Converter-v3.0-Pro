@@ -118,6 +118,22 @@ Microsoft MarkItDown: ativado
 Endpoint: http://localhost:8000
 ```
 
+## Imagem Docker para backend público
+
+O repositório inclui um `Dockerfile` com Python 3.12, FastAPI, dependências do projeto e FFmpeg para os fluxos de vídeo/YouTube.
+
+Com Docker:
+
+```bash
+docker build -t markai-converter-backend .
+docker run --rm -p 8000:8000 \
+  -e MARKAI_CORS_ORIGINS="https://felipe11shimizu.github.io" \
+  -e OPENAI_API_KEY="SUA_CHAVE" \
+  markai-converter-backend
+```
+
+Em um provedor de hospedagem, configure a variável `PORT` fornecida pelo serviço e aponte o frontend para a URL HTTPS pública do container usando `?backend=https://SEU-BACKEND` ou **Configurações → Motor de Conversão**.
+
 ## Configuração do backend
 
 Variáveis disponíveis:
