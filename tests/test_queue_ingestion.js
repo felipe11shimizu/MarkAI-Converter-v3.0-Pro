@@ -34,14 +34,14 @@ function createHarness() {
 
   const queueManager = {
     add(files) {
-      const item = {
-        id: 'q' + (queue.length + 1),
-        name: files[0].name,
+      const items = Array.from(files).map((file, index) => ({
+        id: 'q' + (queue.length + index + 1),
+        name: file.name,
         status: 'queued'
-      };
-      queue.push(item);
-      calls.push(['add', files[0].name]);
-      return [item];
+      }));
+      queue.push(...items);
+      calls.push(['add', ...items.map(item => item.name)]);
+      return items;
     },
     getOrdered() { return queue.slice(); },
     getById(id) { return queue.find(item => item.id === id) || null; },
@@ -128,6 +128,40 @@ function createHarness() {
   ]);
   assert.equal(fileInput.value, '');
   assert.deepEqual(calls.at(-1), ['convert', 'q1']);
+}
+
+// Selecting multiple files in one native FileList must enqueue every file,
+// not just the first entry.
+{
+  const { calls, queue, elements } = createHarness();
+  const fileInput = {
+    files: [
+      { name: 'primeiro.md' },
+      { name: 'segundo.pdf' },
+      { name: 'terceiro.docx' }
+    ],
+    value: ''
+  };
+
+  elements.fileInput.dispatch('change', { target: fileInput });
+
+  assert.equal(queue.length, 3);
+  assert.deepEqual(queue.map(item => item.name), [
+    'primeiro.md',
+    'segundo.pdf',
+    'terceiro.docx'
+  ]);
+  assert.deepEqual(calls.slice(0, 4), [
+    ['add', 'primeiro.md', 'segundo.pdf', 'terceiro.docx'],
+    ['save'],
+    ['render'],
+    ['toast', '3 arquivo(s) adicionado(s) à fila.', 'success']
+  ]);
+  assert.deepEqual(
+    calls.filter(call => call[0] === 'convert').map(call => call[1]),
+    ['q1', 'q2', 'q3']
+  );
+  assert.equal(fileInput.value, '');
 }
 
 console.log('queue ingestion integration tests: ok');
