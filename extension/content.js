@@ -136,9 +136,9 @@
       const height = Math.min(innerHeight - top, Math.abs(y - areaStart.y));
       removeAreaOverlay();
       if (width < 20 || height < 20) return;
-      post('DEVTRAIL_AREA_SELECTED', {
-        area: { x: left, y: top, width, height, devicePixelRatio: window.devicePixelRatio || 1 }
-      });
+      const area = { x: left, y: top, width, height, devicePixelRatio: window.devicePixelRatio || 1 };
+      post('DEVTRAIL_AREA_SELECTED', { area });
+      chrome.runtime.sendMessage({ type: 'DEVTRAIL_AREA_SELECTED', payload: { area } }).catch(() => {});
     };
 
     overlay.addEventListener('mousedown', event => {
@@ -200,7 +200,10 @@
     if (event.source !== window || event.data?.source !== EVENT_SOURCE || !CONTROL_TYPES.has(event.data.type)) return;
     const type = event.data.type;
     if (type === 'DEVTRAIL_PICK_AREA') beginAreaSelection();
-    if (type === 'DEVTRAIL_CLEAR_AREA') post('DEVTRAIL_AREA_CLEARED');
+    if (type === 'DEVTRAIL_CLEAR_AREA') {
+      post('DEVTRAIL_AREA_CLEARED');
+      chrome.runtime.sendMessage({ type: 'DEVTRAIL_CLEAR_AREA', payload: {} }).catch(() => {});
+    }
     chrome.runtime.sendMessage({ type, payload: event.data.payload || {} }).catch(() => {});
   });
   chrome.runtime.onMessage.addListener(message => {
