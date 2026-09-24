@@ -203,15 +203,12 @@
           fileInput?.click();
         }
       });
+      // browseBtn is a native <label for="fileInput">. Keep its default
+      // activation so mobile browsers can hand the FileList to the input
+      // reliably. Only stop bubbling to avoid the drop-zone click handler
+      // opening a second picker.
       browseBtn?.addEventListener('click', event => {
-        event.preventDefault();
         event.stopPropagation();
-
-        if (typeof fileInput?.showPicker === 'function') {
-          fileInput.showPicker();
-        } else {
-          fileInput?.click();
-        }
       });
       const handleFileInput = event => {
         const input = event.currentTarget || event.target;
