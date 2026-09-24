@@ -20,7 +20,7 @@ const AppState = (() => {
       aiModel: 'gemini-1.5-flash',
       apiKey: '',
       markitdownEnabled: true,
-      markitdownEndpoint: 'http://localhost:8000',
+      markitdownEndpoint: getDefaultBackendEndpoint(),
       syntaxHL: true,
       autoPreview: true,
     },
@@ -45,6 +45,16 @@ const AppState = (() => {
   function get(key) { return proxy[key]; }
   function set(key, value) { proxy[key] = value; }
 
+  function getDefaultBackendEndpoint() {
+    const configured = globalThis.MARKAI_CONFIG?.backendUrl;
+    if (configured) return String(configured).replace(/\/$/, '');
+    try {
+      const fromQuery = new URL(globalThis.location?.href || '').searchParams.get('backend');
+      if (fromQuery) return String(fromQuery).trim().replace(/\/$/, '');
+    } catch (_) {}
+    return 'http://localhost:8000';
+  }
+
   function loadSettings() {
     try {
       const saved = localStorage.getItem('markai-settings');
@@ -56,7 +66,7 @@ const AppState = (() => {
     localStorage.setItem('markai-settings', JSON.stringify(_state.settings));
   }
 
-  return { on, get, set, loadSettings, saveSettings };
+  return { on, get, set, loadSettings, saveSettings, getDefaultBackendEndpoint };
 })();
 
 // ══════════════════════════════════════════════
