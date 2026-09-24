@@ -45,6 +45,10 @@ jobs:
       - run: node --check video_automation_validator.js
       - run: node --check frontend/modules/video_automation_controller.js
       - run: node --check frontend/modules/settings_controller.js
+      - run: node --check frontend/modules/devtrail_formatters.js
+      - run: node --check frontend/modules/devtrail_controller.js
+      - run: node --check extension/content.js
+      - run: node --check extension/background.js
       - name: Run frontend tests
         shell: bash
         run: |
@@ -80,6 +84,9 @@ jobs:
             tests/test_chat_formatter.js
             tests/test_conversion_quality.js
             tests/test_queue_ingestion.js
+            tests/test_devtrail_formatters.js
+            tests/test_devtrail_controller.js
+            tests/test_devtrail_contract.js
           )
 
           for test in "${tests[@]}"; do
