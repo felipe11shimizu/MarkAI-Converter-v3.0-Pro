@@ -34,6 +34,7 @@ assert.match(content, /CSS\.escape/);
 assert.match(content, /setTimeout\(\(\) => emit\('input'/);
 assert.match(content, /password/i);
 assert.match(content, /DEVTRAIL_CONTENT_READY/);
+assert.match(content, /'DEVTRAIL_DOM_EVENT'/);
 assert.match(content, /beginAreaSelection\(\)/);
 assert.match(content, /chrome\.runtime\.onMessage/);
 assert.match(index, /devtrail_controller\.js/);
