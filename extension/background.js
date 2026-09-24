@@ -11,6 +11,7 @@
   let session = null;
   let timer = null;
   const pendingAreas = new Map();
+  const portalByTargetTab = new Map();
 
   const now = () => Date.now();
   const clip = (value, limit) => {
@@ -32,9 +33,14 @@
     return out;
   }
   function isNoise(url = '') { return NOISE.test(String(url)); }
-  function sendToPortal(type, payload = {}) {
-    if (session?.portalTabId == null) return;
-    chrome.tabs.sendMessage(session.portalTabId, { type, payload }).catch(() => {});
+  function sendToTab(tabId, type, payload = {}) {
+    if (tabId == null) return Promise.resolve(false);
+    return chrome.tabs.sendMessage(tabId, { type, payload })
+      .then(() => true)
+      .catch(() => false);
+  }
+  function sendToPortal(type, payload = {}, portalTabId = session?.portalTabId) {
+    return sendToTab(portalTabId, type, payload);
   }
   async function ensureContentScript(tabId) {
     try {
@@ -233,36 +239,89 @@
   chrome.runtime.onMessage.addListener((message, sender) => {
     const type = message?.type;
     const payload = message?.payload || {};
-    if (type === 'DEVTRAIL_PING') {
-      chrome.tabs.sendMessage(sender.tab.id, { type: 'DEVTRAIL_READY', payload: { extension: true } }).catch(() => {});
+    if (type === 'DEVTRAIL_PING' || type === 'DEVTRAIL_CONTENT_READY') {
+      sendToPortal('DEVTRAIL_READY', {
+        extension: true,
+        tabId: sender.tab?.id ?? null,
+        page: payload.page || null,
+        reason: type
+      }, sender.tab?.id);
       return;
     }
     if (type === 'DEVTRAIL_LIST_TABS') {
+      const portalTabId = sender.tab?.id;
       chrome.tabs.query({}).then(async tabs => {
-        const webTabs = tabs.filter(t => /^https?:/i.test(t.url || ''));
-        await Promise.all(webTabs.map(t => ensureContentScript(t.id)));
-        const safeTabs = webTabs.map(t => ({
-          id: t.id,
-          title: clip(t.title || t.url || 'Aba', 120),
-          url: clip(t.url || '', 500)
-        }));
-        chrome.tabs.sendMessage(sender.tab.id, { type: 'DEVTRAIL_TABS', payload: { tabs: safeTabs } }).catch(() => {});
+        const webTabs = tabs.filter(t => /^https?:/i.test(t.url || '') && t.id != null);
+        const results = await Promise.all(webTabs.map(async t => ({
+          tab: t,
+          injected: await ensureContentScript(t.id)
+        })));
+        const safeTabs = results.map(({ tab, injected }) => {
+          portalByTargetTab.set(tab.id, portalTabId);
+          return {
+            id: tab.id,
+            title: clip(tab.title || tab.url || 'Aba', 120),
+            url: clip(tab.url || '', 500),
+            ready: injected || tab.id === portalTabId
+          };
+        });
+        await sendToPortal('DEVTRAIL_TABS', {
+          tabs: safeTabs,
+          portalTabId,
+          total: safeTabs.length,
+          timestamp_epoch_ms: now()
+        }, portalTabId);
+        await sendToPortal('DEVTRAIL_STATUS', {
+          extension: true,
+          message: safeTabs.length
+            ? safeTabs.length + ' aba(s) HTTP/HTTPS encontrada(s).'
+            : 'Nenhuma aba HTTP/HTTPS disponível para o DevTrail.'
+        }, portalTabId);
+      }).catch(error => {
+        sendToPortal('DEVTRAIL_ERROR', {
+          message: 'Falha ao listar abas: ' + (error?.message || 'erro desconhecido')
+        }, portalTabId);
       });
       return;
     }
     if (type === 'DEVTRAIL_AREA_SELECTED') {
       const area = payload.area || null;
-      if (area && Number(area.width) > 0 && Number(area.height) > 0) {
-        pendingAreas.set(sender.tab.id, area);
-        if (session && session.targetTabId === sender.tab.id) session.area = area;
-        sendToPortal('DEVTRAIL_AREA_SELECTED', { area });
+      const targetTabId = sender.tab?.id;
+      if (area && Number(area.width) > 0 && Number(area.height) > 0 && targetTabId != null) {
+        pendingAreas.set(targetTabId, area);
+        if (session && session.targetTabId === targetTabId) session.area = area;
+        sendToPortal('DEVTRAIL_AREA_SELECTED', { area, targetTabId }, session?.targetTabId === targetTabId ? session.portalTabId : portalByTargetTab.get(targetTabId));
       }
       return;
     }
     if (type === 'DEVTRAIL_CLEAR_AREA') {
-      pendingAreas.delete(sender.tab.id);
-      if (session && session.targetTabId === sender.tab.id) session.area = null;
-      sendToPortal('DEVTRAIL_AREA_CLEARED');
+      const targetTabId = sender.tab?.id;
+      if (targetTabId != null) pendingAreas.delete(targetTabId);
+      if (session && session.targetTabId === targetTabId) session.area = null;
+      sendToPortal('DEVTRAIL_AREA_CLEARED', { targetTabId }, session?.targetTabId === targetTabId ? session.portalTabId : portalByTargetTab.get(targetTabId));
+      return;
+    }
+    if (type === 'DEVTRAIL_PICK_AREA') {
+      const targetTabId = Number(payload.targetTabId);
+      const portalTabId = sender.tab?.id;
+      if (!Number.isInteger(targetTabId)) return;
+      portalByTargetTab.set(targetTabId, portalTabId);
+      ensureContentScript(targetTabId).then(ok => {
+        if (!ok) {
+          sendToPortal('DEVTRAIL_ERROR', { message: 'Não foi possível preparar a aba selecionada para definir a área.' }, portalTabId);
+          return;
+        }
+        sendToTab(targetTabId, 'DEVTRAIL_PICK_AREA', { targetTabId });
+      });
+      return;
+    }
+    if (type === 'DEVTRAIL_CLEAR_AREA_FROM_PORTAL') {
+      const targetTabId = Number(payload.targetTabId);
+      const portalTabId = sender.tab?.id;
+      if (!Number.isInteger(targetTabId)) return;
+      pendingAreas.delete(targetTabId);
+      sendToTab(targetTabId, 'DEVTRAIL_CLEAR_AREA', { targetTabId });
+      sendToPortal('DEVTRAIL_AREA_CLEARED', { targetTabId }, portalTabId);
       return;
     }
     if (type === 'DEVTRAIL_START') { start(payload, sender.tab.id); return; }
@@ -347,6 +406,10 @@
   chrome.tabs.onRemoved.addListener(tabId => {
     if (session && tabId === session.targetTabId) finish('target_tab_closed');
     else if (session && tabId === session.portalTabId) session.portalTabId = null;
+    portalByTargetTab.forEach((portalTabId, targetTabId) => {
+      if (targetTabId === tabId || portalTabId === tabId) portalByTargetTab.delete(targetTabId);
+    });
+    pendingAreas.delete(tabId);
   });
   chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (tab.status === 'complete' && /^https?:/i.test(tab.url || '')) ensureContentScript(tabId).catch(() => {});
