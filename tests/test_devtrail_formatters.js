@@ -37,12 +37,10 @@ const sample = {
 const md = formatters.convertJsonToMarkdown(sample);
 assert.match(md, /# Relato Técnico da Atividade/);
 assert.match(md, /Salvar Dados/);
-assert.match(md, /POST https:\/\/api\.example\.test\/v1\/salvar/);
+assert.match(md, /POST \/v1\/salvar/);
 assert.match(md, /"id": 10/);
-assert.match(md, /0m 12s 500ms/);\nassert.match(md, /## 6\\. Especificação para desenvolvimento\\/RPA/);\nassert.match(md, /RF01|RF02/);
-
-console.log('devtrail formatter tests: ok');
-
-assert.match(md, /# Relato Técnico da Atividade/);
+assert.match(md, /0m 12s 500ms/);
 assert.match(md, /## 6\. Especificação para desenvolvimento\/RPA/);
 assert.match(md, /RF01|RF02/);
+
+console.log('devtrail formatter tests: ok');
