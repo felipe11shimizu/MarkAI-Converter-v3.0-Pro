@@ -203,15 +203,11 @@
           fileInput?.click();
         }
       });
+      // browseBtn is the native label for fileInput. Do not prevent its
+      // default activation: mobile browsers must dispatch the input change
+      // event after the user selects a file.
       browseBtn?.addEventListener('click', event => {
-        event.preventDefault();
         event.stopPropagation();
-
-        if (typeof fileInput?.showPicker === 'function') {
-          fileInput.showPicker();
-        } else {
-          fileInput?.click();
-        }
       });
       const handleFileInput = event => {
         const input = event.currentTarget || event.target;
