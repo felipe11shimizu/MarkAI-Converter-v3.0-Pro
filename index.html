@@ -90,10 +90,20 @@
             <button class="btn-icon-xs" id="btnClearQueue" title="Limpar fila"><i data-lucide="trash-2"></i></button>
           </div>
           <ul class="queue-list" id="queueList"></ul>
+          <div class="queue-organizer-hint">
+            <i data-lucide="grip-horizontal"></i>
+            <span>Arraste ou use as setas para definir a ordem da juntada.</span>
+          </div>
+          <div class="queue-merge-options">
+            <label class="queue-merge-marker">
+              <input type="checkbox" id="mergeMarkFiles" checked />
+              <span><strong>Marcar arquivos distintos</strong><small>Inclui início/fim e nome do arquivo na juntada.</small></span>
+            </label>
+          </div>
           <div class="queue-actions">
             <button class="btn btn-primary btn-full" id="btnMergeAll"><i data-lucide="layers"></i>Juntar Todos (Merge)</button>
             <button class="btn btn-secondary btn-full" id="btnConvertAll"><i data-lucide="zap"></i>Converter Todos</button>
-              <button class="btn btn-outline btn-full" id="btnDownloadZip" style="margin-top:0.5rem"><i data-lucide="archive"></i>Baixar Todos (ZIP)</button>
+            <button class="btn btn-outline btn-full" id="btnDownloadZip" style="margin-top:0.5rem"><i data-lucide="archive"></i>Baixar Todos (ZIP)</button>
           </div>
         </div>
         <div class="panel video-panel" id="videoPanel">
