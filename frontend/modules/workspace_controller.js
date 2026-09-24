@@ -74,7 +74,17 @@
         throw new Error('WorkspaceStore.init() did not return a valid project');
       }
 
-      const queue = await workspaceStore.loadQueue(project.id);
+      const persistedQueue = await workspaceStore.loadQueue(project.id);
+      // File ingestion is bound before workspace initialization so mobile file
+      // selection remains responsive. If files arrive while IndexedDB is
+      // loading, preserve those in-memory items instead of replacing them
+      // with the older persisted snapshot.
+      const pendingQueue = getState().queue || [];
+      const pendingIds = new Set(pendingQueue.map(item => item.id));
+      const queue = [
+        ...persistedQueue.filter(item => !pendingIds.has(item.id)),
+        ...pendingQueue
+      ];
       setState({ currentProjectId: project.id, queue });
       renderQueue();
       setWorkspaceStatus('Projeto: ' + project.name);
