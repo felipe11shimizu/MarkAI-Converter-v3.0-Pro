@@ -148,6 +148,7 @@ const WorkspaceStore = (() => {
         result: item.result || null,
         sourceType: item.sourceType || 'file',
         sourceUrl: item.sourceUrl || null,
+        mergeMarker: item.mergeMarker !== false,
         file: item.file || null,
         order: index,
         updatedAt: Date.now()
@@ -168,7 +169,8 @@ const WorkspaceStore = (() => {
         id: item.id, file, name: item.name, ext: item.ext, size: item.size,
         status: item.status || 'pending', result: item.result || null,
         engine: item.engine || null, conversionMeta: item.conversionMeta || null,
-        sourceType: item.sourceType || 'file', sourceUrl: item.sourceUrl || null
+        sourceType: item.sourceType || 'file', sourceUrl: item.sourceUrl || null,
+        mergeMarker: item.mergeMarker !== false
       };
     });
   }
@@ -225,7 +227,7 @@ const WorkspaceStore = (() => {
       documents: documents.map(d => ({
         id: d.id, name: d.name, ext: d.ext, size: d.size, status: d.status,
         engine: d.engine, conversionMeta: d.conversionMeta, result: d.result,
-        sourceType: d.sourceType, sourceUrl: d.sourceUrl
+        sourceType: d.sourceType, sourceUrl: d.sourceUrl, mergeMarker: d.mergeMarker !== false
       })),
       versions,
       aiHistory
