@@ -54,14 +54,20 @@ const systemMap = require('../extension/autonomous_system_map.js');
     }]
   }]);
 
+  systemMap.addNetworkEvents(map, [
+    { requestId: 'r3', url: '/api/persisted', metodo: 'GET', status: 200 },
+    { requestId: 'r3', url: '/api/persisted', status: 201 }
+  ]);
+
   const result = systemMap.finalize(map);
   assert.equal(result.pages.length, 1);
   assert.equal(result.elements.length, 2);
   assert.equal(result.actions.length, 2);
-  assert.equal(result.network.length, 2);
+  assert.equal(result.network.length, 3);
+  assert.equal(result.network.find(item => item.network_id === 'r3').status, 201);
   assert.equal(result.actions[0].network_refs[0], 'r1');
   assert.deepEqual(result.totals, {
-    pages: 1, elements: 2, actions: 2, network: 2, flows: 0, diagnostics: 0
+    pages: 1, elements: 2, actions: 2, network: 3, flows: 0, diagnostics: 0
   });
 
   console.log('devtrail autonomous system map tests: ok');

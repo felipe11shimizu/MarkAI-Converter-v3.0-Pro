@@ -87,6 +87,14 @@
     return map;
   }
 
+  function addNetworkEvents(map, events = []) {
+    for (const event of events) {
+      const networkId = key(event.network_id || event.requestId, event.url || 'network-' + map.network.length);
+      upsert(map.network, { network_id: networkId, ...event }, item => item.network_id);
+    }
+    return map;
+  }
+
   function addFlow(map, flow = {}) {
     const flowId = key(flow.flow_id, 'flow-' + (map.flows.length + 1));
     upsert(map.flows, { ...flow, flow_id: flowId }, item => item.flow_id);
@@ -120,6 +128,7 @@
     create,
     addDomSnapshot,
     addCorrelatedSteps,
+    addNetworkEvents,
     addFlow,
     addDiagnostics,
     finalize
