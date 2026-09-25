@@ -290,6 +290,37 @@ def _build_video_timeline(
     return timeline
 
 
+def _classify_evidence_correlation(
+    *,
+    frame_count: int,
+    frame_delta_seconds: float | None,
+    transcript_matched: bool,
+) -> dict:
+    """Classify temporal evidence deterministically; never represents model confidence."""
+    if frame_count <= 0:
+        status = "forte" if transcript_matched else "sem_correlacao_temporal"
+        evidence_basis = "transcricao" if transcript_matched else "nenhuma"
+    elif frame_delta_seconds is None:
+        status = "aproximada"
+        evidence_basis = "frame_sem_timestamp"
+    elif frame_delta_seconds <= 2.0:
+        status = "forte"
+        evidence_basis = "frame"
+    elif frame_delta_seconds <= 5.0:
+        status = "aproximada"
+        evidence_basis = "frame"
+    else:
+        status = "sem_correlacao_temporal"
+        evidence_basis = "frame"
+    return {
+        "status": status,
+        "frame_delta_max_seconds": 2.0 if status == "forte" else 5.0 if status == "aproximada" else None,
+        "transcript_matched": bool(transcript_matched),
+        "criterio": "delta_temporal_deterministico",
+        "base": evidence_basis,
+    }
+
+
 def _enrich_analysis_evidence(
     analysis: dict,
     *,
@@ -332,12 +363,18 @@ def _enrich_analysis_evidence(
             frame_index = min(max(frame_index, 1), max(frame_count, 1))
 
         nearby = _nearest_transcript_segments(segment_list, timestamp_seconds)
+        correlation = _classify_evidence_correlation(
+            frame_count=frame_count,
+            frame_delta_seconds=(abs(frame_timestamps[frame_index - 1] - timestamp_seconds) if frame_timestamps and frame_count else None),
+            transcript_matched=bool(nearby),
+        )
         step["evidencia"] = {
             "timestamp_seconds": round(timestamp_seconds, 3),
             "frame_indices": [frame_index] if frame_count else [],
             "frame_timestamp_seconds": round(frame_timestamps[frame_index - 1], 3) if frame_timestamps and frame_count else None,
             "frame_delta_seconds": round(abs(frame_timestamps[frame_index - 1] - timestamp_seconds), 3) if frame_timestamps and frame_count else None,
             "transcript_segment_indices": [item.get("index") for item in nearby],
+            "correlacao_evidencia": correlation,
         }
         # Keep a stable reference list for downstream automation/exporters.
         step["segmentos_transcricao"] = [item.get("index") for item in nearby]
@@ -349,6 +386,9 @@ def _enrich_analysis_evidence(
         "etapas_com_transcricao": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("transcript_segment_indices")),
         "frames_total": frame_count,
         "segmentos_transcricao_total": len(segment_list),
+        "correlacao_forte": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("correlacao_evidencia", {}).get("status") == "forte"),
+        "correlacao_aproximada": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("correlacao_evidencia", {}).get("status") == "aproximada"),
+        "sem_correlacao_temporal": sum(1 for step in etapas if isinstance(step, dict) and step.get("evidencia", {}).get("correlacao_evidencia", {}).get("status") == "sem_correlacao_temporal"),
     }
     return analysis
 

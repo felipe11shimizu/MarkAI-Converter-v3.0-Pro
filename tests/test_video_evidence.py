@@ -50,3 +50,13 @@ def test_enrich_analysis_evidence_uses_actual_adaptive_frame_timestamps():
     assert result["etapas"][1]["evidencia"]["frame_indices"] == [4]
     assert result["etapas"][1]["evidencia"]["frame_timestamp_seconds"] == 30.0
     assert result["etapas"][1]["evidencia"]["frame_delta_seconds"] == 1.0
+
+
+def test_evidence_correlation_is_deterministic_and_separates_temporal_quality():
+    from backend.app import _classify_evidence_correlation
+
+    assert _classify_evidence_correlation(frame_count=4, frame_delta_seconds=1.5, transcript_matched=True)["status"] == "forte"
+    assert _classify_evidence_correlation(frame_count=4, frame_delta_seconds=3.5, transcript_matched=False)["status"] == "aproximada"
+    assert _classify_evidence_correlation(frame_count=4, frame_delta_seconds=8.0, transcript_matched=True)["status"] == "sem_correlacao_temporal"
+    assert _classify_evidence_correlation(frame_count=0, frame_delta_seconds=None, transcript_matched=True)["status"] == "forte"
+    assert _classify_evidence_correlation(frame_count=0, frame_delta_seconds=None, transcript_matched=False)["status"] == "sem_correlacao_temporal"
