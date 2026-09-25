@@ -819,7 +819,7 @@ async def convert(file: UploadFile = File(...)):
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     return _convert_bytes(filename, suffix, data)
 
-\n@app.post("/api/deep-extract")
+@app.post("/api/deep-extract")
 async def deep_extract(file: UploadFile = File(...)):
     filename, suffix = _read_upload(file)
     data = await file.read(MAX_UPLOAD_BYTES + 1)
