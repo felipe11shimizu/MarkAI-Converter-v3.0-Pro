@@ -1,6 +1,33 @@
-importScripts('autonomous_agent.js');
+importScripts('autonomous_agent.js', 'autonomous_dom_scanner.js');
 const devTrailAutonomousAgent = globalThis.DevTrailAutonomousAgent?.(chrome);
 devTrailAutonomousAgent?.install?.();
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type !== 'DEVTRAIL_AUTONOMOUS_SCAN_DOM') return false;
+
+  const targetTabId = Number(message?.payload?.targetTabId ?? devTrailAutonomousAgent?.state?.tabId);
+  const activeTabId = devTrailAutonomousAgent?.state?.tabId;
+
+  if (!Number.isInteger(targetTabId) || !devTrailAutonomousAgent?.state?.active || targetTabId !== activeTabId) {
+    sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+    return false;
+  }
+
+  const scanner = globalThis.DevTrailAutonomousDomScanner?.();
+  if (!scanner) {
+    sendResponse({ ok: false, code: 'DOM_SCANNER_UNAVAILABLE' });
+    return false;
+  }
+
+  scanner.scanTab(chrome, targetTabId)
+    .then(sendResponse)
+    .catch(error => sendResponse({
+      ok: false,
+      code: 'DOM_SCAN_FAILED',
+      error: error?.message || String(error)
+    }));
+  return true;
+});
 
 importScripts('explorer/explorer_policy.js', 'explorer/explorer_state.js', 'explorer/explorer_engine.js');
 
