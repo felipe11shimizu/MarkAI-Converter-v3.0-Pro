@@ -196,7 +196,22 @@ Implementado em branch `feat/devtrail-autonomous-executor-phase-8`:
 
 O executor permanece atrás de guardrails explícitos e não executa nada sem `execute: true`.
 
+### Fase 16.9 — Validação pós-ação e prevenção de loops
+Implementada na branch `feat/devtrail-autonomous-validation-phase-9`:
+- executor versão `1.1`;
+- snapshot seguro do DOM/URL antes e depois de cada ação;
+- validação de mudança de URL, presença do elemento, estado, geometria e comprimento textual;
+- fingerprints determinísticos para identificar estados repetidos;
+- limite configurável de repetição, padrão 2 e máximo 5;
+- parada com `LOOP_DETECTED` ao detectar repetição do mesmo estado de ação;
+- atraso de validação configurável, padrão 100 ms e máximo 2 s;
+- preservados os guardrails da Fase 16.8;
+- teste dedicado cobrindo mudança pós-ação e prevenção de loops.
+
+### Decisão arquitetural
+A validação permanece dentro do executor e usa somente `chrome.scripting.executeScript` com funções fixas. O plano continua sem capacidade de fornecer JavaScript arbitrário. Os snapshots coletam apenas metadados seguros do DOM, URL e estado visual básico do alvo.
+
 ### Próximos passos
-1. Validação pós-ação e prevenção de loops.
-2. Teste integrado do ciclo Planner → Executor → novo DOM/Network snapshot.
-3. Kill switch operacional e limites de sessão.
+1. Teste integrado do ciclo Planner → Executor → novo DOM/Network snapshot.
+2. Kill switch operacional e limites de sessão.
+3. Validação E2E final do agente autônomo.
