@@ -308,3 +308,21 @@ O ciclo continua recebendo um mapa finalizado para planejamento, mas a persistê
 1. CI da Fase 16.14.
 2. Teste operacional no Chrome usando o painel da Fase 16.13.
 3. Ajustes finais somente se o teste real revelar incompatibilidades.
+
+### Fase 16.15 — Exportação operacional de evidências
+Implementada na branch `feat/devtrail-operational-export-phase-15`:
+- nova mensagem `DEVTRAIL_AUTONOMOUS_EXPORT`;
+- exportação do `systemMap` atual em JSON;
+- exportação do mesmo mapa em Markdown determinístico;
+- controles de exportação adicionados ao painel operacional;
+- downloads locais no navegador, sem envio externo dos dados;
+- teste do painel atualizado;
+- nenhum novo mecanismo de execução foi introduzido.
+
+### Decisão arquitetural
+A exportação ocorre sobre o mapa já mantido pela sessão. O popup apenas solicita o formato e grava localmente o conteúdo retornado; não altera a coleta, execução ou redaction.
+
+### Próximos passos
+1. CI da Fase 16.15.
+2. Teste operacional completo no Chrome.
+3. Consolidar o agente autônomo como módulo operacional estável após a validação real.
