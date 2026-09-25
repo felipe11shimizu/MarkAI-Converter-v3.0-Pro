@@ -42,6 +42,7 @@
     const networkCapture = globalThis.DevTrailAutonomousNetworkCapture?.create?.(api, { state });
     const eventCorrelator = globalThis.DevTrailAutonomousEventCorrelator || null;
     const systemMapApi = globalThis.DevTrailAutonomousSystemMap || null;
+    const systemMapMarkdownApi = globalThis.DevTrailAutonomousSystemMapMarkdown || null;
     const systemMap = systemMapApi?.create?.() || null;
     let installed = false;
 
@@ -186,7 +187,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== PREFIX + 'BUILD_MAP_MD') return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -214,6 +215,22 @@
         if (Array.isArray(payload.diagnostics)) systemMapApi.addDiagnostics(systemMap, payload.diagnostics);
         const result = systemMapApi.finalize(systemMap);
         sendResponse({ ok: true, map: result });
+        return false;
+      }
+
+      if (type === PREFIX + 'BUILD_MAP_MD') {
+        if (!state.active || !systemMapMarkdownApi || !systemMap) {
+          sendResponse({ ok: false, code: 'SYSTEM_MAP_MARKDOWN_UNAVAILABLE' });
+          return false;
+        }
+        const payload = message?.payload || {};
+        if (payload.domSnapshot) systemMapApi?.addDomSnapshot?.(systemMap, payload.domSnapshot);
+        if (Array.isArray(payload.domSnapshots)) payload.domSnapshots.forEach(snapshot => systemMapApi?.addDomSnapshot?.(systemMap, snapshot));
+        if (Array.isArray(payload.steps)) systemMapApi?.addCorrelatedSteps?.(systemMap, payload.steps);
+        if (Array.isArray(payload.flows)) payload.flows.forEach(flow => systemMapApi?.addFlow?.(systemMap, flow));
+        if (Array.isArray(payload.diagnostics)) systemMapApi?.addDiagnostics?.(systemMap, payload.diagnostics);
+        const result = systemMapApi.finalize(systemMap);
+        sendResponse({ ok: true, markdown: systemMapMarkdownApi.render(result), map: result });
         return false;
       }
 
