@@ -1,4 +1,4 @@
-importScripts('autonomous_system_map.js', 'autonomous_system_map_markdown.js', 'autonomous_event_correlator.js', 'autonomous_planner.js', 'autonomous_executor.js', 'autonomous_agent.js', 'autonomous_dom_scanner.js', 'autonomous_network_capture.js');
+importScripts('autonomous_system_map.js', 'autonomous_system_map_markdown.js', 'autonomous_event_correlator.js', 'autonomous_planner.js', 'autonomous_executor.js', 'autonomous_cycle.js', 'autonomous_agent.js', 'autonomous_dom_scanner.js', 'autonomous_network_capture.js');
 const devTrailAutonomousAgent = globalThis.DevTrailAutonomousAgent?.(chrome);
 devTrailAutonomousAgent?.install?.();
 

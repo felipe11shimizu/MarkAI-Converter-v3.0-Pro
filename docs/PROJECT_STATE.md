@@ -215,3 +215,22 @@ A validação permanece dentro do executor e usa somente `chrome.scripting.execu
 1. Teste integrado do ciclo Planner → Executor → novo DOM/Network snapshot.
 2. Kill switch operacional e limites de sessão.
 3. Validação E2E final do agente autônomo.
+
+### Fase 16.10 — Ciclo integrado Planner → Executor → Snapshot
+Implementada na branch `feat/devtrail-autonomous-cycle-phase-10`:
+- `extension/autonomous_cycle.js`;
+- ciclo único que gera plano, executa sob autorização explícita e captura novo snapshot DOM;
+- coleta delta de Network da sessão entre o início e o fim da execução;
+- exposição via `DEVTRAIL_AUTONOMOUS_CYCLE` no agente;
+- validação da aba alvo e sessão continuam obrigatórias;
+- execução permanece limitada pelos guardrails do executor;
+- scanner DOM é usado como etapa pós-ação;
+- teste integrado dedicado e inclusão no CI;
+- `background.js` carrega o novo módulo explicitamente.
+
+### Decisão arquitetural
+O ciclo não substitui Planner, Executor, Scanner ou captura Network. Ele apenas orquestra os contratos existentes, mantendo cada componente testável isoladamente. O ciclo só executa quando `execute: true` é informado.
+
+### Próximos passos
+1. Kill switch operacional e limites de sessão.
+2. E2E final do agente autônomo.

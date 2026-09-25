@@ -14,6 +14,7 @@
     CORRELATE: PREFIX + 'CORRELATE',
     BUILD_MAP: PREFIX + 'BUILD_MAP',
     BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD',
+    CYCLE: PREFIX + 'CYCLE',
     PLAN: PREFIX + 'PLAN',
     EXECUTE: PREFIX + 'EXECUTE'
   });
@@ -48,6 +49,8 @@
     const systemMapMarkdownApi = globalThis.DevTrailAutonomousSystemMapMarkdown || null;
     const plannerApi = globalThis.DevTrailAutonomousPlanner || null;
     const executorApi = globalThis.DevTrailAutonomousExecutor || null;
+    const domScannerApi = globalThis.DevTrailAutonomousDomScanner || null;
+    const cycleApi = globalThis.DevTrailAutonomousCycle || null;
     let systemMap = null;
     let installed = false;
 
@@ -195,6 +198,23 @@
       return { ok: true, code: 'AUTONOMOUS_SESSION_STOPPED' };
     }
 
+    async function runCycle(payload = {}) {
+      if (!state.active) return { ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' };
+      if (!cycleApi?.run || !domScannerApi?.scanTab || !plannerApi?.plan || !executorApi?.execute || !systemMapApi || !systemMap) {
+        return { ok: false, code: 'AUTONOMOUS_CYCLE_UNAVAILABLE' };
+      }
+      const map = systemMapApi.finalize(systemMap);
+      return cycleApi.run(
+        api,
+        state,
+        plannerApi,
+        executorApi,
+        domScannerApi,
+        map,
+        payload.options || {}
+      );
+    }
+
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
       if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
@@ -242,6 +262,22 @@
         const result = systemMapApi.finalize(systemMap);
         sendResponse({ ok: true, markdown: systemMapMarkdownApi.render(result), map: result });
         return false;
+      }
+
+      if (type === MESSAGE.CYCLE) {
+        const targetTabId = Number(message?.payload?.targetTabId);
+        if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        runCycle(message?.payload || {})
+          .then(sendResponse)
+          .catch(error => sendResponse({
+            ok: false,
+            code: 'AUTONOMOUS_CYCLE_ERROR',
+            message: safeMessage(error, 'Erro no ciclo autônomo.')
+          }));
+        return true;
       }
 
       if (type === MESSAGE.PLAN) {
@@ -362,6 +398,8 @@
       eventCorrelator,
       plannerApi,
       executorApi,
+      domScannerApi,
+      cycleApi,
       systemMap
     });
   }
