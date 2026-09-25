@@ -32,6 +32,9 @@ assert.equal(typeof create, 'function');
     fetchImpl: geminiFetch
   });
   assert.equal(await gemini.enhance('texto', 'preserve tables'), '# Gemini');
+  const geminiBody = JSON.parse(calls.find(call => call.url.includes('generativelanguage.googleapis.com')).options.body);
+  assert.equal(geminiBody.generationConfig.maxOutputTokens, 8192);
+  assert.equal('temperature' in geminiBody.generationConfig, false);
 
   const noKey = create({ getSettings: () => ({}), fetchImpl });
   await assert.rejects(() => noKey.enhance('texto'), /API Key não configurada/);
