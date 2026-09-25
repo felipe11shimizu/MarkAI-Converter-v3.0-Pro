@@ -227,6 +227,7 @@ const UIManager = (() => {
       const label = EXT_LABELS[item.ext] || String(item.ext || '').toUpperCase();
       const name = _escapeHtml(item.name || 'arquivo');
       const markerEnabled = item.mergeMarker !== false;
+      const deepOcrEnabled = ['pdf', 'docx', 'pptx', 'xlsx'].includes(String(item.ext || '').toLowerCase());
       const first = index === 0;
       const last = index === items.length - 1;
       li.innerHTML = [
@@ -245,6 +246,7 @@ const UIManager = (() => {
           '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-preview" data-id="' + item.id + '" title="Pré-visualizar"><i data-lucide="eye"></i></button>',
           '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-convert" data-id="' + item.id + '" title="Converter"><i data-lucide="zap"></i></button>',
           '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-compare" data-id="' + item.id + '" title="Comparar motores"><i data-lucide="columns-2"></i></button>',
+          deepOcrEnabled ? '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-deep-ocr" data-id="' + item.id + '" title="Leitura profunda: OCR + IA" aria-label="Leitura profunda OCR e IA"><i data-lucide="scan-text"></i></button>' : '',
           '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-download" data-id="' + item.id + '" title="Baixar Arquivo"><i data-lucide="download"></i></button>',
           '<button type="button" class="btn btn-ghost btn-icon-xs qi-btn-remove" data-id="' + item.id + '" title="Remover"><i data-lucide="x"></i></button>',
         '</div>',
@@ -800,6 +802,21 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   FileActionsUIController.bind();
   ComparisonUIController.bind();
+
+  document.getElementById('btnDeepOCRPreview')?.addEventListener('click', async () => {
+    const id = AppState.get('previewItemId');
+    if (!id) {
+      UIManager.toast('Nenhum documento está selecionado para leitura profunda.', 'warning');
+      return;
+    }
+    const item = QueueManager.getById(id);
+    if (!['pdf', 'docx', 'pptx', 'xlsx'].includes(String(item?.ext || '').toLowerCase())) {
+      UIManager.toast('Leitura profunda disponível para PDF, DOCX, PPTX e XLSX.', 'warning');
+      return;
+    }
+    document.getElementById('modalPreview')?.close?.();
+    await ConversionController.deepExtractItem(id);
+  });
 
   // File ingestion is centralized in QueueUIController.
 });

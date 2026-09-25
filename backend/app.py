@@ -667,6 +667,69 @@ def _convert_bytes(filename: str, suffix: str, data: bytes):
             temp_path.unlink(missing_ok=True)
 
 
+OCR_DOCUMENT_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx"}
+OCR_DEEP_PROMPT = """Extraia fielmente todo o conteúdo textual visível do documento/imagens, sem resumir e sem inventar informações. Preserve a ordem de leitura e a estrutura documental. Inclua cabeçalhos, rodapés, carimbos, assinaturas legíveis, números de processo, datas, nomes, tabelas, listas, campos preenchidos e texto dentro de imagens. Para tabelas, preserve a relação entre colunas e linhas em Markdown. Quando uma página for escaneada, faça OCR da página inteira. Não descreva a imagem quando o objetivo for texto: transcreva o texto. Se uma palavra estiver ilegível, indique [ilegível] em vez de inventá-la."""
+
+
+def _build_deep_ocr_engine():
+    if not OCR_API_KEY:
+        return None
+    try:
+        from openai import OpenAI
+        return MarkItDown(
+            enable_plugins=True,
+            llm_client=OpenAI(api_key=OCR_API_KEY),
+            llm_model=OCR_MODEL,
+            llm_prompt=OCR_DEEP_PROMPT,
+        )
+    except Exception:
+        return None
+
+
+def _deep_extract_bytes(filename: str, suffix: str, data: bytes):
+    if suffix not in OCR_DOCUMENT_EXTENSIONS:
+        raise HTTPException(status_code=415, detail="Leitura profunda disponível para PDF, DOCX, PPTX e XLSX.")
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail=f"Arquivo excede o limite de {MAX_UPLOAD_MB} MB.")
+    if not OCR_ENABLED or not OCR_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Leitura profunda OCR/IA não está configurada. Ative MARKAI_OCR_ENABLED=true e forneça MARKAI_OCR_API_KEY ou OPENAI_API_KEY.",
+        )
+
+    engine = _build_deep_ocr_engine()
+    if engine is None:
+        raise HTTPException(status_code=503, detail="Não foi possível inicializar o motor OCR/IA.")
+
+    temp_path = None
+    started = time.perf_counter()
+    try:
+        with tempfile.NamedTemporaryFile(prefix="markai_deep_ocr_", suffix=suffix, delete=False) as tmp:
+            tmp.write(data)
+            temp_path = Path(tmp.name)
+        result = engine.convert(str(temp_path))
+        markdown = result.markdown or result.text_content or ""
+        if not markdown.strip():
+            raise HTTPException(status_code=422, detail="O leitor OCR/IA não encontrou texto extraível.")
+        return {
+            "ok": True,
+            "engine": "markitdown-ocr-deep",
+            "mode": "deep-ocr-ai",
+            "filename": filename,
+            "markdown": markdown,
+            "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
+            "quality": _quality(markdown),
+            "ocr": {"enabled": True, "model": OCR_MODEL, "forced": True},
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Falha na leitura profunda OCR/IA: {type(exc).__name__}") from exc
+    finally:
+        if temp_path:
+            temp_path.unlink(missing_ok=True)
+
+
 def _build_engine():
     if not OCR_ENABLED or not OCR_API_KEY:
         return MarkItDown()
@@ -755,6 +818,12 @@ async def convert(file: UploadFile = File(...)):
     filename, suffix = _read_upload(file)
     data = await file.read(MAX_UPLOAD_BYTES + 1)
     return _convert_bytes(filename, suffix, data)
+
+@app.post("/api/deep-extract")
+async def deep_extract(file: UploadFile = File(...)):
+    filename, suffix = _read_upload(file)
+    data = await file.read(MAX_UPLOAD_BYTES + 1)
+    return _deep_extract_bytes(filename, suffix, data)
 
 
 @app.post("/api/youtube/resolve")

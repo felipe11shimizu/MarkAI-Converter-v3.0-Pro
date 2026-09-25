@@ -164,6 +164,8 @@
         if (!getState().queue.length) ui.setEmptyState?.(true);
       } else if (btn.classList.contains('qi-btn-convert')) {
         void conversionController.convertItem(id);
+      } else if (btn.classList.contains('qi-btn-deep-ocr')) {
+        void conversionController.deepExtractItem(id);
       } else if (btn.classList.contains('qi-btn-compare')) {
         void conversionController.compareItem(id);
       } else if (btn.classList.contains('qi-btn-download')) {

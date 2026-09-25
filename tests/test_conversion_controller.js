@@ -16,7 +16,8 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   };
   const markitdown = {
     isAvailable: async () => true,
-    convert: async () => ({ markdown: '# remote', meta: { engine: 'test' } })
+    convert: async () => ({ markdown: '# remote', meta: { engine: 'test' } }),
+    deepExtract: async () => ({ markdown: '# OCR profundo', meta: { engine: 'markitdown-ocr-deep', mode: 'deep-ocr-ai' } })
   };
   const parser = { parseBrowser: async () => '# local' };
   let mergeOptions = null;
@@ -31,6 +32,11 @@ const Controller = require('../frontend/modules/conversion_controller.js');
     conversionQuality: quality, mergeEngine: { merge: async (_progress, options) => { mergeOptions = options; return '# merged'; } }, getState: () => ({}),
     setState: patch => calls.push(['state', patch]), ui, workspace: { scheduleSave() { calls.push(['save']); } }
   });
+  const deepResult = await controller.deepExtractItem('3');
+  assert.strictEqual(deepResult, '# OCR profundo');
+  assert.strictEqual(items[2].engine, 'markitdown-ocr-deep');
+  assert.strictEqual(items[2].extractionMode, 'deep-ocr-ai');
+
   const result = await controller.convertItem('1');
   assert.strictEqual(result, '# remote');
   assert.strictEqual(items[0].status, 'done');
