@@ -10,7 +10,10 @@
 
     const request = async (path, payload, timeout = timeoutMs) => {
       const settings = getSettings() || {};
-      const endpoint = (settings.markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
+      const endpoint = String(settings.markitdownEndpoint || '').trim().replace(/\/$/, '');
+      if (!endpoint) {
+        throw new Error('Backend não configurado. Para usar YouTube no portal publicado, informe a URL pública do backend em Configurações → Motor de Conversão.');
+      }
       let response;
       try {
         response = await fetchImpl(endpoint + path, {
