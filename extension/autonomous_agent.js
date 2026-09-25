@@ -24,6 +24,7 @@
     return {
       active: false,
       debuggerAttached: false,
+      network: [],
       sessionId: null,
       tabId: null,
       portalTabId: null,
@@ -36,6 +37,7 @@
 
   function createAgent(api) {
     const state = createState();
+    const networkCapture = globalThis.DevTrailAutonomousNetworkCapture?.create?.(api, { state });
     let installed = false;
 
     const safeMessage = (error, fallback) => {
@@ -233,6 +235,7 @@
       onMessageEvent.addListener(onMessage);
       api.debugger?.onDetach?.addListener?.(onDetach);
       api.tabs?.onRemoved?.addListener?.(onTabRemoved);
+      networkCapture?.install?.();
       installed = true;
       return true;
     }
@@ -246,7 +249,8 @@
       onMessage,
       onDetach,
       onTabRemoved,
-      install
+      install,
+      networkCapture
     });
   }
 
