@@ -14,6 +14,7 @@
     CORRELATE: PREFIX + 'CORRELATE',
     BUILD_MAP: PREFIX + 'BUILD_MAP',
     BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD',
+    EXPORT: PREFIX + 'EXPORT',
     CYCLE: PREFIX + 'CYCLE',
     KILL: PREFIX + 'KILL',
     PLAN: PREFIX + 'PLAN',
@@ -339,6 +340,25 @@
         if (Array.isArray(payload.diagnostics)) systemMapApi?.addDiagnostics?.(systemMap, payload.diagnostics);
         const result = systemMapApi.finalize(systemMap);
         sendResponse({ ok: true, markdown: systemMapMarkdownApi.render(result), map: result });
+        return false;
+      }
+
+      if (type === MESSAGE.EXPORT) {
+        if (!state.active || !systemMap) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        const format = String(message?.payload?.format || 'json').toLowerCase();
+        const result = systemMapApi.finalize(systemMap);
+        if (format === 'markdown' || format === 'md') {
+          if (!systemMapMarkdownApi) {
+            sendResponse({ ok: false, code: 'SYSTEM_MAP_MARKDOWN_UNAVAILABLE' });
+            return false;
+          }
+          sendResponse({ ok: true, format: 'markdown', content: systemMapMarkdownApi.render(result), map: result });
+          return false;
+        }
+        sendResponse({ ok: true, format: 'json', content: JSON.stringify(result, null, 2), map: result });
         return false;
       }
 
