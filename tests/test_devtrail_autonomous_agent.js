@@ -72,7 +72,7 @@ function createChromeMock() {
     { tab: { id: 99 } },
     value => { response = value; }
   );
-  assert.equal(killed, true);
+  assert.equal(killed, true, 'KILL must be handled asynchronously');
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.equal(response.ok, true);
   assert.equal(agent.state.active, false);
