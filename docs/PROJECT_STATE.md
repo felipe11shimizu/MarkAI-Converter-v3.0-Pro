@@ -141,7 +141,18 @@ Implementado em `feat/devtrail-autonomous-agent-phase-4-correlation`:
 
 A correlação não altera o recorder reativo existente e não executa ações no alvo.
 
+
+### Fase 16.5 — Agregação `system_map.json`
+Implementado em `feat/devtrail-autonomous-agent-phase-5-system-map`:
+- `extension/autonomous_system_map.js`;
+- agregação de páginas, elementos, ações, Network, fluxos e diagnósticos;
+- deduplicação determinística por identidade;
+- referências entre ações e chamadas Network;
+- totais consolidados;
+- exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP`;
+- teste dedicado e validação no CI.
+
 ### Próximos passos
-1. Agregação dos dados correlacionados em `system_map.json`.
-2. Geração de `system_map.md` para leitura humana.
-3. Planejamento/autonomia controlada sobre o mapa.
+1. Geração de `system_map.md` para leitura humana.
+2. Planner de exploração baseado no mapa.
+3. Executor autônomo controlado com guardrails.
