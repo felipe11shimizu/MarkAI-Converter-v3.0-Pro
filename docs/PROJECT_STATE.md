@@ -255,3 +255,23 @@ Os limites são aplicados no agente, acima do executor, para impedir que múltip
 ### Próximos passos
 1. Validação E2E final do agente autônomo.
 2. Teste operacional no Chrome/portal com uma página real.
+
+### Fase 16.12 — E2E final do agente autônomo
+Implementada na branch `feat/devtrail-autonomous-e2e-phase-12`:
+- teste `tests/test_devtrail_autonomous_final_e2e.js` cobrindo o fluxo completo;
+- inicialização da sessão e attach CDP;
+- habilitação Network/Runtime/Page;
+- construção do System Map a partir do snapshot DOM;
+- Planner real gerando ação a partir do mapa;
+- Executor real realizando ação controlada com validação pós-ação;
+- novo DOM Snapshot após a ação;
+- contadores de ciclo/ações;
+- kill switch e encerramento limpo da sessão;
+- inclusão do teste e syntax check no CI.
+
+### Critério de conclusão
+Com o CI verde desta fase, a cadeia autônoma fica coberta de ponta a ponta em teste determinístico: `START → CDP → DOM Map → Planner → Executor → pós-ação → novo Snapshot → limites → KILL`.
+
+### Próximos passos
+- Após o merge, executar validação operacional manual da extensão no Chrome contra uma página HTTP/HTTPS real.
+- Corrigir somente problemas observados nessa validação, preservando o baseline testado.
