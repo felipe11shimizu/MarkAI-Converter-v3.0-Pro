@@ -2,13 +2,36 @@
 
 ## Baseline estável
 - Branch: `main`
-- Commit: `17a1d964a7506f9ab07f4991e0a0ea781754d571`
-- Data do baseline: 2026-09-25
+- Commit: `069a56bd677b45329bf97afa755c6df5e2688ac6`
+- Data do baseline: 2026-09-23
 - CI do baseline: aprovado
-- Fase 16.8 integrada
+- PR #4: integrado
+- PR #3: permanece integrado e preservado
 
 ## Estado atual
-A Fase 16.8 — Executor autônomo controlado está integrada na `main`.
+A Fase 14.5 — painel de qualidade da evidência foi integrada na `main` e validada pelo CI.
+As fases recentes de Video Intelligence foram concluídas:
+- Fase 14 — otimização de análise por transcrição;
+- Fase 14.2 — análise visual adaptativa;
+- Fase 14.3 — correlação precisa de evidências;
+- Fase 14.4 — qualidade determinística da correlação;
+- Fase 14.5 — painel de qualidade da evidência.
+
+O DevTrail também possui a cadeia consolidada das fases 1–13, incluindo especificação, prontidão, pacote RPA, plano de replay, validação, auditoria, drift/regressão e E2E.
+
+A arquitetura atual possui, entre outros:
+- QueueUIController
+- WorkspaceUIController
+- ConversionController
+- WorkspaceController
+- WorkspaceStore
+- MergeEngine
+- EditorController
+- YouTubeController
+- SettingsController
+- VideoAutomationController
+- VideoEvidenceTimeline
+- módulos de auditoria, replay, drift e pacote DevTrail
 
 ## Regras de continuidade
 1. `main` deve permanecer estável.
@@ -21,34 +44,174 @@ A Fase 16.8 — Executor autônomo controlado está integrada na `main`.
 8. Registrar decisões arquiteturais e pendências neste arquivo.
 9. Antes de remover ou substituir comportamento existente, identificar a cobertura de teste correspondente.
 
+## Próxima etapa
+**Fase 8 — Auditoria pós-Fase 7 e planejamento técnico.**
+
+### Objetivos da auditoria
+- mapear funcionalidades existentes;
+- identificar responsabilidades ainda concentradas em `script.js`;
+- identificar duplicidade de lógica;
+- verificar cobertura de testes por módulo;
+- identificar fluxos críticos sem teste;
+- revisar contratos entre Controllers, Engines, State e UI;
+- levantar riscos de regressão;
+- definir próximos micro-PRs.
+
+## Mapa funcional inicial
+- Importação: drag/drop, file picker, múltiplos arquivos
+- Conversão: individual, lote, qualidade
+- Fila: ordenar, remover, preview, download, ZIP
+- Merge: combinação e persistência
+- Workspace: projetos, versões, histórico IA, JSON/ZIP
+- Editor
+- Comparação
+- IA
+- YouTube
+- Automação de vídeo
+- Configurações
+- Backend/API
+
+## Critério de conclusão da Fase 8
+Não iniciar uma grande funcionalidade nova enquanto a auditoria não produzir:
+- inventário funcional;
+- mapa de responsabilidades;
+- lacunas de testes;
+- riscos prioritários;
+- roadmap de micro-PRs;
+- baseline documentado.
+
+## Histórico recente
+- PR #3: `refactor: modularize workspace and queue UI`
+- PR #4: `fix: persist workspace after queue merge`
+- Correções posteriores: delegação de merge/conversão, injeção de timer, testes de ZIP, prevenção de nomes duplicados, teste do file picker e remoção de dependência obsoleta de MergeEngine no QueueUIController.
+
+
 ## Fase 16 — Agente Autônomo de Exploração e Mapeamento
 
-### Fases 16.1–16.8 — concluídas
-- agente autônomo isolado e sessão CDP;
-- scanner DOM semântico;
-- captura Network/CDP com redaction;
-- correlação DOM + Network;
-- system_map JSON;
-- system_map Markdown;
-- planner determinístico observe-plan-only;
-- executor controlado com guardrails.
+### Passo 1 — Arquitetura e isolamento
+- Criado `extension/autonomous_agent.js` como núcleo isolado do agente autônomo.
+- Mantido o gravador reativo existente em `extension/background.js` sem compartilhar estado interno.
+- Criado namespace de mensagens `DEVTRAIL_AUTONOMOUS_*`.
+- Criado gerenciamento de sessão com estados `idle`, `attaching`, `ready`, `stopping` e `error`.
+- O núcleo possui tratamento de erro CDP e cleanup de sessão.
+- Em falha de `chrome.debugger.attach`, o agente não executa `detach`, evitando interferência sobre uma sessão CDP pertencente ao modo reativo.
+- O núcleo ainda não executa exploração DOM nem coleta Network; essas responsabilidades entram nos Passos 2 e 3.
+
+### Validação
+- Adicionado `tests/test_devtrail_autonomous_agent.js`.
+- Cobertos: instalação única do listener, início/finalização de sessão, prevenção de sessão duplicada, habilitação dos domínios CDP e isolamento em falha de attach.
+- CI passa a validar sintaxe do novo módulo e executar o contrato do agente.
+
+### Fase 16.2 — Scanner semântico do DOM
+Implementado em branch `feat/devtrail-autonomous-agent-phase-2-dom`:
+- `extension/autonomous_dom_scanner.js`;
+- descoberta de links, botões, campos, selects, textareas, roles, contenteditable e summary;
+- seletor estável por id/data-testid/name/aria-label com fallback estrutural;
+- estado visível/desabilitado e bounding box;
+- metadados de página e viewport;
+- proteção contra captura de texto/placeholder/valor de campos `password`;
+- execução remota via `chrome.scripting.executeScript`;
+- operação `DEVTRAIL_AUTONOMOUS_SCAN_DOM` somente para a aba da sessão autônoma ativa;
+- teste dedicado `tests/test_devtrail_autonomous_dom_scanner.js`;
+- validação de sintaxe e teste incluídos no CI.
+
+### Fase 16.3 — Captura e normalização Network/CDP
+Implementado em `feat/devtrail-autonomous-agent-phase-3-network`:
+- `extension/autonomous_network_capture.js`;
+- captura de `Network.requestWillBeSent` e `Network.responseReceived`;
+- recuperação opcional de corpo via `Network.getResponseBody`;
+- normalização de URL, método, status, MIME, payload, headers e latência;
+- filtragem de ruído e conteúdo binário;
+- redaction de credenciais, cookies, tokens e chaves;
+- captura restrita à aba da sessão autônoma;
+- limite de histórico de 2.000 eventos;
+- teste dedicado e validação no CI.
+
+
+### Fase 16.4 — Correlação DOM + Network
+Implementado em `feat/devtrail-autonomous-agent-phase-4-correlation`:
+- `extension/autonomous_event_correlator.js`;
+- correlação temporal de eventos DOM com chamadas Network da mesma sessão;
+- janela padrão de 5 segundos após cada evento DOM;
+- ordenação cronológica e limite por evento;
+- normalização de eventos e resumo determinístico;
+- exposição via `DEVTRAIL_AUTONOMOUS_CORRELATE`;
+- isolamento por `tabId` e exigência de sessão autônoma ativa;
+- teste dedicado e validação no CI.
+
+A correlação não altera o recorder reativo existente e não executa ações no alvo.
+
+
+### Fase 16.5 — Agregação `system_map.json`
+Implementado em `feat/devtrail-autonomous-agent-phase-5-system-map`:
+- `extension/autonomous_system_map.js`;
+- agregação de páginas, elementos, ações, Network, fluxos e diagnósticos;
+- deduplicação determinística por identidade;
+- referências entre ações e chamadas Network;
+- totais consolidados;
+- exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP`;
+- teste dedicado e validação no CI.
+
+### Fase 16.6 — Geração `system_map.md`
+Implementada em `feat/devtrail-autonomous-agent-phase-6-system-map-md`:
+- `extension/autonomous_system_map_markdown.js`;
+- renderização determinística do mapa em Markdown;
+- resumo de sessão, páginas, elementos, ações, Network, fluxos e diagnósticos;
+- escaping básico para células Markdown;
+- preservação das regras de redaction e segurança;
+- exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP_MD`;
+- teste dedicado e validação no CI.
+
+### Fase 16.7 — Planner de exploração autônoma
+Implementado em branch de correção da Fase 16.7:
+- `extension/autonomous_planner.js`;
+- planejamento determinístico sem execução de ações;
+- priorização de elementos visíveis e interativos;
+- exclusão de elementos ocultos/desabilitados;
+- prevenção de repetição de elementos já observados;
+- limites explícitos de ações, navegação e inputs;
+- todas as ações planejadas exigem validação;
+- exposição via `DEVTRAIL_AUTONOMOUS_PLAN`;
+- carregamento explícito do planner no `background.js`;
+- teste dedicado e validação no CI.
+
+O planner permanece em modo `observe-plan-only`: não executa clique, digitação ou navegação.
+
+### Fase 16.8 — Executor autônomo controlado
+Implementado em branch `feat/devtrail-autonomous-executor-phase-8`:
+- `extension/autonomous_executor.js`;
+- validação de sessão e correspondência de `sessionId`;
+- execução limitada à aba alvo da sessão;
+- exigência explícita de autorização para executar;
+- limite de ações por execução;
+- somente ações `click`, `navigate` e `input`;
+- navegação e inputs desabilitáveis por configuração;
+- inputs desabilitados por padrão e exigem valor explícito;
+- bloqueio de campos `password`;
+- cada ação exige `requires_validation=true`;
+- execução via `chrome.scripting.executeScript`, sem JavaScript arbitrário fornecido pelo plano;
+- resultado individual por ação e parada quando a sessão deixa de estar ativa;
+- mensagem `DEVTRAIL_AUTONOMOUS_EXECUTE`;
+- teste dedicado e validação no CI.
+
+O executor permanece atrás de guardrails explícitos e não executa nada sem `execute: true`.
 
 ### Fase 16.9 — Validação pós-ação e prevenção de loops
 Implementada na branch `feat/devtrail-autonomous-validation-phase-9`:
-- versão do executor elevada para `1.1`;
-- snapshot DOM/URL antes e depois de cada ação;
+- executor versão `1.1`;
+- snapshot seguro do DOM/URL antes e depois de cada ação;
 - validação de mudança de URL, presença do elemento, estado, geometria e comprimento textual;
-- fingerprints determinísticos para detectar estados repetidos;
+- fingerprints determinísticos para identificar estados repetidos;
 - limite configurável de repetição, padrão 2 e máximo 5;
-- parada imediata com `LOOP_DETECTED` quando o mesmo estado de ação se repete além do limite;
+- parada com `LOOP_DETECTED` ao detectar repetição do mesmo estado de ação;
 - atraso de validação configurável, padrão 100 ms e máximo 2 s;
 - preservados os guardrails da Fase 16.8;
-- teste dedicado cobrindo mudança pós-ação e loop.
+- teste dedicado cobrindo mudança pós-ação e prevenção de loops.
 
 ### Decisão arquitetural
-A validação pós-ação é feita dentro do executor usando somente `chrome.scripting.executeScript` com função fixa. O plano continua sem capacidade de fornecer JavaScript arbitrário. A validação observa apenas metadados seguros do DOM, URL e estado visual básico do alvo.
+A validação permanece dentro do executor e usa somente `chrome.scripting.executeScript` com funções fixas. O plano continua sem capacidade de fornecer JavaScript arbitrário. Os snapshots coletam apenas metadados seguros do DOM, URL e estado visual básico do alvo.
 
 ### Próximos passos
-1. Integrar Planner → Executor → novo DOM/Network snapshot em teste de ciclo.
-2. Adicionar kill switch operacional e limites de sessão.
-3. Executar validação E2E final do agente autônomo.
+1. Teste integrado do ciclo Planner → Executor → novo DOM/Network snapshot.
+2. Kill switch operacional e limites de sessão.
+3. Validação E2E final do agente autônomo.
