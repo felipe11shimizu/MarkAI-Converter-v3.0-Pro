@@ -177,7 +177,26 @@ Implementado em branch de correção da Fase 16.7:
 
 O planner permanece em modo `observe-plan-only`: não executa clique, digitação ou navegação.
 
+### Fase 16.8 — Executor autônomo controlado
+Implementado em branch `feat/devtrail-autonomous-executor-phase-8`:
+- `extension/autonomous_executor.js`;
+- validação de sessão e correspondência de `sessionId`;
+- execução limitada à aba alvo da sessão;
+- exigência explícita de autorização para executar;
+- limite de ações por execução;
+- somente ações `click`, `navigate` e `input`;
+- navegação e inputs desabilitáveis por configuração;
+- inputs desabilitados por padrão e exigem valor explícito;
+- bloqueio de campos `password`;
+- cada ação exige `requires_validation=true`;
+- execução via `chrome.scripting.executeScript`, sem JavaScript arbitrário fornecido pelo plano;
+- resultado individual por ação e parada quando a sessão deixa de estar ativa;
+- mensagem `DEVTRAIL_AUTONOMOUS_EXECUTE`;
+- teste dedicado e validação no CI.
+
+O executor permanece atrás de guardrails explícitos e não executa nada sem `execute: true`.
+
 ### Próximos passos
-1. Planner de exploração baseado no mapa.
-2. Executor autônomo controlado com guardrails.
-3. Validação pós-ação e prevenção de loops.
+1. Validação pós-ação e prevenção de loops.
+2. Teste integrado do ciclo Planner → Executor → novo DOM/Network snapshot.
+3. Kill switch operacional e limites de sessão.
