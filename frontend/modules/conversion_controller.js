@@ -49,6 +49,45 @@
       }
     }
 
+    async function deepExtractItem(id) {
+      const item = queueManager.getById(id);
+      if (!item) return null;
+      const supported = ['pdf', 'docx', 'pptx', 'xlsx'];
+      if (!supported.includes(String(item.ext || '').toLowerCase())) {
+        ui.toast('Leitura profunda disponível para PDF, DOCX, PPTX e XLSX.', 'warning');
+        return null;
+      }
+      queueManager.update(id, { status: 'converting' });
+      ui.renderQueue();
+      ui.setStatus('Leitura profunda OCR/IA: ' + item.name + '…', 'busy');
+      ui.setProgress(0.05);
+      try {
+        const result = await markItDownEngine.deepExtract(item.file, p => ui.setProgress(p));
+        if (!result?.markdown) throw new Error('O leitor OCR/IA não retornou conteúdo.');
+        queueManager.update(id, {
+          status: 'done',
+          result: result.markdown,
+          engine: 'markitdown-ocr-deep',
+          conversionMeta: result.meta || null,
+          extractionMode: 'deep-ocr-ai'
+        });
+        if (workspace) workspace.scheduleSave();
+        ui.renderQueue();
+        ui.setProgress(1);
+        ui.loadMarkdown(result.markdown, item.name.replace(/\\.[^.]+$/, '') + '.md');
+        ui.setStatus(item.name + ' — leitura profunda concluída', 'idle');
+        ui.toast('✓ OCR + IA aplicado: ' + item.name, 'success');
+        return result.markdown;
+      } catch (e) {
+        queueManager.update(id, { status: item.result ? 'done' : 'error' });
+        ui.renderQueue();
+        ui.setProgress(0, false);
+        ui.setStatus('Leitura profunda não concluída', 'error');
+        ui.toast('OCR/IA: ' + e.message, 'error');
+        return null;
+      }
+    }
+
     async function convertAll() {
       const items = queueManager.getOrdered();
       if (!items.length) {
@@ -123,7 +162,7 @@
       }
     }
 
-    return { convertItem, convertAll, mergeAll, compareItem };
+    return { convertItem, deepExtractItem, convertAll, mergeAll, compareItem };
   }
 
   return { create };
