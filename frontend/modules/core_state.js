@@ -46,12 +46,12 @@ const AppState = (() => {
   function set(key, value) { proxy[key] = value; }
 
   function getDefaultBackendEndpoint() {
-    const configured = globalThis.MARKAI_CONFIG?.backendUrl;
-    if (configured) return String(configured).trim().replace(/\/$/, '');
     try {
       const location = globalThis.location;
       const fromQuery = new URL(location?.href || '').searchParams.get('backend');
       if (fromQuery) return String(fromQuery).trim().replace(/\/$/, '');
+      const configured = globalThis.MARKAI_CONFIG?.backendUrl;
+      if (configured) return String(configured).trim().replace(/\/$/, '');
       const hostname = String(location?.hostname || '').toLowerCase();
       const isLocal = hostname === 'localhost' ||
         hostname === '127.0.0.1' ||

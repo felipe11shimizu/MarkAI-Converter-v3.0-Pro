@@ -87,6 +87,12 @@ https://SEU-USUARIO.github.io/MarkAI-Converter-v3.0-Pro/?backend=https://SEU-BAC
 
 O backend público deve permitir a origem do portal em `MARKAI_CORS_ORIGINS`. Para análise visual de YouTube, além disso, é necessário habilitar `MARKAI_YOUTUBE_VISUAL_ENABLED=true` e configurar uma chave de IA para a análise de vídeo.
 
+## Google Cloud Run — backend público
+
+O backend de produção é FastAPI + MarkItDown e deve ser executado no **Google Cloud Run**. O portal GitHub Pages já carrega a configuração pública do endpoint pelo `frontend/config.js`, sem armazenar chaves de API.
+
+A configuração operacional completa, incluindo CORS, Deep OCR, Secret Manager, deploy e validação, está em [docs/CLOUD_RUN.md](docs/CLOUD_RUN.md).
+
 ## Executar o backend
 
 Requer Python 3.10+.
