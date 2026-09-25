@@ -59,6 +59,7 @@ jobs:
       - run: node --check extension/content.js
       - run: node --check extension/autonomous_agent.js
       - run: node --check extension/autonomous_dom_scanner.js
+      - run: node --check extension/autonomous_network_capture.js
       - run: node --check extension/background.js
       - name: Run frontend tests
         shell: bash
@@ -106,6 +107,7 @@ jobs:
             tests/test_devtrail_final_e2e.js
             tests/test_devtrail_autonomous_agent.js
             tests/test_devtrail_autonomous_dom_scanner.js
+            tests/test_devtrail_autonomous_network_capture.js
           )
 
           for test in "${tests[@]}"; do

@@ -1,4 +1,4 @@
-importScripts('autonomous_agent.js', 'autonomous_dom_scanner.js');
+importScripts('autonomous_agent.js', 'autonomous_dom_scanner.js', 'autonomous_network_capture.js');
 const devTrailAutonomousAgent = globalThis.DevTrailAutonomousAgent?.(chrome);
 devTrailAutonomousAgent?.install?.();
 
