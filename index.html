@@ -113,9 +113,14 @@
             <span class="badge-count video-badge">IA</span>
           </div>
           <input type="file" id="videoInput" accept=".mp4,.mov,.webm,.mkv,.avi,video/*" style="display:none" />
+          <label class="form-label" for="videoAnalysisMode">Modo de análise</label>
+          <select class="input-field input-field-sm" id="videoAnalysisMode">
+            <option value="transcript" selected>Somente transcrição — mais rápido e suporta vídeos maiores</option>
+            <option value="visual">Análise visual completa — áudio + transcrição + quadros</option>
+          </select>
           <label class="btn btn-accent btn-full" id="btnVideoAnalyze" for="videoInput" role="button" tabindex="0"><i data-lucide="scan-search"></i>Analisar tarefas</label>
           <textarea class="input-textarea video-prompt" id="videoPrompt" rows="3" placeholder="Opcional: diga o que deseja identificar. Ex.: descreva o passo a passo do RPA e os sistemas utilizados."></textarea>
-          <p class="form-hint">Arraste um vídeo para a área de importação ou use este botão. O sistema identifica etapas, ações, telas, decisões e resultados.</p>
+          <p class="form-hint" id="videoAnalysisModeHint">No modo somente transcrição, o vídeo é enviado sem extração de quadros; no YouTube, quando há legenda disponível, o MP4 não é baixado.</p>
         </div>
         <div class="panel devtrail-panel" id="devtrailPanel">
           <div class="panel-header">
