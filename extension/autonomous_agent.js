@@ -250,11 +250,7 @@
     });
   }
 
-  if (chromeApi?.runtime?.onMessage && chromeApi?.debugger) {
-    const agent = createAgent(chromeApi);
-    agent.install();
-    return agent;
-  }
-
-  return createAgent;
+  // The module is a factory in both Node tests and the browser.
+  // Installation is explicit at the integration boundary (background.js).
+  return createAgent(chromeApi);
 });
