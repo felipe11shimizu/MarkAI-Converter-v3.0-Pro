@@ -40,7 +40,7 @@ Rules:
       const body = {
         system_instruction: { parts: [{ text: effectiveSystemPrompt }] },
         contents: [{ parts: [{ text }] }],
-        generationConfig: { temperature: 0.2, maxOutputTokens: 8192 }
+        generationConfig: { maxOutputTokens: 8192 }
       };
       const resp = await requestFetch(url, {
         method: 'POST',
