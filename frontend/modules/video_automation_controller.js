@@ -1187,6 +1187,9 @@ function create({
             (evidenceSummary.etapas_total || 0) + ' com frame · ' +
             (evidenceSummary.etapas_com_transcricao || 0) + '/' +
             (evidenceSummary.etapas_total || 0) + ' com fala'
+          : '') + (data.evidencia_video
+          ? ' · vídeo: ' + (data.evidencia_video.frames_selecionados || data.frames_analyzed || 0) +
+            ' frames selecionados · redução ' + Math.round((data.evidencia_video.taxa_reducao || data.frame_reduction_rate || 0) * 100) + '%'
           : '');
       summary.append(title, desc, evidenceText);
     }

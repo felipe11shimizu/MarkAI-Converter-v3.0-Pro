@@ -154,6 +154,10 @@ Variáveis disponíveis:
 - `MARKAI_YOUTUBE_VISUAL_MAX_MB`: limite do arquivo de vídeo visual. Padrão: 150 MB.
 - `MARKAI_YOUTUBE_VISUAL_MAX_DURATION_SECONDS`: duração máxima para análise visual. Padrão: 2700 segundos.
 - `MARKAI_YOUTUBE_VISUAL_MAX_HEIGHT`: altura máxima do vídeo baixado para análise visual. Padrão: 480 px.
+- `MARKAI_VIDEO_FRAME_INTERVAL`: intervalo de amostragem inicial dos quadros. Padrão: 5 segundos.
+- `MARKAI_VIDEO_MAX_FRAMES`: máximo de quadros enviados ao modelo na análise visual. Padrão: 24.
+- `MARKAI_VIDEO_MAX_HEIGHT`: altura máxima dos quadros usados na análise visual. Padrão: 480 px.
+- `MARKAI_VIDEO_SCENE_THRESHOLD`: limiar de mudança de cena usado na seleção adaptativa. Padrão: 0,18.
 
 Exemplo:
 
