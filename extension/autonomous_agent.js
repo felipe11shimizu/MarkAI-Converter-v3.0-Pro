@@ -23,6 +23,7 @@
   function createState() {
     return {
       active: false,
+      debuggerAttached: false,
       sessionId: null,
       tabId: null,
       portalTabId: null,
@@ -53,16 +54,42 @@
       Object.assign(state, createState());
     };
 
-    async function attach(tabId) {
-      await api.debugger.attach({ tabId }, '1.3');
+    async function attachAndInitialize(tabId) {
+      const target = { tabId };
+
+      // Ownership starts only after debugger.attach() succeeds.
       try {
-        await api.debugger.sendCommand({ tabId }, 'Network.enable');
-        await api.debugger.sendCommand({ tabId }, 'Runtime.enable');
-        await api.debugger.sendCommand({ tabId }, 'Page.enable');
-        return true;
+        await api.debugger.attach(target, '1.3');
       } catch (error) {
-        try { await api.debugger.detach({ tabId }); } catch (_) {}
-        throw error;
+        return {
+          ok: false,
+          code: 'CDP_ATTACH_FAILED',
+          error: safeMessage(error, 'Falha ao anexar o CDP.')
+        };
+      }
+
+      state.debuggerAttached = true;
+
+      try {
+        for (const method of [
+          'Network.enable',
+          'Runtime.enable',
+          'Page.enable'
+        ]) {
+          await api.debugger.sendCommand(target, method);
+        }
+        return { ok: true };
+      } catch (error) {
+        // Detach is safe only because this agent successfully attached.
+        if (state.debuggerAttached) {
+          try { await api.debugger.detach(target); } catch (_) {}
+        }
+        state.debuggerAttached = false;
+        return {
+          ok: false,
+          code: 'CDP_ATTACH_FAILED',
+          error: safeMessage(error, 'Falha ao inicializar o CDP.')
+        };
       }
     }
 
@@ -96,7 +123,8 @@
         return { ok: false, code: 'TARGET_TAB_UNAVAILABLE', message: safeMessage(error, 'A aba alvo não está disponível.') };
       }
 
-      state.active = true;
+      state.active = false;
+      state.debuggerAttached = false;
       state.sessionId = (api.crypto?.randomUUID || (() => 'autonomous-' + Date.now()))();
       state.tabId = tabId;
       state.portalTabId = Number.isInteger(senderTabId) ? senderTabId : null;
@@ -105,9 +133,22 @@
       state.startedAt = Date.now();
       state.lastError = null;
 
-      let attached = false;
       try {
-        attached = await attach(tabId);
+        const result = await attachAndInitialize(tabId);
+        if (!result.ok) {
+          state.phase = PHASE.ERROR;
+          state.lastError = result.error;
+          const failure = {
+            ok: false,
+            code: 'CDP_ATTACH_FAILED',
+            message: state.lastError,
+            state: { ...state }
+          };
+          reset();
+          return failure;
+        }
+
+        state.active = true;
         state.phase = PHASE.READY;
         await emit(state.portalTabId, MESSAGE.READY, {
           sessionId: state.sessionId,
@@ -117,9 +158,15 @@
         return { ok: true, state: { ...state } };
       } catch (error) {
         state.phase = PHASE.ERROR;
-        state.lastError = safeMessage(error, 'Falha ao anexar o CDP.');
-        if (attached) await detach(tabId);
-        const result = { ok: false, code: 'CDP_ATTACH_FAILED', message: state.lastError, state: { ...state } };
+        state.lastError = safeMessage(error, 'Falha ao iniciar o agente autônomo.');
+        if (state.debuggerAttached) await detach(tabId);
+        state.debuggerAttached = false;
+        const result = {
+          ok: false,
+          code: 'CDP_ATTACH_FAILED',
+          message: state.lastError,
+          state: { ...state }
+        };
         reset();
         return result;
       }
@@ -130,7 +177,10 @@
       const tabId = state.tabId;
       const sessionId = state.sessionId;
       state.phase = PHASE.STOPPING;
-      await detach(tabId);
+      if (state.debuggerAttached) {
+        await detach(tabId);
+        state.debuggerAttached = false;
+      }
       await emit(state.portalTabId, MESSAGE.STATUS, {
         sessionId,
         tabId,
