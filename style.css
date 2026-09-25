@@ -1423,3 +1423,62 @@ body::before {
   flex: 1 1 180px;
   min-width: 0;
 }
+
+
+/* Mobile workspace toolbar: keep document actions inside the viewport. */
+@media (max-width: 600px) {
+  .workspace-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .45rem;
+    padding: .55rem .65rem;
+  }
+
+  .toolbar-left,
+  .toolbar-right {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .toolbar-left {
+    justify-content: flex-start;
+  }
+
+  .toolbar-right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: .35rem;
+    overflow: visible;
+  }
+
+  .toolbar-right .btn {
+    width: 34px;
+    min-width: 34px;
+    height: 32px;
+    padding: 0;
+    flex: 0 0 34px;
+  }
+
+  .toolbar-right .btn i {
+    width: 15px;
+    height: 15px;
+  }
+
+  .toolbar-right .btn span {
+    display: none;
+  }
+
+  .toolbar-right .btn-primary {
+    display: inline-flex;
+  }
+
+  .toolbar-right .btn-icon-sm {
+    width: 32px;
+    min-width: 32px;
+    flex-basis: 32px;
+  }
+
+  .doc-name {
+    max-width: min(70vw, 260px);
+  }
+}
