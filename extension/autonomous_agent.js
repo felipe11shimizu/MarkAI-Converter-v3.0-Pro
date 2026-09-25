@@ -12,7 +12,8 @@
     ERROR: PREFIX + 'ERROR',
     READY: PREFIX + 'READY',
     CORRELATE: PREFIX + 'CORRELATE',
-    BUILD_MAP: PREFIX + 'BUILD_MAP'
+    BUILD_MAP: PREFIX + 'BUILD_MAP',
+    BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD'
   });
   const PHASE = Object.freeze({
     IDLE: 'idle',
@@ -43,7 +44,7 @@
     const eventCorrelator = globalThis.DevTrailAutonomousEventCorrelator || null;
     const systemMapApi = globalThis.DevTrailAutonomousSystemMap || null;
     const systemMapMarkdownApi = globalThis.DevTrailAutonomousSystemMapMarkdown || null;
-    const systemMap = systemMapApi?.create?.() || null;
+    let systemMap = null;
     let installed = false;
 
     const safeMessage = (error, fallback) => {
@@ -60,6 +61,7 @@
 
     const reset = () => {
       Object.assign(state, createState());
+      systemMap = null;
     };
 
     async function attachAndInitialize(tabId) {
@@ -136,6 +138,10 @@
       state.phase = PHASE.ATTACHING;
       state.startedAt = Date.now();
       state.lastError = null;
+      systemMap = systemMapApi?.create?.({
+        session_id: state.sessionId,
+        target_url: state.targetUrl
+      }) || null;
 
       const result = await attachAndInitialize(tabId);
 
@@ -187,7 +193,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== PREFIX + 'BUILD_MAP_MD') return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -218,7 +224,7 @@
         return false;
       }
 
-      if (type === PREFIX + 'BUILD_MAP_MD') {
+      if (type === MESSAGE.BUILD_MAP_MD) {
         if (!state.active || !systemMapMarkdownApi || !systemMap) {
           sendResponse({ ok: false, code: 'SYSTEM_MAP_MARKDOWN_UNAVAILABLE' });
           return false;
