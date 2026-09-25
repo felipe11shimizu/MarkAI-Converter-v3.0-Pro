@@ -63,6 +63,7 @@ jobs:
       - run: node --check extension/autonomous_event_correlator.js
       - run: node --check extension/autonomous_system_map.js
       - run: node --check extension/autonomous_system_map_markdown.js
+      - run: node --check extension/autonomous_planner.js
       - run: node --check extension/background.js
       - name: Run frontend tests
         shell: bash
@@ -114,6 +115,7 @@ jobs:
             tests/test_devtrail_autonomous_event_correlator.js
             tests/test_devtrail_autonomous_system_map.js
             tests/test_devtrail_autonomous_system_map_markdown.js
+            tests/test_devtrail_autonomous_planner.js
           )
 
           for test in "${tests[@]}"; do
