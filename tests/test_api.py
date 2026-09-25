@@ -33,6 +33,43 @@ def test_unsupported_extension():
     assert response.status_code == 415
 
 
+def test_deep_extract_requires_ocr_configuration(monkeypatch):
+    monkeypatch.setattr(api, "OCR_ENABLED", False)
+    monkeypatch.setattr(api, "OCR_API_KEY", None)
+    response = client.post(
+        "/api/deep-extract",
+        files={"file": ("document.pdf", b"pdf", "application/pdf")},
+    )
+    assert response.status_code == 503
+
+
+def test_deep_extract_uses_dedicated_ocr_engine(monkeypatch):
+    class FakeResult:
+        markdown = "# OCR\n\nTexto recuperado da imagem."
+        text_content = ""
+
+    class FakeEngine:
+        def convert(self, path):
+            return FakeResult()
+
+    monkeypatch.setattr(api, "OCR_ENABLED", True)
+    monkeypatch.setattr(api, "OCR_API_KEY", "test-key")
+    monkeypatch.setattr(api, "_build_deep_ocr_engine", lambda: FakeEngine())
+
+    response = client.post(
+        "/api/deep-extract",
+        files={"file": ("document.pdf", b"pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ok"] is True
+    assert body["engine"] == "markitdown-ocr-deep"
+    assert body["mode"] == "deep-ocr-ai"
+    assert body["ocr"]["forced"] is True
+    assert "Texto recuperado" in body["markdown"]
+
+
 def test_convert_uses_local_file(monkeypatch):
     class FakeResult:
         markdown = "# Documento\n\nConteúdo"
