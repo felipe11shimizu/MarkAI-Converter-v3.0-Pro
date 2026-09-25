@@ -1004,3 +1004,4 @@ async def convert_batch(files: list[UploadFile] = File(...)):
             results.append(_convert_bytes(filename, suffix, data))
         except HTTPException as exc:
             results.append({"ok": False, "filename": Path(file.filename or "documento").name, "error": exc.detail, "status_code": exc.status_code})
+    return {"ok": all(item.get("ok") for item in results), "engine": "markitdown", "total": len(results), "successful": sum(1 for item in results if item.get("ok")), "failed": sum(1 for item in results if not item.get("ok")), "results": results}
