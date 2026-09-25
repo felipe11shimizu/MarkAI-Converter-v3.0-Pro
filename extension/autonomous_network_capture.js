@@ -86,33 +86,64 @@
       if (state.network.length > 2000) state.network.shift();
     }
 
-    function onEvent(source, method, params) {
-      if (!state?.active || source?.tabId !== state.tabId) return;
+    async function handleResponseReceived(tab, params) {
+      if (!state?.active || tab?.tabId !== state.tabId) return;
+
+      const request = pending.get(params?.requestId);
+      if (!request) return;
+
+      pending.delete(params.requestId);
+
+      let body = '';
+      try {
+        const result = await api?.debugger?.sendCommand?.(
+          { tabId: state.tabId },
+          'Network.getResponseBody',
+          { requestId: params.requestId }
+        );
+        body = result?.body || '';
+      } catch (_) {
+        // Response bodies are optional; preserve the network record.
+      }
+
+      let payload = request.postData;
+      try {
+        payload = request.postData ? redactObject(JSON.parse(request.postData)) : undefined;
+      } catch (_) {
+        // Keep non-JSON request bodies as strings.
+      }
+
+      const response = params?.response || {};
+      const preview = typeof body === 'string' ? body.slice(0, 1000) : clip(body, 1000);
+
+      push({
+        requestId: params.requestId || null,
+        url: response.url || request.url || null,
+        method: request.method || null,
+        status: response.status ?? null,
+        mimeType: response.mimeType || null,
+        headers: redactHeaders(request.headers || {}),
+        ...(payload === undefined ? {} : { payload }),
+        response_preview: preview,
+        timestamp_epoch_ms: now()
+      });
+    }
+
+    function onEvent(tab, method, params) {
+      if (!state?.active || tab?.tabId !== state.tabId) return;
 
       if (method === 'Network.requestWillBeSent') {
-        const record = normalizeRequest(params, now());
-        if (!shouldCapture(record.url)) return;
-        pending.set(record.requestId, record);
+        pending.set(params?.requestId, {
+          url: params?.request?.url,
+          method: params?.request?.method,
+          headers: params?.request?.headers || {},
+          postData: params?.request?.postData
+        });
         return;
       }
 
       if (method === 'Network.responseReceived') {
-        const request = pending.get(params?.requestId);
-        const response = params?.response || {};
-        if (!request || !shouldCapture(response.url || request.url, response.mimeType)) return;
-
-        const record = normalizeResponse(params, request, null, now());
-        pending.delete(params.requestId);
-
-        if (api?.debugger?.sendCommand) {
-          Promise.resolve(api.debugger.sendCommand(source, 'Network.getResponseBody', { requestId: params.requestId }))
-            .then(body => {
-              push(normalizeResponse(params, request, body?.body || null, now()));
-            })
-            .catch(() => push(record));
-        } else {
-          push(record);
-        }
+        void handleResponseReceived(tab, params);
       }
     }
 
@@ -123,7 +154,13 @@
       return true;
     }
 
-    return Object.freeze({ install, onEvent, normalizeRequest, normalizeResponse });
+    return Object.freeze({
+      install,
+      onEvent,
+      normalizeRequest,
+      normalizeResponse,
+      handleResponseReceived
+    });
   }
 
   return Object.freeze({
