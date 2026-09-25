@@ -25,7 +25,7 @@
       aiModel: 'gemini-1.5-flash',
       apiKey: '',
       markitdownEnabled: true,
-      markitdownEndpoint: globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000',
+      markitdownEndpoint: globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || '',
       syntaxHL: true,
       autoPreview: true
     };
@@ -36,7 +36,7 @@
         ...(settings || {}),
         aiProvider: settings.aiProvider || defaults.aiProvider,
         aiModel: settings.aiModel || defaults.aiModel,
-        markitdownEndpoint: settings.markitdownEndpoint || defaults.markitdownEndpoint
+        markitdownEndpoint: settings.markitdownEndpoint ?? defaults.markitdownEndpoint
       };
     }
 
