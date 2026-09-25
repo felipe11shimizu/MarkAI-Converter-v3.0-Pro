@@ -48,6 +48,13 @@ jobs:
       - run: node --check frontend/modules/devtrail_formatters.js
       - run: node --check frontend/modules/devtrail_analyzer.js
       - run: node --check frontend/modules/devtrail_specification.js
+      - run: node --check frontend/modules/devtrail_replay_plan.js
+      - run: node --check frontend/modules/devtrail_replay_validator.js
+      - run: node --check frontend/modules/devtrail_audit.js
+      - run: node --check frontend/modules/devtrail_quality.js
+      - run: node --check frontend/modules/devtrail_readiness.js
+      - run: node --check frontend/modules/devtrail_package.js
+      - run: node --check frontend/modules/devtrail_drift.js
       - run: node --check frontend/modules/devtrail_controller.js
       - run: node --check extension/content.js
       - run: node --check extension/background.js
@@ -91,6 +98,10 @@ jobs:
             tests/test_devtrail_specification.js
             tests/test_devtrail_controller.js
             tests/test_devtrail_contract.js
+            tests/test_devtrail_replay_validator.js
+            tests/test_devtrail_audit.js
+            tests/test_devtrail_drift.js
+            tests/test_devtrail_final_e2e.js
           )
 
           for test in "${tests[@]}"; do
