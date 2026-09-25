@@ -102,7 +102,20 @@ Não iniciar uma grande funcionalidade nova enquanto a auditoria não produzir:
 - Cobertos: instalação única do listener, início/finalização de sessão, prevenção de sessão duplicada, habilitação dos domínios CDP e isolamento em falha de attach.
 - CI passa a validar sintaxe do novo módulo e executar o contrato do agente.
 
+### Fase 16.2 — Scanner semântico do DOM
+Implementado em branch `feat/devtrail-autonomous-agent-phase-2-dom`:
+- `extension/autonomous_dom_scanner.js`;
+- descoberta de links, botões, campos, selects, textareas, roles, contenteditable e summary;
+- seletor estável por id/data-testid/name/aria-label com fallback estrutural;
+- estado visível/desabilitado e bounding box;
+- metadados de página e viewport;
+- proteção contra captura de texto/placeholder/valor de campos `password`;
+- execução remota via `chrome.scripting.executeScript`;
+- operação `DEVTRAIL_AUTONOMOUS_SCAN_DOM` somente para a aba da sessão autônoma ativa;
+- teste dedicado `tests/test_devtrail_autonomous_dom_scanner.js`;
+- validação de sintaxe e teste incluídos no CI.
+
 ### Próximos passos
-1. Captura semântica do DOM.
-2. Captura e normalização Network/CDP.
+1. Captura e normalização Network/CDP.
+2. Correlação de eventos DOM + Network.
 3. Agregação e exportação `system_map.json` / `system_map.md`.
