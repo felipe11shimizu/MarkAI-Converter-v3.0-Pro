@@ -23,16 +23,21 @@ assert.equal(typeof create, 'function');
   assert.match(calls[0].url, /api\.openai\.com/);
   assert.equal(calls[0].options.method, 'POST');
 
-  const geminiFetch = async (url) => ({
-    ok: true,
-    json: async () => ({ candidates: [{ content: { parts: [{ text: '# Gemini' }] } }] })
-  });
+  const geminiFetch = async (url, options) => {
+    calls.push({ url, options });
+    return {
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: '# Gemini' }] } }] })
+    };
+  };
   const gemini = create({
     getSettings: () => ({ apiKey: 'test-key', aiProvider: 'gemini', aiModel: 'gemini-test' }),
     fetchImpl: geminiFetch
   });
   assert.equal(await gemini.enhance('texto', 'preserve tables'), '# Gemini');
-  const geminiBody = JSON.parse(calls.find(call => call.url.includes('generativelanguage.googleapis.com')).options.body);
+  const geminiCall = calls.find(call => call.url.includes('generativelanguage.googleapis.com'));
+  assert.ok(geminiCall, 'Gemini request should be captured by the test fetch');
+  const geminiBody = JSON.parse(geminiCall.options.body);
   assert.equal(geminiBody.generationConfig.maxOutputTokens, 8192);
   assert.equal('temperature' in geminiBody.generationConfig, false);
 
