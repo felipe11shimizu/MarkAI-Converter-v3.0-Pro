@@ -77,6 +77,13 @@ function createChromeMock() {
   assert.equal(second.code, 'AUTONOMOUS_SESSION_ACTIVE');
   await agent.stop('cleanup');
 
+  const attachFailure = createChromeMock();
+  attachFailure.debugger.attach = async () => { throw new Error('already attached'); };
+  const attachFailing = createAgent(attachFailure);
+  const attachFailureResult = await attachFailing.start({ targetTabId: 7 }, { tab: { id: 8 } });
+  assert.equal(attachFailureResult.code, 'CDP_ATTACH_FAILED');
+  assert.equal(attachFailure.__attached.some(x => x.detached), false, 'must not detach a debugger owned by another mode');
+
   const chromeFailure = createChromeMock();
   chromeFailure.debugger.sendCommand = async () => { throw new Error('blocked'); };
   const failing = createAgent(chromeFailure);
