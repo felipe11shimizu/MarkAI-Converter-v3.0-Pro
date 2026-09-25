@@ -280,6 +280,22 @@
         return true;
       }
 
+      if (type === MESSAGE.STATUS) {
+        sendResponse({ ok: true, state: { ...state, limits: { ...state.limits } } });
+        return false;
+      }
+
+      if (type === MESSAGE.STOP) {
+        stop(message?.payload?.reason || 'manual')
+          .then(sendResponse)
+          .catch(error => sendResponse({
+            ok: false,
+            code: 'AUTONOMOUS_STOP_ERROR',
+            message: safeMessage(error, 'Erro ao finalizar o agente autônomo.')
+          }));
+        return true;
+      }
+
       if (type === MESSAGE.BUILD_MAP) {
         if (!state.active || !systemMapApi || !systemMap) {
           sendResponse({ ok: false, code: 'SYSTEM_MAP_UNAVAILABLE' });
