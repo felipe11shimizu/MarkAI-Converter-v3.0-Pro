@@ -59,6 +59,7 @@
         await api.debugger.sendCommand({ tabId }, 'Network.enable');
         await api.debugger.sendCommand({ tabId }, 'Runtime.enable');
         await api.debugger.sendCommand({ tabId }, 'Page.enable');
+        return true;
       } catch (error) {
         try { await api.debugger.detach({ tabId }); } catch (_) {}
         throw error;
@@ -104,8 +105,9 @@
       state.startedAt = Date.now();
       state.lastError = null;
 
+      let attached = false;
       try {
-        await attach(tabId);
+        attached = await attach(tabId);
         state.phase = PHASE.READY;
         await emit(state.portalTabId, MESSAGE.READY, {
           sessionId: state.sessionId,
@@ -116,7 +118,7 @@
       } catch (error) {
         state.phase = PHASE.ERROR;
         state.lastError = safeMessage(error, 'Falha ao anexar o CDP.');
-        await detach(tabId);
+        if (attached) await detach(tabId);
         const result = { ok: false, code: 'CDP_ATTACH_FAILED', message: state.lastError, state: { ...state } };
         reset();
         return result;
