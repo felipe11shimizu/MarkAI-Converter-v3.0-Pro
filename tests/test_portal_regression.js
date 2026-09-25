@@ -62,6 +62,7 @@ const requiredElements = [
   'btnCompare',
   'btnUseMarkItDown',
   'btnUseBrowser',
+  'btnDeepOCRPreview',
   'btnDownload',
   'btnReset',
   'btnSettings',
