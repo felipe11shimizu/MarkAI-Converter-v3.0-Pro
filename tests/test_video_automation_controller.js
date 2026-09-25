@@ -74,7 +74,7 @@ const controller = VideoAutomationController.create({
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
 assert.equal(controller.isVideo({ type: '', name: 'screen.webm' }), true);
 assert.equal(controller.isVideo({ type: 'text/plain', name: 'notes.txt' }), false);
-assert.deepEqual(controller.evidenceQualitySummary({ analysis: { evidencia_resumo: { correlacao_forte: 1, correlacao_aproximada: 0, sem_correlacao_temporal: 0 } }, etapas: [] } }), { total: 0, forte: 1, aproximada: 0, sem_correlacao_temporal: 0, sem_classificacao: 0, cobertura: 0, criterio: 'delta_temporal_deterministico' });
+assert.deepEqual(controller.evidenceQualitySummary({ analysis: { evidencia_resumo: { correlacao_forte: 1, correlacao_aproximada: 0, sem_correlacao_temporal: 0 } }, etapas: [] }), { total: 0, forte: 1, aproximada: 0, sem_correlacao_temporal: 0, sem_classificacao: 0, cobertura: 0, criterio: 'delta_temporal_deterministico' });
 assert.deepEqual(controller.evidenceQualitySummary({
   transcript_segments: [],
   analysis: { etapas: [
