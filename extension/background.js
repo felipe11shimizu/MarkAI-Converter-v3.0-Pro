@@ -1,3 +1,5 @@
+importScripts('autonomous_agent.js');
+
 importScripts('explorer/explorer_policy.js', 'explorer/explorer_state.js', 'explorer/explorer_engine.js');
 
 (function () {
