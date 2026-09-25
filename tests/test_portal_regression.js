@@ -56,6 +56,7 @@ const requiredElements = [
   'btnYoutubeAnalyze',
   'videoInput',
   'btnVideoAnalyze',
+  'videoAnalysisMode',
   'btnEnhanceAI',
   'workspaceProjectSelect',
   'btnCompare',
@@ -121,3 +122,7 @@ assert.match(
 );
 
 console.log('portal regression contract tests: ok');
+
+
+assert.match(index, /id=["']videoAnalysisMode["']/);
+assert.match(index, /value=["']transcript["']/);

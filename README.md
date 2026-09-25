@@ -2,6 +2,10 @@
 
 Portal web para conversão, organização, edição, pré-visualização e consolidação de documentos em Markdown.
 
+### Análise de vídeo — modo somente transcrição
+
+O portal oferece dois modos: `transcript` (somente transcrição) e `visual` (análise multimodal). O modo `transcript` não extrai quadros. Em vídeos locais, o arquivo é gravado temporariamente em disco e convertido para áudio mono 16 kHz/32 kbps antes da transcrição; em vídeos do YouTube com legenda disponível, o MP4 não é baixado. O limite independente do modo de transcrição é configurado por `MARKAI_VIDEO_TRANSCRIPT_MAX_MB` (padrão 1024 MB), enquanto `MARKAI_VIDEO_MAX_MB` continua controlando a análise visual.
+
 ## Arquitetura híbrida
 
 A versão 3.6 consolida o **Microsoft MarkItDown** como motor principal opcional no backend, mantendo os conversores JavaScript existentes como fallback automático.

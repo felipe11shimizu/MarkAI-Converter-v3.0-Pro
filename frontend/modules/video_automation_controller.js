@@ -1397,7 +1397,8 @@ function create({
         url: normalized,
         languages: [...new Set(languageList)],
         translate_to: $('youtubeTranslate')?.value || null,
-        task_prompt: $('videoPrompt')?.value || ''
+        task_prompt: $('videoPrompt')?.value || '',
+        analysis_mode: $('videoAnalysisMode')?.value || 'transcript'
       };
       const response = await fetchImpl(endpointUrl + '/api/youtube/analyze', {
         method: 'POST',
@@ -1413,7 +1414,7 @@ function create({
         throw new Error(detail || ('Falha HTTP ' + response.status));
       }
       render(data);
-      if (typeof ui.toast === 'function') ui.toast('Análise multimodal do YouTube concluída.', 'success');
+      if (typeof ui.toast === 'function') ui.toast(($('videoAnalysisMode')?.value || 'transcript') === 'transcript' ? 'Análise por transcrição do YouTube concluída.' : 'Análise multimodal do YouTube concluída.', 'success');
     } catch (error) {
       if (typeof ui.toast === 'function') ui.toast('Falha no YouTube: ' + error.message, 'error');
       else windowRef.alert('Falha no YouTube: ' + error.message);
@@ -1426,18 +1427,20 @@ function create({
     if (!file) return;
     const form = new FormData();
     form.append('file', file, file.name);
+    const analysisMode = $('videoAnalysisMode')?.value || 'transcript';
     form.append('task_prompt', $('videoPrompt')?.value || '');
+    form.append('analysis_mode', analysisMode);
     const overlay = $('procOverlay');
     const label = $('procLabel');
     const sub = $('procSub');
     if (overlay) overlay.style.display = 'flex';
     if (label) label.textContent = 'Analisando vídeo…';
-    if (sub) sub.textContent = 'Extraindo áudio, quadros e tarefas realizadas.';
+    if (sub) sub.textContent = analysisMode === 'transcript' ? 'Extraindo apenas o áudio e analisando a transcrição.' : 'Extraindo áudio, quadros e tarefas realizadas.';
     try {
       const response = await fetchImpl(endpoint() + '/api/analyze-video', {
         method: 'POST',
         body: form,
-        signal: signalTimeout(300000)
+        signal: signalTimeout(600000)
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
