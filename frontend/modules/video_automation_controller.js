@@ -559,6 +559,28 @@ function create({
     return evidenceTimeline.normalize(data);
   }
 
+  function evidenceQualitySummary(data = lastAnalysis) {
+    const analysis = data?.analysis || {};
+    const timeline = normalizeEvidenceTimeline(data);
+    const summary = analysis.evidencia_resumo || {};
+    const counts = { forte: 0, aproximada: 0, sem_correlacao_temporal: 0, sem_classificacao: 0 };
+    timeline.steps.forEach(step => {
+      const status = step?.evidenceCorrelation?.status || step?.correlacaoEvidencia?.status;
+      if (Object.prototype.hasOwnProperty.call(counts, status)) counts[status] += 1;
+      else counts.sem_classificacao += 1;
+    });
+    const total = timeline.steps.length;
+    return {
+      total,
+      forte: Number.isFinite(Number(summary.correlacao_forte)) ? Number(summary.correlacao_forte) : counts.forte,
+      aproximada: Number.isFinite(Number(summary.correlacao_aproximada)) ? Number(summary.correlacao_aproximada) : counts.aproximada,
+      sem_correlacao_temporal: Number.isFinite(Number(summary.sem_correlacao_temporal)) ? Number(summary.sem_correlacao_temporal) : counts.sem_correlacao_temporal,
+      sem_classificacao: counts.sem_classificacao,
+      cobertura: total ? Math.round(((total - counts.sem_classificacao) / total) * 100) : 0,
+      criterio: 'delta_temporal_deterministico'
+    };
+  }
+
   function reviewPackageReadiness(data = lastAnalysis) {
     if (!data) return { ready: false, reason: 'Nenhuma análise de vídeo disponível.' };
     if (!reviewFinalizedAt) return { ready: false, reason: 'Finalize a revisão humana para habilitar o pacote auditável.' };
@@ -818,11 +840,15 @@ function create({
     const evidenceSummary = analysis.evidencia_resumo || {};
     const stepsWithFrames = steps.filter(step => step.frameIndices.length > 0).length;
     const stepsWithTranscript = steps.filter(step => step.transcriptSegmentIndices.length > 0).length;
+    const quality = evidenceQualitySummary(data);
     summary.textContent =
       'Etapas: ' + steps.length +
       ' · frames correlacionados: ' + (evidenceSummary.etapas_com_frame ?? stepsWithFrames) +
       ' · fala correlacionada: ' + (evidenceSummary.etapas_com_transcricao ?? stepsWithTranscript) +
-      ' · segmentos de transcrição: ' + (evidenceSummary.segmentos_transcricao_total ?? timeline.transcriptSegments.length);
+      ' · forte: ' + quality.forte +
+      ' · aproximada: ' + quality.aproximada +
+      ' · sem correlação: ' + quality.sem_correlacao_temporal +
+      ' · cobertura classificada: ' + quality.cobertura + '%';
     root.appendChild(summary);
 
     if (!steps.length) {
@@ -838,7 +864,7 @@ function create({
     table.className = 'video-evidence-table';
     const thead = documentRef.createElement('thead');
     const headerRow = documentRef.createElement('tr');
-    ['Etapa', 'Tempo', 'Ação', 'Frame', 'Fala', 'Decisão / resultado', 'Confiança'].forEach(label => {
+    ['Etapa', 'Tempo', 'Ação', 'Frame', 'Fala', 'Correlação', 'Decisão / resultado', 'Confiança'].forEach(label => {
       const th = documentRef.createElement('th');
       th.textContent = label;
       headerRow.appendChild(th);
@@ -855,6 +881,10 @@ function create({
         String(step.actionType || 'other') + (step.action ? ' · ' + step.action : ''),
         step.frameIndices.join(', '),
         step.transcriptSegmentIndices.join(', '),
+        [
+          step.evidenceCorrelation?.status || step.correlacaoEvidencia?.status || '—',
+          step.evidenceCorrelation?.base || step.correlacaoEvidencia?.base || ''
+        ].filter(Boolean).join(' · '),
         [
           step.precondition ? 'pré: ' + step.precondition : '',
           step.postcondition ? 'pós: ' + step.postcondition : '',
@@ -1637,7 +1667,7 @@ function create({
   return {
     bind, analyze, analyzeYoutube, render, renderAutomation,
     generateAutomation, validateAnalysis, automationFilename, reviewAuditManifest, finalizeReview, isVideo,
-    normalizeEvidenceTimeline, exportReviewPackage, isReviewPackageReady, reviewPackageReadiness, reviewPackageManifest, verifyReviewPackageManifest, getOriginalAnalysis, getReviewHistory
+    normalizeEvidenceTimeline, evidenceQualitySummary, exportReviewPackage, isReviewPackageReady, reviewPackageReadiness, reviewPackageManifest, verifyReviewPackageManifest, getOriginalAnalysis, getReviewHistory
   };
 }
 

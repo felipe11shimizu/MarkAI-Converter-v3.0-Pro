@@ -123,6 +123,15 @@
       ? null
       : Math.max(0, Math.min(1, confidenceValue));
 
+    const correlation = evidenceSource.correlacao_evidencia ?? evidenceSource.evidenceCorrelation ?? item.correlacao_evidencia ?? item.evidenceCorrelation;
+    const evidenceCorrelation = correlation && typeof correlation === 'object'
+      ? {
+          status: text(correlation.status),
+          base: text(correlation.base),
+          frameDeltaSeconds: finiteNumber(correlation.frame_delta_seconds ?? correlation.frameDeltaSeconds, null)
+        }
+      : null;
+
     const evidence = {
       ...evidenceSource,
       timestampSeconds: timestamp,
@@ -143,6 +152,7 @@
       reviewStatus: normalizeReviewStatus(item.review_status ?? item.reviewStatus),
       frameIndices,
       transcriptSegmentIndices,
+      evidenceCorrelation,
       evidence
     };
   }

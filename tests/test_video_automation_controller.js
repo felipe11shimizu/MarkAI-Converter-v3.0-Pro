@@ -74,6 +74,15 @@ const controller = VideoAutomationController.create({
 assert.equal(controller.isVideo({ type: 'video/mp4', name: 'screen.mp4' }), true);
 assert.equal(controller.isVideo({ type: '', name: 'screen.webm' }), true);
 assert.equal(controller.isVideo({ type: 'text/plain', name: 'notes.txt' }), false);
+assert.deepEqual(controller.evidenceQualitySummary({ analysis: { evidencia_resumo: { correlacao_forte: 1, correlacao_aproximada: 0, sem_correlacao_temporal: 0 } }, etapas: [] }), { total: 0, forte: 1, aproximada: 0, sem_correlacao_temporal: 0, sem_classificacao: 0, cobertura: 0, criterio: 'delta_temporal_deterministico' });
+assert.deepEqual(controller.evidenceQualitySummary({
+  transcript_segments: [],
+  analysis: { etapas: [
+    { ordem: 1, evidencia: { correlacao_evidencia: { status: 'forte', base: 'frame' } } },
+    { ordem: 2, evidencia: { correlacao_evidencia: { status: 'aproximada', base: 'frame' } } },
+    { ordem: 3, evidencia: { correlacao_evidencia: { status: 'sem_correlacao_temporal', base: 'frame' } } }
+  ] }
+}), { total: 3, forte: 1, aproximada: 1, sem_correlacao_temporal: 1, sem_classificacao: 0, cobertura: 100, criterio: 'delta_temporal_deterministico' });
 assert.equal(controller.normalizeEvidenceTimeline({
   timeline: [{ frame_index: 1, timestamp: 3 }],
   transcript_segments: [{ index: 1, start: 3, duration: 2, text: 'Confirmação' }],
