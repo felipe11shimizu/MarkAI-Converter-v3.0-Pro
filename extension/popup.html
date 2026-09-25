@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>DevTrail Autonomous</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font: 13px system-ui,sans-serif; width: 360px; margin: 0; padding: 16px; box-sizing: border-box; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    label { display:block; margin: 8px 0 4px; font-weight: 600; }
+    input { width:100%; box-sizing:border-box; padding:7px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px; }
+    button { padding:8px; cursor:pointer; }
+    button.danger { font-weight:700; }
+    pre { white-space:pre-wrap; word-break:break-word; max-height:260px; overflow:auto; margin-top:12px; padding:8px; border:1px solid #8884; border-radius:6px; }
+    #status { margin-top:8px; font-size:12px; opacity:.8; }
+  </style>
+</head>
+<body>
+  <h1>DevTrail — Agente Autônomo</h1>
+  <label for="tabId">Aba alvo</label>
+  <input id="tabId" type="number" min="0" placeholder="ID da aba ativa">
+  <div class="grid">
+    <button id="start">Iniciar</button>
+    <button id="scan">Mapear DOM</button>
+    <button id="map">Construir mapa</button>
+    <button id="cycle">Executar ciclo</button>
+    <button id="status">Status</button>
+    <button id="kill" class="danger">KILL SWITCH</button>
+  </div>
+  <div id="message"></div>
+  <pre id="output">{}</pre>
+  <script src="popup.js"></script>
+</body>
+</html>
