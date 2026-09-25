@@ -803,6 +803,21 @@ document.addEventListener('DOMContentLoaded', () => {
   FileActionsUIController.bind();
   ComparisonUIController.bind();
 
+  document.getElementById('btnDeepOCRPreview')?.addEventListener('click', async () => {
+    const id = AppState.get('previewItemId');
+    if (!id) {
+      UIManager.toast('Nenhum documento está selecionado para leitura profunda.', 'warning');
+      return;
+    }
+    const item = QueueManager.getById(id);
+    if (!['pdf', 'docx', 'pptx', 'xlsx'].includes(String(item?.ext || '').toLowerCase())) {
+      UIManager.toast('Leitura profunda disponível para PDF, DOCX, PPTX e XLSX.', 'warning');
+      return;
+    }
+    document.getElementById('modalPreview')?.close?.();
+    await ConversionController.deepExtractItem(id);
+  });
+
   // File ingestion is centralized in QueueUIController.
 });
 
