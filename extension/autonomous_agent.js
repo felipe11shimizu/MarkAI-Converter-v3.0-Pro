@@ -238,8 +238,13 @@
     }
 
     function install() {
-      if (installed || !api?.runtime?.onMessage?.addListener) return false;
-      api.runtime.onMessage.addListener(onMessage);
+      if (installed) return false;
+
+      const runtime = api && api.runtime;
+      const onMessageEvent = runtime && runtime.onMessage;
+      if (!onMessageEvent || typeof onMessageEvent.addListener !== 'function') return false;
+
+      onMessageEvent.addListener(onMessage);
       api.debugger?.onDetach?.addListener?.(onDetach);
       api.tabs?.onRemoved?.addListener?.(onTabRemoved);
       installed = true;
