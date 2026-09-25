@@ -24,7 +24,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from markitdown import MarkItDown
 
@@ -38,6 +38,8 @@ MAX_URL_MB = max(1, int(os.getenv("MARKAI_MAX_URL_MB", "20")))
 MAX_URL_BYTES = MAX_URL_MB * 1024 * 1024
 VIDEO_MAX_MB = max(10, int(os.getenv("MARKAI_VIDEO_MAX_MB", "200")))
 VIDEO_MAX_BYTES = VIDEO_MAX_MB * 1024 * 1024
+VIDEO_TRANSCRIPT_MAX_MB = max(VIDEO_MAX_MB, int(os.getenv("MARKAI_VIDEO_TRANSCRIPT_MAX_MB", "1024")))
+VIDEO_TRANSCRIPT_MAX_BYTES = VIDEO_TRANSCRIPT_MAX_MB * 1024 * 1024
 VIDEO_MODEL = os.getenv("MARKAI_VIDEO_MODEL", "gpt-5.6-luna")
 VIDEO_TRANSCRIBE_MODEL = os.getenv("MARKAI_VIDEO_TRANSCRIBE_MODEL", "gpt-4o-mini-transcribe")
 VIDEO_API_KEY = os.getenv("MARKAI_VIDEO_API_KEY") or os.getenv("OPENAI_API_KEY")
@@ -338,6 +340,66 @@ def _enrich_analysis_evidence(
         "segmentos_transcricao_total": len(segment_list),
     }
     return analysis
+
+
+def _parse_analysis_json(raw: str) -> dict:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        start = raw.find("{")
+        end = raw.rfind("}")
+        if start < 0 or end <= start:
+            raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.")
+        try:
+            return json.loads(raw[start:end + 1])
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=422, detail="A IA não retornou uma análise estruturada válida.") from exc
+
+
+def _analyze_transcript_text(transcript: str, transcript_segments: list[dict] | None = None, task_prompt: str = "", source: dict | None = None) -> dict:
+    if not VIDEO_API_KEY:
+        raise HTTPException(status_code=503, detail="Análise por IA não está configurada. Defina MARKAI_VIDEO_API_KEY ou OPENAI_API_KEY.")
+    if not transcript.strip():
+        raise HTTPException(status_code=422, detail="Nenhuma transcrição foi encontrada para análise.")
+    from openai import OpenAI
+    client = OpenAI(api_key=VIDEO_API_KEY)
+    prompt = f"""Analise SOMENTE a transcrição abaixo para engenharia reversa de processo.
+Identifique as tarefas realmente descritas, em ordem temporal, sem inventar ações visuais que não estejam na fala. Para cada etapa, informe ação, tipo de ação, sistema/tela quando explicitamente mencionado, elemento ou campo mencionado, dados informados sem reproduzir credenciais, pré-condição, pós-condição, resultado, timestamp/segmentos e confiança.
+Separe observações explícitas de inferências e marque pontos que precisam de confirmação visual ou humana. Produza uma sequência neutra para implementação de automação, sem afirmar que seletores, coordenadas ou estados de tela são conhecidos quando não aparecem na transcrição.
+Retorne SOMENTE JSON válido no schema:
+{{"objetivo":"","resumo":"","etapas":[{{"ordem":1,"timestamp":"00:00","acao":"","tipo_acao":"click|double_click|type|select|hotkey|keypress|scroll|drag|wait|open|navigate|download|upload|copy|paste|check|submit|other","sistema":"","tela":"","detalhes":"","elementos":[],"alvo":{{"descricao":"","texto":"","controle":"","seletores":[],"atalho":null}},"dados":{{"valor":"","campo":"","sensivel":false}},"precondicao":"","poscondicao":"","espera_segundos":0,"resultado":"","evidencia_frame":null,"segmentos_transcricao":[],"confianca":0.0}}],"decisoes":[],"erros":[],"observacoes":[],"automacao":{{"plataforma_sugerida":"pyautogui|playwright|selenium|rpa_desktop|indefinida","observacoes":"","passos":[]}}}}
+Transcrição:
+{transcript[:120000]}
+Segmentos com timestamps:
+{json.dumps(transcript_segments or [], ensure_ascii=False)[:60000]}
+Instrução adicional:
+{task_prompt or "Descreva o processo executado a partir da fala disponível."}"""
+    response = client.responses.create(model=VIDEO_MODEL, input=[{"role": "user", "content": [{"type": "input_text", "text": prompt}]}])
+    analysis = _parse_analysis_json(getattr(response, "output_text", "") or "")
+    analysis = _enrich_analysis_evidence(analysis, transcript_segments=transcript_segments, frame_count=0, interval_seconds=VIDEO_FRAME_INTERVAL)
+    analysis.setdefault("timeline", [{"timestamp": item.get("start", 0), "transcript_segment_indices": [item.get("index")]} for item in (transcript_segments or [])])
+    analysis.setdefault("fonte_video", source or {"type": "transcript_only"})
+    return {"ok": True, "engine": "video-transcript-analyzer", "mode": "transcript_only", "analysis": analysis, "transcript": transcript, "transcript_segments": transcript_segments or [], "timeline": analysis.get("timeline", []), "frames_analyzed": 0, "frame_interval_seconds": None, "source": source or {"type": "transcript_only"}}
+
+
+def _transcribe_video_file(path: Path) -> dict:
+    ffmpeg = _video_toolchain()
+    audio_path = path.parent / "audio_transcript.mp3"
+    try:
+        proc = subprocess.run([ffmpeg, "-y", "-i", str(path), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k", str(audio_path)], capture_output=True, text=True, timeout=1800)
+        if proc.returncode != 0 or not audio_path.exists() or audio_path.stat().st_size == 0:
+            raise HTTPException(status_code=422, detail="Não foi possível extrair o áudio para transcrição.")
+        if audio_path.stat().st_size > 24 * 1024 * 1024:
+            raise HTTPException(status_code=413, detail="O áudio extraído excede o limite operacional de transcrição. Use um vídeo menor ou a transcrição do YouTube quando disponível.")
+        from openai import OpenAI
+        if not VIDEO_API_KEY:
+            raise HTTPException(status_code=503, detail="Transcrição por IA não está configurada. Defina MARKAI_VIDEO_API_KEY ou OPENAI_API_KEY.")
+        client = OpenAI(api_key=VIDEO_API_KEY)
+        with audio_path.open("rb") as audio_file:
+            transcription = client.audio.transcriptions.create(model=VIDEO_TRANSCRIBE_MODEL, file=audio_file)
+        return {"text": getattr(transcription, "text", "") or "", "segments": []}
+    finally:
+        audio_path.unlink(missing_ok=True)
 
 
 def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", transcript_override: str | None = None, transcript_segments: list[dict] | None = None, source: dict | None = None):
@@ -748,13 +810,38 @@ async def convert_url(payload: dict):
 
 
 @app.post("/api/analyze-video")
-async def analyze_video(file: UploadFile = File(...), task_prompt: str = ""):
+async def analyze_video(file: UploadFile = File(...), task_prompt: str = "", analysis_mode: str = Form("visual")):
     filename = Path(file.filename or "video.mp4").name
     suffix = Path(filename).suffix.lower()
     if suffix not in {".mp4", ".mov", ".webm", ".mkv", ".avi"}:
         raise HTTPException(status_code=415, detail="Formato de vídeo não habilitado.")
+    mode = str(analysis_mode or "visual").strip().lower()
+    if mode in {"transcript", "transcript_only", "transcricao"}:
+        root = Path(tempfile.mkdtemp(prefix="markai_transcript_"))
+        video_path = root / filename
+        total = 0
+        try:
+            with video_path.open("wb") as target:
+                while True:
+                    chunk = await file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > VIDEO_TRANSCRIPT_MAX_BYTES:
+                        raise HTTPException(status_code=413, detail=f"Vídeo para transcrição excede o limite de {VIDEO_TRANSCRIPT_MAX_MB} MB.")
+                    target.write(chunk)
+            transcription = _transcribe_video_file(video_path)
+            return _analyze_transcript_text(
+                transcription["text"],
+                transcription.get("segments", []),
+                task_prompt,
+                source={"type": "local_file", "filename": filename, "mode": "transcript_only", "size_bytes": total},
+            )
+        finally:
+            import shutil
+            shutil.rmtree(root, ignore_errors=True)
     data = await file.read(VIDEO_MAX_BYTES + 1)
-    return _analyze_video_file(filename, data, task_prompt, source={"type": "local_file", "filename": filename})
+    return _analyze_video_file(filename, data, task_prompt, source={"type": "local_file", "filename": filename, "mode": "visual"})
 
 
 @app.post("/api/convert-batch")
