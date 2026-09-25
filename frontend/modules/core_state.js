@@ -17,7 +17,7 @@ const AppState = (() => {
     activePanel: 'panelRaw',
     settings: {
       aiProvider: 'gemini',
-      aiModel: 'gemini-1.5-flash',
+      aiModel: 'gemini-3.5-flash-lite',
       apiKey: '',
       markitdownEnabled: true,
       markitdownEndpoint: getDefaultBackendEndpoint(),
