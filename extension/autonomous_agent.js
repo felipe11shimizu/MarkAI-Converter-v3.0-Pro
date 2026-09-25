@@ -14,7 +14,8 @@
     CORRELATE: PREFIX + 'CORRELATE',
     BUILD_MAP: PREFIX + 'BUILD_MAP',
     BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD',
-    PLAN: PREFIX + 'PLAN'
+    PLAN: PREFIX + 'PLAN',
+    EXECUTE: PREFIX + 'EXECUTE'
   });
   const PHASE = Object.freeze({
     IDLE: 'idle',
@@ -46,6 +47,7 @@
     const systemMapApi = globalThis.DevTrailAutonomousSystemMap || null;
     const systemMapMarkdownApi = globalThis.DevTrailAutonomousSystemMapMarkdown || null;
     const plannerApi = globalThis.DevTrailAutonomousPlanner || null;
+    const executorApi = globalThis.DevTrailAutonomousExecutor || null;
     let systemMap = null;
     let installed = false;
 
@@ -195,7 +197,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -256,6 +258,29 @@
         const plan = plannerApi.plan(map, message?.payload?.options || {});
         sendResponse({ ok: true, plan });
         return false;
+      }
+
+      if (type === MESSAGE.EXECUTE) {
+        const targetTabId = Number(message?.payload?.targetTabId);
+        if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        if (!executorApi?.execute) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_EXECUTOR_UNAVAILABLE' });
+          return false;
+        }
+        executorApi.execute(
+          api,
+          state,
+          message?.payload?.plan,
+          { ...(message?.payload?.options || {}), execute: message?.payload?.execute === true }
+        ).then(sendResponse).catch(error => sendResponse({
+          ok: false,
+          code: 'AUTONOMOUS_EXECUTION_ERROR',
+          message: safeMessage(error, 'Erro na execução autônoma.')
+        }));
+        return true;
       }
 
       if (type === MESSAGE.CORRELATE) {
@@ -336,6 +361,7 @@
       networkCapture,
       eventCorrelator,
       plannerApi,
+      executorApi,
       systemMap
     });
   }
