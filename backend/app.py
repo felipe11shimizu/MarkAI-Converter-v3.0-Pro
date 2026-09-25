@@ -45,6 +45,8 @@ VIDEO_TRANSCRIBE_MODEL = os.getenv("MARKAI_VIDEO_TRANSCRIBE_MODEL", "gpt-4o-mini
 VIDEO_API_KEY = os.getenv("MARKAI_VIDEO_API_KEY") or os.getenv("OPENAI_API_KEY")
 VIDEO_FRAME_INTERVAL = max(1, int(os.getenv("MARKAI_VIDEO_FRAME_INTERVAL", "5")))
 VIDEO_MAX_FRAMES = max(4, int(os.getenv("MARKAI_VIDEO_MAX_FRAMES", "24")))
+VIDEO_MAX_HEIGHT = max(180, int(os.getenv("MARKAI_VIDEO_MAX_HEIGHT", "480")))
+VIDEO_SCENE_THRESHOLD = min(1.0, max(0.01, float(os.getenv("MARKAI_VIDEO_SCENE_THRESHOLD", "0.18")))
 URL_TIMEOUT_SECONDS = max(5, int(os.getenv("MARKAI_URL_TIMEOUT_SECONDS", "30")))
 URL_MAX_REDIRECTS = max(0, int(os.getenv("MARKAI_URL_MAX_REDIRECTS", "3")))
 YOUTUBE_CACHE_TTL_SECONDS = max(0, int(os.getenv("MARKAI_YOUTUBE_CACHE_TTL_SECONDS", "900")))
@@ -402,6 +404,56 @@ def _transcribe_video_file(path: Path) -> dict:
         audio_path.unlink(missing_ok=True)
 
 
+def _extract_adaptive_video_frames(ffmpeg: str, video_path: Path, frames_dir: Path) -> dict:
+    """Extract low-rate, resized frames and keep scene changes only."""
+    frames_dir.mkdir(parents=True, exist_ok=True)
+    filter_graph = (
+        f"fps=1/{VIDEO_FRAME_INTERVAL},scale=-2:{VIDEO_MAX_HEIGHT},"
+        f"select='eq(n,0)+gt(scene,{VIDEO_SCENE_THRESHOLD})',showinfo"
+    )
+    try:
+        proc = subprocess.run(
+            [ffmpeg, "-y", "-i", str(video_path), "-vf", filter_graph,
+             "-vsync", "vfr", str(frames_dir / "frame_%03d.jpg")],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=504, detail="Tempo limite excedido durante a seleção adaptativa de quadros.") from exc
+    if proc.returncode != 0:
+        raise HTTPException(status_code=422, detail="Não foi possível extrair quadros adaptativos do vídeo.")
+
+    import re
+    timestamps = [float(value) for value in re.findall(r"pts_time:([0-9]+(?:\\.[0-9]+)?)", proc.stderr)]
+    frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+    if len(timestamps) > len(frame_files):
+        timestamps = timestamps[:len(frame_files)]
+    elif len(timestamps) < len(frame_files):
+        timestamps.extend(round(index * VIDEO_FRAME_INTERVAL, 3) for index in range(len(timestamps), len(frame_files)))
+
+    # The scene filter may produce more frames than the model budget.
+    # Preserve temporal order and spread the selected set across the video.
+    if len(frame_files) > VIDEO_MAX_FRAMES:
+        keep_indices = [round(index * (len(frame_files) - 1) / (VIDEO_MAX_FRAMES - 1)) for index in range(VIDEO_MAX_FRAMES)]
+        keep_indices = sorted(set(keep_indices))
+        keep_set = set(keep_indices)
+        for index, frame in enumerate(frame_files):
+            if index not in keep_set:
+                frame.unlink(missing_ok=True)
+        frame_files = [frame_files[index] for index in keep_indices]
+        timestamps = [timestamps[index] for index in keep_indices]
+
+    return {
+        "frame_files": frame_files,
+        "timestamps": [round(value, 3) for value in timestamps],
+        "sampled_frames": len(frame_files),
+        "selected_frames": len(frame_files),
+        "discarded_frames": 0,
+        "reduction_rate": 0.0,
+    }
+
+
 def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", transcript_override: str | None = None, transcript_segments: list[dict] | None = None, source: dict | None = None):
     if len(data) > VIDEO_MAX_BYTES:
         raise HTTPException(status_code=413, detail=f"Vídeo excede o limite de {VIDEO_MAX_MB} MB.")
@@ -417,7 +469,7 @@ def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", trans
     audio_path = root / "audio.mp3"
     video_path.write_bytes(data)
     try:
-        _run_ffmpeg(ffmpeg, ["-y", "-i", str(video_path), "-vf", f"fps=1/{VIDEO_FRAME_INTERVAL}", "-frames:v", str(VIDEO_MAX_FRAMES), str(frames_dir / "frame_%03d.jpg")])
+        frame_selection = _extract_adaptive_video_frames(ffmpeg, video_path, frames_dir)
         audio_result = subprocess.run([ffmpeg, "-y", "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000", "-b:a", "32k", str(audio_path)], capture_output=True, text=True, timeout=180)
         transcript = transcript_override or ""
         if transcript_override is None and audio_result.returncode == 0 and audio_path.exists() and audio_path.stat().st_size > 0:
@@ -426,7 +478,8 @@ def _analyze_video_file(filename: str, data: bytes, task_prompt: str = "", trans
                 transcription = client.audio.transcriptions.create(model=VIDEO_TRANSCRIBE_MODEL, file=audio_file)
             transcript = getattr(transcription, "text", "") or ""
 
-        frame_files = sorted(frames_dir.glob("frame_*.jpg"))
+        frame_files = frame_selection["frame_files"]
+        frame_timestamps = frame_selection["timestamps"]
         if not frame_files:
             raise HTTPException(status_code=422, detail="Não foi possível extrair quadros do vídeo.")
         client = OpenAI(api_key=VIDEO_API_KEY)
@@ -449,14 +502,17 @@ Instrução adicional:
 """
 
         content = [{"type": "input_text", "text": prompt}]
-        timeline = _build_video_timeline(
-            len(frame_files),
-            interval_seconds=VIDEO_FRAME_INTERVAL,
-            transcript_segments=transcript_segments,
-        )
+        timeline = [
+            {
+                "frame_index": index + 1,
+                "timestamp": timestamp,
+                "transcript_segment_indices": [item.get("index") for item in _nearest_transcript_segments(transcript_segments, timestamp)],
+            }
+            for index, timestamp in enumerate(frame_timestamps)
+        ]
         for idx, frame in enumerate(frame_files):
             encoded = base64.b64encode(frame.read_bytes()).decode("ascii")
-            timestamp = idx * VIDEO_FRAME_INTERVAL
+            timestamp = frame_timestamps[idx]
             nearby = _nearest_transcript_segments(transcript_segments, timestamp)
             nearby_text = "\n".join(
                 f"[{item.get('index')}] {item.get('text', '')}"
@@ -492,8 +548,18 @@ Instrução adicional:
             interval_seconds=VIDEO_FRAME_INTERVAL,
         )
         analysis.setdefault("timeline", timeline)
+        analysis["evidencia_video"] = {
+            "estrategia": "fps_intervalo_com_scale_e_scene_detection",
+            "frame_interval_seconds": VIDEO_FRAME_INTERVAL,
+            "scene_threshold": VIDEO_SCENE_THRESHOLD,
+            "max_height": VIDEO_MAX_HEIGHT,
+            "frames_extraidos_amostragem": frame_selection["sampled_frames"],
+            "frames_selecionados": len(frame_files),
+            "frames_descartados": frame_selection["discarded_frames"],
+            "taxa_reducao": frame_selection["reduction_rate"],
+        }
         analysis.setdefault("fonte_video", source or {"type": "local_file", "filename": filename})
-        return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "transcript_segments": transcript_segments or [], "timeline": timeline, "frames_analyzed": len(frame_files), "frame_interval_seconds": VIDEO_FRAME_INTERVAL, "source": source or {"type": "local_file", "filename": filename}}
+        return {"ok": True, "engine": "video-task-analyzer", "filename": filename, "analysis": analysis, "transcript": transcript, "transcript_segments": transcript_segments or [], "timeline": timeline, "frames_analyzed": len(frame_files), "frames_sampled": frame_selection["sampled_frames"], "frames_discarded": frame_selection["discarded_frames"], "frame_reduction_rate": frame_selection["reduction_rate"], "frame_timestamps": frame_timestamps, "frame_interval_seconds": VIDEO_FRAME_INTERVAL, "source": source or {"type": "local_file", "filename": filename}}
     except HTTPException:
         raise
     except Exception as exc:
