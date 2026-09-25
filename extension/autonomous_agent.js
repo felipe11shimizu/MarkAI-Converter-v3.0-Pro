@@ -239,6 +239,7 @@
       cycleRunning = true;
       try {
         const map = systemMapApi.finalize(systemMap);
+        const networkBefore = Array.isArray(state.network) ? state.network.length : 0;
         const result = await cycleApi.run(
           api,
           state,
@@ -248,6 +249,17 @@
           map,
           payload.options || {}
         );
+        if (result?.snapshot && systemMapApi.addDomSnapshot) {
+          systemMapApi.addDomSnapshot(systemMap, result.snapshot);
+        }
+        if (Array.isArray(state.network) && state.network.length > networkBefore && systemMapApi.addNetworkEvents) {
+          systemMapApi.addNetworkEvents(systemMap, state.network.slice(networkBefore));
+        }
+        result.persisted = {
+          snapshot: Boolean(result?.snapshot),
+          network_events: Math.max(0, (Array.isArray(state.network) ? state.network.length : 0) - networkBefore),
+          map_totals: systemMapApi.finalize(systemMap).totals
+        };
         state.limits.cyclesExecuted += 1;
         state.limits.actionsExecuted += Number(result?.execution?.executed || 0);
         if (state.limits.actionsExecuted >= state.limits.maxActionsTotal) {
