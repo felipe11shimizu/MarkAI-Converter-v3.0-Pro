@@ -56,21 +56,13 @@
 
     async function attachAndInitialize(tabId) {
       const target = { tabId };
+      let attachedByAgent = false;
 
-      // Ownership starts only after debugger.attach() succeeds.
       try {
         await api.debugger.attach(target, '1.3');
-      } catch (error) {
-        return {
-          ok: false,
-          code: 'CDP_ATTACH_FAILED',
-          error: safeMessage(error, 'Falha ao anexar o CDP.')
-        };
-      }
+        attachedByAgent = true;
+        state.debuggerAttached = true;
 
-      state.debuggerAttached = true;
-
-      try {
         for (const method of [
           'Network.enable',
           'Runtime.enable',
@@ -78,13 +70,17 @@
         ]) {
           await api.debugger.sendCommand(target, method);
         }
+
         return { ok: true };
       } catch (error) {
-        // Detach is safe only because this agent successfully attached.
-        if (state.debuggerAttached) {
+        // Never detach when attach() itself failed. The debugger may belong
+        // to another extension or operating mode.
+        if (attachedByAgent) {
           try { await api.debugger.detach(target); } catch (_) {}
         }
+
         state.debuggerAttached = false;
+
         return {
           ok: false,
           code: 'CDP_ATTACH_FAILED',
@@ -133,43 +129,33 @@
       state.startedAt = Date.now();
       state.lastError = null;
 
-      try {
-        const result = await attachAndInitialize(tabId);
-        if (!result.ok) {
-          state.phase = PHASE.ERROR;
-          state.lastError = result.error;
-          const failure = {
-            ok: false,
-            code: 'CDP_ATTACH_FAILED',
-            message: state.lastError,
-            state: { ...state }
-          };
-          reset();
-          return failure;
-        }
+      const result = await attachAndInitialize(tabId);
 
-        state.active = true;
-        state.phase = PHASE.READY;
-        await emit(state.portalTabId, MESSAGE.READY, {
-          sessionId: state.sessionId,
-          tabId: state.tabId,
-          targetUrl: state.targetUrl
-        });
-        return { ok: true, state: { ...state } };
-      } catch (error) {
+      if (!result.ok) {
         state.phase = PHASE.ERROR;
-        state.lastError = safeMessage(error, 'Falha ao iniciar o agente autônomo.');
-        if (state.debuggerAttached) await detach(tabId);
-        state.debuggerAttached = false;
-        const result = {
+        state.lastError = result.error;
+
+        const failure = {
           ok: false,
-          code: 'CDP_ATTACH_FAILED',
-          message: state.lastError,
+          code: result.code,
+          message: result.error,
           state: { ...state }
         };
+
         reset();
-        return result;
+        return failure;
       }
+
+      state.active = true;
+      state.phase = PHASE.READY;
+
+      await emit(state.portalTabId, MESSAGE.READY, {
+        sessionId: state.sessionId,
+        tabId: state.tabId,
+        targetUrl: state.targetUrl
+      });
+
+      return { ok: true, state: { ...state } };
     }
 
     async function stop(reason = 'manual') {
