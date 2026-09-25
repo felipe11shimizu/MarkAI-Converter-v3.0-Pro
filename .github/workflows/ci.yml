@@ -120,6 +120,7 @@ jobs:
             tests/test_devtrail_autonomous_planner.js
             tests/test_devtrail_autonomous_executor.js
             tests/test_devtrail_autonomous_cycle.js
+            tests/test_devtrail_autonomous_final_e2e.js
           )
 
           for test in "${tests[@]}"; do
