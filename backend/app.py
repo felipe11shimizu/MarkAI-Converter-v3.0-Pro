@@ -700,6 +700,7 @@ async def youtube_analyze(payload: dict):
     url = str(payload.get("url") or "").strip()
     task_prompt = str(payload.get("task_prompt") or "").strip()
     translate_to = str(payload.get("translate_to") or "").strip() or None
+    analysis_mode = str(payload.get("analysis_mode") or "visual").strip().lower()
 
     transcript = None
     transcript_error = None
@@ -716,6 +717,35 @@ async def youtube_analyze(payload: dict):
             "message": exc.message,
             "retryable": exc.retryable,
         }
+
+    if analysis_mode in {"transcript", "transcript_only", "transcricao"}:
+        if not transcript:
+            raise HTTPException(status_code=422, detail="Não foi encontrada transcrição disponível para este vídeo do YouTube.")
+        result = _analyze_transcript_text(
+            " ".join(item.get("text", "") for item in transcript.get("segments", [])),
+            transcript.get("segments", []),
+            task_prompt,
+            source={
+                "type": "youtube",
+                "video_id": transcript.get("video_id"),
+                "url": transcript.get("url", url),
+                "canonical_url": transcript.get("canonical_url", url),
+                "source_type": transcript.get("source_type"),
+                "mode": "transcript_only",
+                "visual_download": False,
+            },
+        )
+        result["transcript_metadata"] = {
+            "available": True,
+            "provider": transcript.get("provider"),
+            "language": transcript.get("language"),
+            "language_code": transcript.get("language_code"),
+            "is_generated": transcript.get("is_generated"),
+            "translated": transcript.get("translated", False),
+            "quality": transcript.get("quality"),
+            "error": transcript_error,
+        }
+        return result
 
     try:
         video = _youtube_video_service.download(url)
@@ -740,6 +770,7 @@ async def youtube_analyze(payload: dict):
                 "duration_seconds": video.get("duration_seconds"),
                 "filesize_bytes": video.get("filesize_bytes"),
                 "visual_provider": "yt-dlp",
+                "mode": "visual",
             },
         )
         result["transcript_metadata"] = {
