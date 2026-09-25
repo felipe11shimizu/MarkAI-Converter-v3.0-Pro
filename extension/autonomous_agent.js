@@ -11,7 +11,8 @@
     STATUS: PREFIX + 'STATUS',
     ERROR: PREFIX + 'ERROR',
     READY: PREFIX + 'READY',
-    CORRELATE: PREFIX + 'CORRELATE'
+    CORRELATE: PREFIX + 'CORRELATE',
+    BUILD_MAP: PREFIX + 'BUILD_MAP'
   });
   const PHASE = Object.freeze({
     IDLE: 'idle',
@@ -40,6 +41,8 @@
     const state = createState();
     const networkCapture = globalThis.DevTrailAutonomousNetworkCapture?.create?.(api, { state });
     const eventCorrelator = globalThis.DevTrailAutonomousEventCorrelator || null;
+    const systemMapApi = globalThis.DevTrailAutonomousSystemMap || null;
+    const systemMap = systemMapApi?.create?.() || null;
     let installed = false;
 
     const safeMessage = (error, fallback) => {
@@ -183,7 +186,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -194,6 +197,24 @@
             message: safeMessage(error, 'Erro inesperado no agente autônomo.')
           }));
         return true;
+      }
+
+      if (type === MESSAGE.BUILD_MAP) {
+        if (!state.active || !systemMapApi || !systemMap) {
+          sendResponse({ ok: false, code: 'SYSTEM_MAP_UNAVAILABLE' });
+          return false;
+        }
+        const payload = message?.payload || {};
+        if (payload.domSnapshot) systemMapApi.addDomSnapshot(systemMap, payload.domSnapshot);
+        if (Array.isArray(payload.domSnapshots)) {
+          payload.domSnapshots.forEach(snapshot => systemMapApi.addDomSnapshot(systemMap, snapshot));
+        }
+        if (Array.isArray(payload.steps)) systemMapApi.addCorrelatedSteps(systemMap, payload.steps);
+        if (Array.isArray(payload.flows)) payload.flows.forEach(flow => systemMapApi.addFlow(systemMap, flow));
+        if (Array.isArray(payload.diagnostics)) systemMapApi.addDiagnostics(systemMap, payload.diagnostics);
+        const result = systemMapApi.finalize(systemMap);
+        sendResponse({ ok: true, map: result });
+        return false;
       }
 
       if (type === MESSAGE.CORRELATE) {
@@ -272,7 +293,8 @@
       onTabRemoved,
       install,
       networkCapture,
-      eventCorrelator
+      eventCorrelator,
+      systemMap
     });
   }
 
