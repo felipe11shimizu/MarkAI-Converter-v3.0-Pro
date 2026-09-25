@@ -66,6 +66,33 @@
     } catch (error) { show({ ok: false, code: 'POPUP_ERROR', message: error.message }); }
   });
 
+  const download = (filename, content, type) => {
+    const blob = new Blob([content], { type });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
+
+  const exportEvidence = async format => {
+    try {
+      const result = await send('DEVTRAIL_AUTONOMOUS_EXPORT', { format });
+      if (!result?.ok) return show(result);
+      download(
+        format === 'markdown' ? 'devtrail-system-map.md' : 'devtrail-system-map.json',
+        result.content,
+        format === 'markdown' ? 'text/markdown;charset=utf-8' : 'application/json;charset=utf-8'
+      );
+      show({ ok: true, code: 'EVIDENCE_EXPORTED', format });
+    } catch (error) { show({ ok: false, code: 'POPUP_ERROR', message: error.message }); }
+  };
+
+  $('status').insertAdjacentHTML('afterend', '<button id="exportJson">Exportar JSON</button><button id="exportMd">Exportar Markdown</button>');
+  $('exportJson').addEventListener('click', () => exportEvidence('json'));
+  $('exportMd').addEventListener('click', () => exportEvidence('markdown'));
+
   $('status').addEventListener('click', async () => {
     try { show(await send('DEVTRAIL_AUTONOMOUS_STATUS', { targetTabId: await resolveTabId() })); }
     catch (error) { show({ ok: false, code: 'POPUP_ERROR', message: error.message }); }

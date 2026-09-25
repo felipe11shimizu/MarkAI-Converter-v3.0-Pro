@@ -18,5 +18,8 @@ assert.match(popupJs, /DEVTRAIL_AUTONOMOUS_BUILD_MAP/);
 assert.match(popupJs, /DEVTRAIL_AUTONOMOUS_CYCLE/);
 assert.match(popupJs, /DEVTRAIL_AUTONOMOUS_STATUS/);
 assert.match(popupJs, /DEVTRAIL_AUTONOMOUS_KILL/);
+assert.match(popupJs, /DEVTRAIL_AUTONOMOUS_EXPORT/);
+assert.match(popupJs, /devtrail-system-map\.json/);
+assert.match(popupJs, /devtrail-system-map\.md/);
 
 console.log('devtrail autonomous control panel tests: ok');
