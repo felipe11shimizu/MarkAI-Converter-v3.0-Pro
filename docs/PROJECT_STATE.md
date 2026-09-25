@@ -290,3 +290,21 @@ Implementada na branch `feat/devtrail-autonomous-control-panel-phase-13`:
 1. CI verde da Fase 16.13.
 2. Carregar a extensão como "Load unpacked" no Chrome e validar uma página HTTP/HTTPS real.
 3. Corrigir somente problemas observados no teste operacional.
+
+### Fase 16.14 — Persistência de evidências do ciclo autônomo
+Implementada na branch `feat/devtrail-autonomous-evidence-persistence-phase-14`:
+- o snapshot DOM pós-ação do ciclo agora é incorporado ao `systemMap` persistente da sessão;
+- eventos Network novos produzidos durante o ciclo também são incorporados ao mapa;
+- nova operação `addNetworkEvents` com deduplicação determinística;
+- resultado do ciclo informa o que foi persistido e os totais atuais do mapa;
+- teste do System Map ampliado para validar inserção e atualização de evidência Network;
+- não altera o contrato do Planner, Executor ou Cycle;
+- mantém redaction e limites da captura Network existentes.
+
+### Decisão arquitetural
+O ciclo continua recebendo um mapa finalizado para planejamento, mas a persistência da evidência ocorre no objeto `systemMap` original mantido pelo agente. Assim, ciclos sucessivos acumulam evidências sem depender de estado global externo.
+
+### Próximos passos
+1. CI da Fase 16.14.
+2. Teste operacional no Chrome usando o painel da Fase 16.13.
+3. Ajustes finais somente se o teste real revelar incompatibilidades.
