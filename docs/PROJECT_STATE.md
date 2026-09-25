@@ -9,7 +9,16 @@
 - PR #3: permanece integrado e preservado
 
 ## Estado atual
-A Fase 7 de modularização de UI foi integrada na `main`.
+A Fase 14.5 — painel de qualidade da evidência foi integrada na `main` e validada pelo CI.
+As fases recentes de Video Intelligence foram concluídas:
+- Fase 14 — otimização de análise por transcrição;
+- Fase 14.2 — análise visual adaptativa;
+- Fase 14.3 — correlação precisa de evidências;
+- Fase 14.4 — qualidade determinística da correlação;
+- Fase 14.5 — painel de qualidade da evidência.
+
+O DevTrail também possui a cadeia consolidada das fases 1–13, incluindo especificação, prontidão, pacote RPA, plano de replay, validação, auditoria, drift/regressão e E2E.
+
 A arquitetura atual possui, entre outros:
 - QueueUIController
 - WorkspaceUIController
@@ -21,6 +30,8 @@ A arquitetura atual possui, entre outros:
 - YouTubeController
 - SettingsController
 - VideoAutomationController
+- VideoEvidenceTimeline
+- módulos de auditoria, replay, drift e pacote DevTrail
 
 ## Regras de continuidade
 1. `main` deve permanecer estável.
