@@ -6,7 +6,7 @@ global.DevTrailAutonomousSystemMap = require('../extension/autonomous_system_map
 global.DevTrailAutonomousSystemMapMarkdown = require('../extension/autonomous_system_map_markdown.js');
 global.DevTrailAutonomousPlanner = require('../extension/autonomous_planner.js');
 global.DevTrailAutonomousExecutor = require('../extension/autonomous_executor.js');
-global.DevTrailAutonomousDomScanner = require('../extension/autonomous_dom_scanner.js');
+global.DevTrailAutonomousDomScanner = require('../extension/autonomous_dom_scanner.js')();
 global.DevTrailAutonomousCycle = require('../extension/autonomous_cycle.js');
 
 const createAgent = require('../extension/autonomous_agent.js');
