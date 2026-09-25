@@ -84,3 +84,25 @@ Não iniciar uma grande funcionalidade nova enquanto a auditoria não produzir:
 - PR #3: `refactor: modularize workspace and queue UI`
 - PR #4: `fix: persist workspace after queue merge`
 - Correções posteriores: delegação de merge/conversão, injeção de timer, testes de ZIP, prevenção de nomes duplicados, teste do file picker e remoção de dependência obsoleta de MergeEngine no QueueUIController.
+
+
+## Fase 16 — Agente Autônomo de Exploração e Mapeamento
+
+### Passo 1 — Arquitetura e isolamento
+- Criado `extension/autonomous_agent.js` como núcleo isolado do agente autônomo.
+- Mantido o gravador reativo existente em `extension/background.js` sem compartilhar estado interno.
+- Criado namespace de mensagens `DEVTRAIL_AUTONOMOUS_*`.
+- Criado gerenciamento de sessão com estados `idle`, `attaching`, `ready`, `stopping` e `error`.
+- O núcleo possui tratamento de erro CDP e cleanup de sessão.
+- Em falha de `chrome.debugger.attach`, o agente não executa `detach`, evitando interferência sobre uma sessão CDP pertencente ao modo reativo.
+- O núcleo ainda não executa exploração DOM nem coleta Network; essas responsabilidades entram nos Passos 2 e 3.
+
+### Validação
+- Adicionado `tests/test_devtrail_autonomous_agent.js`.
+- Cobertos: instalação única do listener, início/finalização de sessão, prevenção de sessão duplicada, habilitação dos domínios CDP e isolamento em falha de attach.
+- CI passa a validar sintaxe do novo módulo e executar o contrato do agente.
+
+### Próximos passos
+1. Captura semântica do DOM.
+2. Captura e normalização Network/CDP.
+3. Agregação e exportação `system_map.json` / `system_map.md`.
