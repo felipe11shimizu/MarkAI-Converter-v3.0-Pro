@@ -29,13 +29,25 @@
     ]));
   }
 
+
+  function normalizePayload(value) {
+    if (value == null) return null;
+    if (typeof value === 'object') return redactObject(value);
+    const text = clip(value, 12000);
+    try {
+      return redactObject(JSON.parse(text));
+    } catch (_) {
+      return text;
+    }
+  }
+
   function normalizeRequest(params, timestamp) {
     const request = params?.request || {};
     return {
       requestId: params?.requestId || null,
       url: clip(request.url, 2000),
       method: request.method || null,
-      payload: redactObject(clip(request.postData || null, 12000)),
+      payload: normalizePayload(request.postData || null),
       headers: redactHeaders(request.headers || {}),
       timestamp_epoch_ms: timestamp
     };
