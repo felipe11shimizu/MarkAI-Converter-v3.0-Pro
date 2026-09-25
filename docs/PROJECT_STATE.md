@@ -127,7 +127,21 @@ Implementado em `feat/devtrail-autonomous-agent-phase-3-network`:
 - limite de histórico de 2.000 eventos;
 - teste dedicado e validação no CI.
 
+
+### Fase 16.4 — Correlação DOM + Network
+Implementado em `feat/devtrail-autonomous-agent-phase-4-correlation`:
+- `extension/autonomous_event_correlator.js`;
+- correlação temporal de eventos DOM com chamadas Network da mesma sessão;
+- janela padrão de 5 segundos após cada evento DOM;
+- ordenação cronológica e limite por evento;
+- normalização de eventos e resumo determinístico;
+- exposição via `DEVTRAIL_AUTONOMOUS_CORRELATE`;
+- isolamento por `tabId` e exigência de sessão autônoma ativa;
+- teste dedicado e validação no CI.
+
+A correlação não altera o recorder reativo existente e não executa ações no alvo.
+
 ### Próximos passos
-1. Captura e normalização Network/CDP.
-2. Correlação de eventos DOM + Network.
-3. Agregação e exportação `system_map.json` / `system_map.md`.
+1. Agregação dos dados correlacionados em `system_map.json`.
+2. Geração de `system_map.md` para leitura humana.
+3. Planejamento/autonomia controlada sobre o mapa.
