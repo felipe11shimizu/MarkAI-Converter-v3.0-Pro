@@ -326,3 +326,24 @@ A exportação ocorre sobre o mapa já mantido pela sessão. O popup apenas soli
 1. CI da Fase 16.15.
 2. Teste operacional completo no Chrome.
 3. Consolidar o agente autônomo como módulo operacional estável após a validação real.
+
+
+### Fase 17 — Leitura profunda OCR + IA para documentos
+Implementada em branch `feat/deep-document-ocr-reader`:
+- criado endpoint `POST /api/deep-extract` para PDF, DOCX, PPTX e XLSX;
+- criado motor dedicado `MarkItDown(enable_plugins=True, llm_client, llm_model, llm_prompt)` para forçar a rota OCR/visão quando o usuário solicitar leitura profunda;
+- prompt especializado para preservar texto integral, estrutura, tabelas, cabeçalhos, rodapés, carimbos e conteúdo de páginas escaneadas, sem resumir ou inventar texto;
+- exposto `deepExtract()` no `MarkItDownEngine` do frontend;
+- adicionada ação `deepExtractItem()` ao `ConversionController`;
+- botão `Leitura profunda (OCR + IA)` no preview e ação de OCR na fila para formatos compatíveis;
+- resultado registra `engine=markitdown-ocr-deep` e `extractionMode=deep-ocr-ai`;
+- falha do OCR não substitui silenciosamente o resultado anterior: o usuário recebe mensagem explícita;
+- testes de API, conversão e contrato do portal atualizados.
+
+### Decisão arquitetural
+A conversão normal continua rápida e preserva o fluxo atual. A leitura profunda é um segundo estágio deliberadamente acionado pelo usuário quando identificar conteúdo ausente ou insuficiente. O estágio utiliza o plugin `markitdown-ocr`, que suporta OCR de imagens incorporadas e fallback de página inteira para PDFs escaneados, usando LLM Vision. O frontend não envia o documento diretamente ao provedor de IA; o arquivo é enviado ao backend configurado, que executa o estágio OCR.
+
+### Próximos passos
+1. CI da Fase 17.
+2. Teste real com o PDF judicial anexado, verificando se o texto das páginas 1–5 é recuperado integralmente.
+3. Ajustar somente se a execução real revelar perda de layout, tabelas ou texto.
