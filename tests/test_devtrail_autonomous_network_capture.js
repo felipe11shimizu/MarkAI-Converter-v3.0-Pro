@@ -51,6 +51,7 @@ const createNetwork = require('../extension/autonomous_network_capture.js');
 
   await new Promise(resolve => setTimeout(resolve, 0));
 
+  assert.deepEqual(commands[0].target, { tabId: 7 });
   assert.equal(commands[0].method, 'Network.getResponseBody');
   assert.equal(state.network.length, 1);
   assert.equal(state.network[0].status, 200);
