@@ -162,6 +162,21 @@ Implementada em `feat/devtrail-autonomous-agent-phase-6-system-map-md`:
 - exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP_MD`;
 - teste dedicado e validação no CI.
 
+### Fase 16.7 — Planner de exploração autônoma
+Implementado em branch de correção da Fase 16.7:
+- `extension/autonomous_planner.js`;
+- planejamento determinístico sem execução de ações;
+- priorização de elementos visíveis e interativos;
+- exclusão de elementos ocultos/desabilitados;
+- prevenção de repetição de elementos já observados;
+- limites explícitos de ações, navegação e inputs;
+- todas as ações planejadas exigem validação;
+- exposição via `DEVTRAIL_AUTONOMOUS_PLAN`;
+- carregamento explícito do planner no `background.js`;
+- teste dedicado e validação no CI.
+
+O planner permanece em modo `observe-plan-only`: não executa clique, digitação ou navegação.
+
 ### Próximos passos
 1. Planner de exploração baseado no mapa.
 2. Executor autônomo controlado com guardrails.

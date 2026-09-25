@@ -13,7 +13,8 @@
     READY: PREFIX + 'READY',
     CORRELATE: PREFIX + 'CORRELATE',
     BUILD_MAP: PREFIX + 'BUILD_MAP',
-    BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD'
+    BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD',
+    PLAN: PREFIX + 'PLAN'
   });
   const PHASE = Object.freeze({
     IDLE: 'idle',
@@ -44,6 +45,7 @@
     const eventCorrelator = globalThis.DevTrailAutonomousEventCorrelator || null;
     const systemMapApi = globalThis.DevTrailAutonomousSystemMap || null;
     const systemMapMarkdownApi = globalThis.DevTrailAutonomousSystemMapMarkdown || null;
+    const plannerApi = globalThis.DevTrailAutonomousPlanner || null;
     let systemMap = null;
     let installed = false;
 
@@ -193,7 +195,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -237,6 +239,22 @@
         if (Array.isArray(payload.diagnostics)) systemMapApi?.addDiagnostics?.(systemMap, payload.diagnostics);
         const result = systemMapApi.finalize(systemMap);
         sendResponse({ ok: true, markdown: systemMapMarkdownApi.render(result), map: result });
+        return false;
+      }
+
+      if (type === MESSAGE.PLAN) {
+        const targetTabId = Number(message?.payload?.targetTabId);
+        if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        if (!plannerApi?.plan || !systemMapApi || !systemMap) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_PLANNER_UNAVAILABLE' });
+          return false;
+        }
+        const map = systemMapApi.finalize(systemMap);
+        const plan = plannerApi.plan(map, message?.payload?.options || {});
+        sendResponse({ ok: true, plan });
         return false;
       }
 
@@ -317,6 +335,7 @@
       install,
       networkCapture,
       eventCorrelator,
+      plannerApi,
       systemMap
     });
   }
