@@ -152,7 +152,17 @@ Implementado em `feat/devtrail-autonomous-agent-phase-5-system-map`:
 - exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP`;
 - teste dedicado e validação no CI.
 
+### Fase 16.6 — Geração `system_map.md`
+Implementada em `feat/devtrail-autonomous-agent-phase-6-system-map-md`:
+- `extension/autonomous_system_map_markdown.js`;
+- renderização determinística do mapa em Markdown;
+- resumo de sessão, páginas, elementos, ações, Network, fluxos e diagnósticos;
+- escaping básico para células Markdown;
+- preservação das regras de redaction e segurança;
+- exposição via `DEVTRAIL_AUTONOMOUS_BUILD_MAP_MD`;
+- teste dedicado e validação no CI.
+
 ### Próximos passos
-1. Geração de `system_map.md` para leitura humana.
-2. Planner de exploração baseado no mapa.
-3. Executor autônomo controlado com guardrails.
+1. Planner de exploração baseado no mapa.
+2. Executor autônomo controlado com guardrails.
+3. Validação pós-ação e prevenção de loops.
