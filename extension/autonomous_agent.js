@@ -264,6 +264,13 @@
     });
   }
 
+  // CommonJS/Node tests must receive a factory so the test controls
+  // installation explicitly. The browser service worker receives an
+  // already-installed agent instance.
+  if (typeof module === 'object' && module.exports) {
+    return createAgent;
+  }
+
   if (chromeApi?.runtime?.onMessage && chromeApi?.debugger) {
     const agent = createAgent(chromeApi);
     agent.install();
