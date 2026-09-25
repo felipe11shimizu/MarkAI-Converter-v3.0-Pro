@@ -296,6 +296,7 @@ def _enrich_analysis_evidence(
     transcript_segments: list[dict] | None,
     frame_count: int,
     interval_seconds: int,
+    frame_timestamps: list[float] | None = None,
 ) -> dict:
     etapas = analysis.get("etapas")
     if not isinstance(etapas, list):
@@ -321,13 +322,21 @@ def _enrich_analysis_evidence(
             frame_index = min(max(index, 1), max(frame_count, 1))
             timestamp_seconds = (frame_index - 1) * interval_seconds
         else:
-            frame_index = int(round(timestamp_seconds / max(interval_seconds, 1))) + 1
+            if frame_timestamps:
+                frame_index = min(
+                    range(1, len(frame_timestamps) + 1),
+                    key=lambda candidate: abs(frame_timestamps[candidate - 1] - timestamp_seconds),
+                )
+            else:
+                frame_index = int(round(timestamp_seconds / max(interval_seconds, 1))) + 1
             frame_index = min(max(frame_index, 1), max(frame_count, 1))
 
         nearby = _nearest_transcript_segments(segment_list, timestamp_seconds)
         step["evidencia"] = {
             "timestamp_seconds": round(timestamp_seconds, 3),
             "frame_indices": [frame_index] if frame_count else [],
+            "frame_timestamp_seconds": round(frame_timestamps[frame_index - 1], 3) if frame_timestamps and frame_count else None,
+            "frame_delta_seconds": round(abs(frame_timestamps[frame_index - 1] - timestamp_seconds), 3) if frame_timestamps and frame_count else None,
             "transcript_segment_indices": [item.get("index") for item in nearby],
         }
         # Keep a stable reference list for downstream automation/exporters.
@@ -547,6 +556,7 @@ Instrução adicional:
             transcript_segments=transcript_segments,
             frame_count=len(frame_files),
             interval_seconds=VIDEO_FRAME_INTERVAL,
+            frame_timestamps=frame_timestamps,
         )
         analysis.setdefault("timeline", timeline)
         analysis["evidencia_video"] = {
