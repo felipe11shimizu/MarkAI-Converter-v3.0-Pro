@@ -11,5 +11,5 @@
     "js": ["content.js"],
     "run_at": "document_start"
   }],
-  "action": {"default_title": "DevTrail Telemetry Recorder"}
+  "action": {"default_title": "DevTrail Telemetry Recorder", "default_popup": "popup.html"}
 }

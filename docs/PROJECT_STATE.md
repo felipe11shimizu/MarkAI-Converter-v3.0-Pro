@@ -275,3 +275,18 @@ Com o CI verde desta fase, a cadeia autônoma fica coberta de ponta a ponta em t
 ### Próximos passos
 - Após o merge, executar validação operacional manual da extensão no Chrome contra uma página HTTP/HTTPS real.
 - Corrigir somente problemas observados nessa validação, preservando o baseline testado.
+
+### Fase 16.13 — Painel operacional do agente autônomo
+Implementada na branch `feat/devtrail-autonomous-control-panel-phase-13`:
+- `extension/popup.html` como painel operacional da extensão;
+- `extension/popup.js` com ações Iniciar, Mapear DOM, Construir mapa, Executar ciclo, Status e Kill Switch;
+- descoberta automática da aba ativa com possibilidade de informar `tabId` manualmente;
+- execução sempre através das mensagens do agente, preservando os guardrails existentes;
+- `DEVTRAIL_AUTONOMOUS_STATUS` e `DEVTRAIL_AUTONOMOUS_STOP` expostos diretamente pelo agente;
+- `manifest.json` aponta `popup.html` como popup da extensão;
+- teste estático do painel e syntax check incluídos no CI.
+
+### Próximos passos
+1. CI verde da Fase 16.13.
+2. Carregar a extensão como "Load unpacked" no Chrome e validar uma página HTTP/HTTPS real.
+3. Corrigir somente problemas observados no teste operacional.
