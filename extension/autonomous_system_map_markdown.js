@@ -26,7 +26,7 @@
       '## Ações correlacionadas','', table(['Evento','Tipo','Elemento','URL','Network refs'], (map.actions||[]).map(action => [cell(action.action_id),cell(action.tipo_evento),cell(action.elemento),cell(action.url),cell((action.network_refs||[]).join(', '))])),'',
       '## Network observado','', table(['ID','Método','Status','URL','MIME'], (map.network||[]).map(item => [cell(item.network_id),cell(item.metodo||item.method),cell(item.status),cell(item.url),cell(item.mimeType||item.mime)])),'',
       '## Fluxos','', table(['ID','Nome/Descrição'], (map.flows||[]).map(flow => [cell(flow.flow_id),cell(flow.name||flow.description||flow.tipo||JSON.stringify(flow))])),'',
-      '## Diagnósticos','', table(['ID','Tipo','Mensagem'], (map.diagnostics||[]).map(item => [cell(item.id),cell(item.type||item.tipo),cell(item.message||item.mensagem||JSON.stringify(item)])),'',
+      '## Diagnósticos','', table(['ID','Tipo','Mensagem'], (map.diagnostics||[]).map(item => [cell(item.id),cell(item.type||item.tipo),cell(item.message||item.mensagem||JSON.stringify(item))])),'',
       '## Critérios de exploração','',
       '- O mapa é descritivo; esta fase não executa ações no alvo.',
       '- Elementos de senha não devem conter valor, placeholder ou texto sensível.',
