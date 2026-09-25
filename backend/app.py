@@ -432,6 +432,9 @@ def _extract_adaptive_video_frames(ffmpeg: str, video_path: Path, frames_dir: Pa
     elif len(timestamps) < len(frame_files):
         timestamps.extend(round(index * VIDEO_FRAME_INTERVAL, 3) for index in range(len(timestamps), len(frame_files)))
 
+    candidate_count = (int(timestamps[-1] / VIDEO_FRAME_INTERVAL) + 1) if timestamps else len(frame_files)
+    selected_before_cap = len(frame_files)
+
     # The scene filter may produce more frames than the model budget.
     # Preserve temporal order and spread the selected set across the video.
     if len(frame_files) > VIDEO_MAX_FRAMES:
@@ -447,10 +450,10 @@ def _extract_adaptive_video_frames(ffmpeg: str, video_path: Path, frames_dir: Pa
     return {
         "frame_files": frame_files,
         "timestamps": [round(value, 3) for value in timestamps],
-        "sampled_frames": len(frame_files),
+        "sampled_frames": candidate_count,
         "selected_frames": len(frame_files),
-        "discarded_frames": 0,
-        "reduction_rate": 0.0,
+        "discarded_frames": max(0, candidate_count - len(frame_files)),
+        "reduction_rate": round(max(0, candidate_count - len(frame_files)) / max(candidate_count, 1), 4),
     }
 
 
