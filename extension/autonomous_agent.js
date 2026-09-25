@@ -212,6 +212,7 @@
   if (chromeApi?.runtime?.onMessage && chromeApi?.debugger) {
     const agent = createAgent(chromeApi);
     agent.install();
+    return agent;
   }
 
   return createAgent;
