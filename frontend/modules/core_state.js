@@ -47,18 +47,37 @@ const AppState = (() => {
 
   function getDefaultBackendEndpoint() {
     const configured = globalThis.MARKAI_CONFIG?.backendUrl;
-    if (configured) return String(configured).replace(/\/$/, '');
+    if (configured) return String(configured).trim().replace(/\/$/, '');
     try {
-      const fromQuery = new URL(globalThis.location?.href || '').searchParams.get('backend');
+      const location = globalThis.location;
+      const fromQuery = new URL(location?.href || '').searchParams.get('backend');
       if (fromQuery) return String(fromQuery).trim().replace(/\/$/, '');
-    } catch (_) {}
-    return 'http://localhost:8000';
+      const hostname = String(location?.hostname || '').toLowerCase();
+      const isLocal = hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '::1' ||
+        hostname.endsWith('.local');
+      return isLocal ? 'http://localhost:8000' : '';
+    } catch (_) {
+      // Node/test environments have no browser location: retain the local default.
+      return 'http://localhost:8000';
+    }
   }
 
   function loadSettings() {
     try {
       const saved = localStorage.getItem('markai-settings');
-      if (saved) Object.assign(_state.settings, JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        Object.assign(_state.settings, parsed);
+        // Do not carry a local-machine endpoint into a public portal.
+        const defaultEndpoint = getDefaultBackendEndpoint();
+        const hostname = String(globalThis.location?.hostname || '').toLowerCase();
+        const isPublicBrowser = hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '::1' && !hostname.endsWith('.local');
+        if (isPublicBrowser && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/i.test(String(_state.settings.markitdownEndpoint || ''))) {
+          _state.settings.markitdownEndpoint = defaultEndpoint;
+        }
+      }
     } catch(e) {}
   }
 

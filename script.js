@@ -469,7 +469,7 @@ const UIManager = (() => {
       aiModel: els.aiModel?.value ?? 'gemini-1.5-flash',
       apiKey: els.aiApiKey?.value ?? '',
       markitdownEnabled: els.toggleMarkItDown ? els.toggleMarkItDown.checked : true,
-      markitdownEndpoint: els.markitdownEndpoint?.value.trim() || (globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || 'http://localhost:8000'),
+      markitdownEndpoint: els.markitdownEndpoint?.value.trim() ?? (globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || ''),
       syntaxHL: els.toggleSyntaxHL ? els.toggleSyntaxHL.checked : true,
       autoPreview: els.toggleAutoPreview ? els.toggleAutoPreview.checked : true
     }),

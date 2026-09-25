@@ -46,7 +46,11 @@ function create({
 
   const endpoint = () => {
     const s = getSettings() || {};
-    return (s.markitdownEndpoint || 'http://localhost:8000').replace(/\/$/, '');
+    const value = String(s.markitdownEndpoint || '').trim().replace(/\/$/, '');
+    if (!value) {
+      throw new Error('Backend não configurado. Para análise de vídeo/YouTube no portal publicado, informe a URL pública do backend em Configurações → Motor de Conversão.');
+    }
+    return value;
   };
 
   function openModal() {

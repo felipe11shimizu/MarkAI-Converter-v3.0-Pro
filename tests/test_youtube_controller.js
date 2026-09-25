@@ -62,5 +62,16 @@ const controller = YouTubeController.create({
   assert.equal(calls[1].url, 'http://localhost:8000/api/youtube/transcripts');
   assert.ok(events.some(e => e[0] === 'text' && e[1].includes('Legendas disponíveis')));
 
+  const missingEndpointEvents = [];
+  const missingEndpointController = YouTubeController.create({
+    urlService: { isYouTubeUrl: url => String(url).includes('youtube.com/watch') },
+    getSettings: () => ({ markitdownEndpoint: '' }),
+    fetchImpl: async () => { throw new Error('fetch should not be called'); },
+    ui: { toast: (message, type) => missingEndpointEvents.push([message, type]) }
+  });
+  const missingResult = await missingEndpointController.transcribe('https://youtube.com/watch?v=abc');
+  assert.equal(missingResult, null);
+  assert.ok(missingEndpointEvents.some(e => e[0].includes('Backend não configurado')));
+
   console.log('youtube_controller module tests: ok');
 })();
