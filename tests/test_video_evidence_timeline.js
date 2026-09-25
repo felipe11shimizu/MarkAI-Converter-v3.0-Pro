@@ -113,5 +113,20 @@ assert.equal(Timeline.timestampSeconds('invalid'), null);
 
 console.log('video evidence timeline tests: ok');
 
-const quality = normalizeStep({ evidencia: { correlacao_evidencia: { status: 'forte', base: 'frame', frame_delta_seconds: 1.25 } } }, 0);
-assert.deepEqual(quality.evidenceCorrelation, { status: 'forte', base: 'frame', frameDeltaSeconds: 1.25 });
+const quality = Timeline.normalizeStep(
+  {
+    evidencia: {
+      correlacao_evidencia: {
+        status: 'forte',
+        base: 'frame',
+        frame_delta_seconds: 1.25
+      }
+    }
+  },
+  0
+);
+assert.deepEqual(quality.evidenceCorrelation, {
+  status: 'forte',
+  base: 'frame',
+  frameDeltaSeconds: 1.25
+});
