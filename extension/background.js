@@ -1,3 +1,7 @@
+importScripts('autonomous_agent.js');
+const devTrailAutonomousAgent = globalThis.DevTrailAutonomousAgent?.(chrome);
+devTrailAutonomousAgent?.install?.();
+
 importScripts('explorer/explorer_policy.js', 'explorer/explorer_state.js', 'explorer/explorer_engine.js');
 
 (function () {
