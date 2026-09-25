@@ -115,6 +115,18 @@ Implementado em branch `feat/devtrail-autonomous-agent-phase-2-dom`:
 - teste dedicado `tests/test_devtrail_autonomous_dom_scanner.js`;
 - validação de sintaxe e teste incluídos no CI.
 
+### Fase 16.3 — Captura e normalização Network/CDP
+Implementado em `feat/devtrail-autonomous-agent-phase-3-network`:
+- `extension/autonomous_network_capture.js`;
+- captura de `Network.requestWillBeSent` e `Network.responseReceived`;
+- recuperação opcional de corpo via `Network.getResponseBody`;
+- normalização de URL, método, status, MIME, payload, headers e latência;
+- filtragem de ruído e conteúdo binário;
+- redaction de credenciais, cookies, tokens e chaves;
+- captura restrita à aba da sessão autônoma;
+- limite de histórico de 2.000 eventos;
+- teste dedicado e validação no CI.
+
 ### Próximos passos
 1. Captura e normalização Network/CDP.
 2. Correlação de eventos DOM + Network.
