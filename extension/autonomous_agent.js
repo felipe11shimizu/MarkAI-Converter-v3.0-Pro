@@ -267,7 +267,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.CYCLE && type !== MESSAGE.KILL && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
