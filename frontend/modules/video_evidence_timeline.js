@@ -152,6 +152,7 @@
       reviewStatus: normalizeReviewStatus(item.review_status ?? item.reviewStatus),
       frameIndices,
       transcriptSegmentIndices,
+      evidenceCorrelation,
       evidence
     };
   }
