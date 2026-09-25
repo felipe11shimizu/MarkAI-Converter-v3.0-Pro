@@ -10,7 +10,8 @@
     STOP: PREFIX + 'STOP',
     STATUS: PREFIX + 'STATUS',
     ERROR: PREFIX + 'ERROR',
-    READY: PREFIX + 'READY'
+    READY: PREFIX + 'READY',
+    CORRELATE: PREFIX + 'CORRELATE'
   });
   const PHASE = Object.freeze({
     IDLE: 'idle',
@@ -38,6 +39,7 @@
   function createAgent(api) {
     const state = createState();
     const networkCapture = globalThis.DevTrailAutonomousNetworkCapture?.create?.(api, { state });
+    const eventCorrelator = globalThis.DevTrailAutonomousEventCorrelator || null;
     let installed = false;
 
     const safeMessage = (error, fallback) => {
@@ -181,7 +183,7 @@
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -192,6 +194,25 @@
             message: safeMessage(error, 'Erro inesperado no agente autônomo.')
           }));
         return true;
+      }
+
+      if (type === MESSAGE.CORRELATE) {
+        const targetTabId = Number(message?.payload?.targetTabId);
+        if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        if (!eventCorrelator?.correlate) {
+          sendResponse({ ok: false, code: 'EVENT_CORRELATOR_UNAVAILABLE' });
+          return false;
+        }
+        const steps = eventCorrelator.correlate(
+          message?.payload?.domEvents || [],
+          state.network,
+          message?.payload?.options || {}
+        );
+        sendResponse({ ok: true, steps, summary: eventCorrelator.summarize(steps) });
+        return false;
       }
 
       if (type === MESSAGE.STOP) {
@@ -250,7 +271,8 @@
       onDetach,
       onTabRemoved,
       install,
-      networkCapture
+      networkCapture,
+      eventCorrelator
     });
   }
 
