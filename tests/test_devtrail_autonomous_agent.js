@@ -53,6 +53,9 @@ function createChromeMock() {
   assert.equal(agent.state.active, true);
   assert.equal(agent.state.tabId, 42);
   assert.equal(agent.state.phase, agent.PHASE.READY);
+  assert.equal(agent.state.limits.maxSessionMs, 15 * 60 * 1000);
+  assert.equal(agent.state.limits.maxCycles, 10);
+  assert.equal(agent.state.limits.maxActionsTotal, 50);
   assert.equal(chrome.__commands.map(x => x.method).join(','), 'Network.enable,Runtime.enable,Page.enable');
 
   let status;
@@ -63,6 +66,22 @@ function createChromeMock() {
   );
   assert.equal(status.ok, true);
   assert.equal(status.state.sessionId, 'test-session');
+
+  const killed = await agent.onMessage(
+    { type: agent.MESSAGE.KILL, payload: { reason: 'test-kill' } },
+    { tab: { id: 99 } },
+    value => { response = value; }
+  );
+  assert.equal(killed, true, 'KILL must be handled asynchronously');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(response.ok, true);
+  assert.equal(agent.state.active, false);
+
+  const restarted = await agent.start({ targetTabId: 42, limits: { maxCycles: 2, maxActionsTotal: 3, maxSessionMs: 5000 } }, { tab: { id: 99 } });
+  assert.equal(restarted.ok, true);
+  assert.equal(agent.state.limits.maxCycles, 2);
+  assert.equal(agent.state.limits.maxActionsTotal, 3);
+  assert.equal(agent.state.limits.maxSessionMs, 5000);
 
   const stopped = await agent.stop('test');
   assert.equal(stopped.ok, true);

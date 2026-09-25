@@ -15,6 +15,7 @@
     BUILD_MAP: PREFIX + 'BUILD_MAP',
     BUILD_MAP_MD: PREFIX + 'BUILD_MAP_MD',
     CYCLE: PREFIX + 'CYCLE',
+    KILL: PREFIX + 'KILL',
     PLAN: PREFIX + 'PLAN',
     EXECUTE: PREFIX + 'EXECUTE'
   });
@@ -37,7 +38,15 @@
       targetUrl: '',
       phase: PHASE.IDLE,
       startedAt: null,
-      lastError: null
+      lastError: null,
+      limits: {
+        maxSessionMs: 15 * 60 * 1000,
+        maxCycles: 10,
+        maxActionsTotal: 50,
+        cyclesExecuted: 0,
+        actionsExecuted: 0,
+        killSwitch: false
+      }
     };
   }
 
@@ -53,6 +62,8 @@
     const cycleApi = globalThis.DevTrailAutonomousCycle || null;
     let systemMap = null;
     let installed = false;
+    let sessionTimer = null;
+    let cycleRunning = false;
 
     const safeMessage = (error, fallback) => {
       try { return error && error.message ? String(error.message) : fallback; }
@@ -66,7 +77,14 @@
         .catch(() => false);
     };
 
+    const clearSessionTimer = () => {
+      if (sessionTimer != null) clearTimeout(sessionTimer);
+      sessionTimer = null;
+    };
+
     const reset = () => {
+      clearSessionTimer();
+      cycleRunning = false;
       Object.assign(state, createState());
       systemMap = null;
     };
@@ -145,6 +163,16 @@
       state.phase = PHASE.ATTACHING;
       state.startedAt = Date.now();
       state.lastError = null;
+      const requestedLimits = payload.limits || {};
+      state.limits.maxSessionMs = Number.isInteger(requestedLimits.maxSessionMs) && requestedLimits.maxSessionMs > 0
+        ? Math.min(requestedLimits.maxSessionMs, 30 * 60 * 1000) : state.limits.maxSessionMs;
+      state.limits.maxCycles = Number.isInteger(requestedLimits.maxCycles) && requestedLimits.maxCycles > 0
+        ? Math.min(requestedLimits.maxCycles, 50) : state.limits.maxCycles;
+      state.limits.maxActionsTotal = Number.isInteger(requestedLimits.maxActionsTotal) && requestedLimits.maxActionsTotal > 0
+        ? Math.min(requestedLimits.maxActionsTotal, 200) : state.limits.maxActionsTotal;
+      state.limits.cyclesExecuted = 0;
+      state.limits.actionsExecuted = 0;
+      state.limits.killSwitch = false;
       systemMap = systemMapApi?.create?.({
         session_id: state.sessionId,
         target_url: state.targetUrl
@@ -169,6 +197,7 @@
 
       state.active = true;
       state.phase = PHASE.READY;
+      sessionTimer = setTimeout(() => { stop('max_session_duration').catch(() => reset()); }, state.limits.maxSessionMs);
 
       await emit(state.portalTabId, MESSAGE.READY, {
         sessionId: state.sessionId,
@@ -200,24 +229,45 @@
 
     async function runCycle(payload = {}) {
       if (!state.active) return { ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' };
+      if (state.limits.killSwitch) return { ok: false, code: 'AUTONOMOUS_KILL_SWITCH_ACTIVE' };
+      if (cycleRunning) return { ok: false, code: 'AUTONOMOUS_CYCLE_ACTIVE' };
+      if (state.limits.cyclesExecuted >= state.limits.maxCycles) return { ok: false, code: 'AUTONOMOUS_MAX_CYCLES_REACHED' };
+      if (state.limits.actionsExecuted >= state.limits.maxActionsTotal) return { ok: false, code: 'AUTONOMOUS_MAX_ACTIONS_REACHED' };
       if (!cycleApi?.run || !domScannerApi?.scanTab || !plannerApi?.plan || !executorApi?.execute || !systemMapApi || !systemMap) {
         return { ok: false, code: 'AUTONOMOUS_CYCLE_UNAVAILABLE' };
       }
-      const map = systemMapApi.finalize(systemMap);
-      return cycleApi.run(
-        api,
-        state,
-        plannerApi,
-        executorApi,
-        domScannerApi,
-        map,
-        payload.options || {}
-      );
+      cycleRunning = true;
+      try {
+        const map = systemMapApi.finalize(systemMap);
+        const result = await cycleApi.run(
+          api,
+          state,
+          plannerApi,
+          executorApi,
+          domScannerApi,
+          map,
+          payload.options || {}
+        );
+        state.limits.cyclesExecuted += 1;
+        state.limits.actionsExecuted += Number(result?.execution?.executed || 0);
+        if (state.limits.actionsExecuted >= state.limits.maxActionsTotal) {
+          state.lastError = 'Limite total de ações atingido.';
+        }
+        return { ...result, limits: { ...state.limits } };
+      } finally {
+        cycleRunning = false;
+      }
+    }
+
+    async function kill(reason = 'kill_switch') {
+      state.limits.killSwitch = true;
+      if (!state.active) return { ok: true, code: 'AUTONOMOUS_KILL_SWITCH_ACTIVE' };
+      return stop(reason);
     }
 
     function onMessage(message, sender, sendResponse) {
       const type = message?.type;
-      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
+      if (type !== MESSAGE.START && type !== MESSAGE.STOP && type !== MESSAGE.STATUS && type !== MESSAGE.CORRELATE && type !== MESSAGE.BUILD_MAP && type !== MESSAGE.BUILD_MAP_MD && type !== MESSAGE.CYCLE && type !== MESSAGE.KILL && type !== MESSAGE.PLAN && type !== MESSAGE.EXECUTE) return false;
 
       if (type === MESSAGE.START) {
         start(message.payload || {}, sender)
@@ -262,6 +312,17 @@
         const result = systemMapApi.finalize(systemMap);
         sendResponse({ ok: true, markdown: systemMapMarkdownApi.render(result), map: result });
         return false;
+      }
+
+      if (type === MESSAGE.KILL) {
+        kill(message?.payload?.reason || 'kill_switch')
+          .then(sendResponse)
+          .catch(error => sendResponse({
+            ok: false,
+            code: 'AUTONOMOUS_KILL_ERROR',
+            message: safeMessage(error, 'Erro no kill switch.')
+          }));
+        return true;
       }
 
       if (type === MESSAGE.CYCLE) {

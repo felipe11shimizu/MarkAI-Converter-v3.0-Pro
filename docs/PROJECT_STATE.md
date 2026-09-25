@@ -234,3 +234,24 @@ O ciclo não substitui Planner, Executor, Scanner ou captura Network. Ele apenas
 ### Próximos passos
 1. Kill switch operacional e limites de sessão.
 2. E2E final do agente autônomo.
+
+### Fase 16.11 — Kill switch e limites operacionais
+Implementada na branch `feat/devtrail-autonomous-guardrails-phase-11`:
+- kill switch explícito via `DEVTRAIL_AUTONOMOUS_KILL`;
+- limite padrão de sessão de 15 minutos, configurável até 30 minutos;
+- limite padrão de 10 ciclos autônomos por sessão, máximo 50;
+- limite padrão de 50 ações executadas por sessão, máximo 200;
+- bloqueio de ciclo concorrente;
+- bloqueio quando o kill switch está ativo;
+- bloqueio quando os limites de ciclos ou ações foram atingidos;
+- contadores de ciclos e ações expostos no estado/resultado;
+- encerramento automático ao atingir o tempo máximo de sessão;
+- testes do agente cobrindo kill switch e limites;
+- preservados os guardrails das fases 16.8, 16.9 e 16.10.
+
+### Decisão arquitetural
+Os limites são aplicados no agente, acima do executor, para impedir que múltiplas chamadas ao ciclo contornem o limite individual de ações do executor. O kill switch utiliza o mesmo caminho de `stop()`, garantindo liberação do debugger e limpeza da sessão.
+
+### Próximos passos
+1. Validação E2E final do agente autônomo.
+2. Teste operacional no Chrome/portal com uma página real.
