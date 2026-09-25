@@ -60,6 +60,28 @@ const MarkItDownEngine = (() => {
     return { markdown: data.markdown, meta: data };
   }
 
+  async function deepExtract(file, onProgress) {
+    if (!(await isAvailable(true))) {
+      throw new Error('Backend MarkItDown indisponível para leitura profunda.');
+    }
+    if (onProgress) onProgress(0.05);
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const resp = await window.fetch(_endpoint() + '/api/deep-extract', {
+      method: 'POST',
+      body: form,
+      signal: AbortSignal.timeout(180000),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = typeof data?.detail === 'string' ? data.detail : data?.detail?.message;
+      throw new Error(detail || 'Leitura profunda OCR/IA indisponível.');
+    }
+    if (!data?.markdown) throw new Error('Leitor OCR/IA retornou conteúdo vazio.');
+    if (onProgress) onProgress(1);
+    return { markdown: data.markdown, meta: data };
+  }
+
   async function convertUrl(url) {
     if (!(await isAvailable(true))) {
       throw new Error('Backend MarkItDown indisponível. Para converter URLs, inicie o backend local antes da conversão.');
@@ -77,7 +99,7 @@ const MarkItDownEngine = (() => {
     return { markdown: body.markdown, meta: body };
   }
 
-  return { isAvailable, convert, convertUrl };
+  return { isAvailable, convert, deepExtract, convertUrl };
 })();
 
 
