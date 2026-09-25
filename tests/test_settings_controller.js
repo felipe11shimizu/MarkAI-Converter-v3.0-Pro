@@ -42,7 +42,7 @@ assert.equal(form.apiKey, 'secret');
 assert.deepEqual(events.shift(), ['filter', 'openai']);
 
 form.aiProvider = 'gemini';
-form.aiModel = 'gemini-1.5-flash';
+form.aiModel = 'gemini-3.5-flash-lite';
 form.apiKey = 'new-secret';
 controller.save();
 assert.equal(state.settings.aiProvider, 'gemini');
