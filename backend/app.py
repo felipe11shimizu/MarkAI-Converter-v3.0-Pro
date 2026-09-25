@@ -298,20 +298,26 @@ def _classify_evidence_correlation(
 ) -> dict:
     """Classify temporal evidence deterministically; never represents model confidence."""
     if frame_count <= 0:
-        status = "sem_correlacao_temporal" if not transcript_matched else "forte"
+        status = "forte" if transcript_matched else "sem_correlacao_temporal"
+        evidence_basis = "transcricao" if transcript_matched else "nenhuma"
     elif frame_delta_seconds is None:
         status = "aproximada"
+        evidence_basis = "frame_sem_timestamp"
     elif frame_delta_seconds <= 2.0:
         status = "forte"
+        evidence_basis = "frame"
     elif frame_delta_seconds <= 5.0:
         status = "aproximada"
+        evidence_basis = "frame"
     else:
         status = "sem_correlacao_temporal"
+        evidence_basis = "frame"
     return {
         "status": status,
         "frame_delta_max_seconds": 2.0 if status == "forte" else 5.0 if status == "aproximada" else None,
         "transcript_matched": bool(transcript_matched),
         "criterio": "delta_temporal_deterministico",
+        "base": evidence_basis,
     }
 
 
@@ -998,4 +1004,3 @@ async def convert_batch(files: list[UploadFile] = File(...)):
             results.append(_convert_bytes(filename, suffix, data))
         except HTTPException as exc:
             results.append({"ok": False, "filename": Path(file.filename or "documento").name, "error": exc.detail, "status_code": exc.status_code})
-    return {"ok": all(item.get("ok") for item in results), "engine": "markitdown", "total": len(results), "successful": sum(1 for item in results if item.get("ok")), "failed": sum(1 for item in results if not item.get("ok")), "results": results}
