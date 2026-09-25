@@ -217,6 +217,22 @@
         return false;
       }
 
+      if (type === MESSAGE.PLAN) {
+        const targetTabId = Number(message?.payload?.targetTabId);
+        if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_SESSION_REQUIRED' });
+          return false;
+        }
+        if (!plannerApi?.plan || !systemMapApi || !systemMap) {
+          sendResponse({ ok: false, code: 'AUTONOMOUS_PLANNER_UNAVAILABLE' });
+          return false;
+        }
+        const map = systemMapApi.finalize(systemMap);
+        const plan = plannerApi.plan(map, message?.payload?.options || {});
+        sendResponse({ ok: true, plan });
+        return false;
+      }
+
       if (type === MESSAGE.CORRELATE) {
         const targetTabId = Number(message?.payload?.targetTabId);
         if (!state.active || !Number.isInteger(targetTabId) || targetTabId !== state.tabId) {
@@ -294,6 +310,7 @@
       install,
       networkCapture,
       eventCorrelator,
+      plannerApi,
       systemMap
     });
   }
