@@ -1,3 +1,5 @@
+importScripts('explorer/explorer_policy.js', 'explorer/explorer_state.js', 'explorer/explorer_engine.js');
+
 (function () {
   'use strict';
 
@@ -10,6 +12,11 @@
 
   let session = null;
   let timer = null;
+  let explorerSession = null;
+  const explorerEngine = globalThis.MarkAIDevTrailExplorerEngine.create({
+    policy: globalThis.MarkAIDevTrailExplorerPolicy,
+    stateFactory: globalThis.MarkAIDevTrailExplorerState
+  });
   const pendingAreas = new Map();
   const portalByTargetTab = new Map();
 
@@ -325,6 +332,83 @@
       pendingAreas.delete(targetTabId);
       sendToTab(targetTabId, 'DEVTRAIL_CLEAR_AREA', { targetTabId });
       sendToPortal('DEVTRAIL_AREA_CLEARED', { targetTabId }, portalTabId);
+      return;
+    }
+    if (type === 'DEVTRAIL_EXPLORER_START') {
+      if (explorerSession) {
+        sendToPortal('DEVTRAIL_EXPLORER_ERROR', { message: 'Já existe uma exploração ativa.' }, sender.tab?.id);
+        return;
+      }
+      const targetTabId = Number(payload.targetTabId);
+      if (!Number.isInteger(targetTabId)) {
+        sendToPortal('DEVTRAIL_EXPLORER_ERROR', { message: 'Aba alvo inválida para exploração.' }, sender.tab?.id);
+        return;
+      }
+      const policy = globalThis.MarkAIDevTrailExplorerPolicy.normalize(payload.policy || {});
+      explorerSession = explorerEngine.start({
+        portalTabId: sender.tab?.id ?? null,
+        targetTabId,
+        policy
+      });
+      explorerSession.status = 'running';
+      explorerSession.timer = setTimeout(() => {
+        if (!explorerSession) return;
+        const result = explorerEngine.finish(explorerSession, 'max_duration');
+        explorerSession = null;
+        sendToPortal('DEVTRAIL_EXPLORER_FINISHED', { result }, result.portal_tab_id);
+      }, policy.maxDurationMs);
+      sendToTab(targetTabId, 'DEVTRAIL_EXPLORER_STARTED', {
+        session_id: explorerSession.sessionId,
+        policy
+      });
+      sendToPortal('DEVTRAIL_EXPLORER_STATUS', {
+        status: 'running',
+        session_id: explorerSession.sessionId,
+        targetTabId,
+        policy
+      }, explorerSession.portalTabId);
+      return;
+    }
+    if (type === 'DEVTRAIL_EXPLORER_STOP') {
+      if (!explorerSession) return;
+      clearTimeout(explorerSession.timer);
+      const result = explorerEngine.finish(explorerSession, 'manual');
+      explorerSession = null;
+      sendToPortal('DEVTRAIL_EXPLORER_FINISHED', { result }, result.portal_tab_id);
+      return;
+    }
+    if (type === 'DEVTRAIL_EXPLORER_STATUS') {
+      if (!explorerSession) {
+        sendToPortal('DEVTRAIL_EXPLORER_STATUS', { status: 'idle' }, sender.tab?.id);
+        return;
+      }
+      sendToPortal('DEVTRAIL_EXPLORER_STATUS', {
+        status: explorerSession.status,
+        session_id: explorerSession.sessionId,
+        targetTabId: explorerSession.targetTabId,
+        pages: explorerSession.pages.length,
+        actions: explorerSession.actions.length
+      }, explorerSession.portalTabId);
+      return;
+    }
+    if (type === 'DEVTRAIL_EXPLORER_PAGE') {
+      if (!explorerSession || sender.tab?.id !== explorerSession.targetTabId) return;
+      const accepted = explorerEngine.recordPage(explorerSession, payload.page || {});
+      if (!accepted) return;
+      sendToPortal('DEVTRAIL_EXPLORER_PAGE', {
+        page: payload.page,
+        pages: explorerSession.pages.length
+      }, explorerSession.portalTabId);
+      return;
+    }
+    if (type === 'DEVTRAIL_EXPLORER_ACTION') {
+      if (!explorerSession || sender.tab?.id !== explorerSession.targetTabId) return;
+      const accepted = explorerEngine.recordAction(explorerSession, payload.action || {});
+      if (!accepted) return;
+      sendToPortal('DEVTRAIL_EXPLORER_ACTION', {
+        action: payload.action,
+        actions: explorerSession.actions.length
+      }, explorerSession.portalTabId);
       return;
     }
     if (type === 'DEVTRAIL_START') { start(payload, sender.tab.id); return; }
