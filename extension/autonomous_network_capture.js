@@ -1,6 +1,7 @@
 (function (root, factory) {
-  if (typeof module === 'object' && module.exports) module.exports = factory;
-  else root.DevTrailAutonomousNetworkCapture = factory;
+  const api = factory();
+  if (typeof module === 'object' && module.exports) module.exports = api;
+  else root.DevTrailAutonomousNetworkCapture = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
