@@ -22,7 +22,7 @@
 
     const defaults = {
       aiProvider: 'gemini',
-      aiModel: 'gemini-1.5-flash',
+      aiModel: 'gemini-3.5-flash-lite',
       apiKey: '',
       markitdownEnabled: true,
       markitdownEndpoint: globalThis.MarkAICore?.getDefaultBackendEndpoint?.() || '',
@@ -31,11 +31,15 @@
     };
 
     function normalize(settings = {}) {
+      const requestedModel = String(settings.aiModel || '').trim();
+      const migratedModel = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash-8b'].includes(requestedModel)
+        ? defaults.aiModel
+        : (requestedModel || defaults.aiModel);
       return {
         ...defaults,
         ...(settings || {}),
         aiProvider: settings.aiProvider || defaults.aiProvider,
-        aiModel: settings.aiModel || defaults.aiModel,
+        aiModel: migratedModel,
         markitdownEndpoint: settings.markitdownEndpoint ?? defaults.markitdownEndpoint
       };
     }
