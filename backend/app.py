@@ -556,6 +556,7 @@ Instrução adicional:
             transcript_segments=transcript_segments,
             frame_count=len(frame_files),
             interval_seconds=VIDEO_FRAME_INTERVAL,
+            frame_timestamps=frame_timestamps,
         )
         analysis.setdefault("timeline", timeline)
         analysis["evidencia_video"] = {
