@@ -74,7 +74,10 @@ const AppState = (() => {
         const defaultEndpoint = getDefaultBackendEndpoint();
         const hostname = String(globalThis.location?.hostname || '').toLowerCase();
         const isPublicBrowser = hostname && hostname !== 'localhost' && hostname !== '127.0.0.1' && hostname !== '::1' && !hostname.endsWith('.local');
-        if (isPublicBrowser && /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/i.test(String(_state.settings.markitdownEndpoint || ''))) {
+        if (isPublicBrowser && (
+          !String(_state.settings.markitdownEndpoint || '').trim() ||
+          /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\/?$/i.test(String(_state.settings.markitdownEndpoint || ''))
+        )) {
           _state.settings.markitdownEndpoint = defaultEndpoint;
         }
       }
