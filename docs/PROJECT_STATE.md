@@ -347,3 +347,41 @@ A conversão normal continua rápida e preserva o fluxo atual. A leitura profund
 1. CI da Fase 17.
 2. Teste real com o PDF judicial anexado, verificando se o texto das páginas 1–5 é recuperado integralmente.
 3. Ajustar somente se a execução real revelar perda de layout, tabelas ou texto.
+
+### Fase 18 — Validação E2E de produção e consolidação pós-Cloud Run
+
+#### Baseline técnico atual
+- `main` está em `74eccc3a4fbc0a07fdf0cc276b22209223367096`, merge do PR #102.
+- PR #98 — Leitura profunda OCR + IA — integrado.
+- PR #99 — migração dos modelos Gemini — integrado.
+- PR #100 — conexão do portal público ao Google Cloud Run — integrado.
+- PR #101 — restauração automática do endpoint público no portal — integrado.
+- PR #102 — fallback YouTube direto via Gemini — integrado.
+- Cloud Run de produção: `markai-converter-v3-0-pro`, região `europe-west1`.
+- Health check de produção validado pelo usuário com `ok=true`, backend `3.6.0` e Gemini YouTube habilitado em `gemini-3.8-flash`.
+
+#### Objetivo
+Fechar a validação funcional do ambiente publicado antes de iniciar novas funcionalidades de alto impacto.
+
+#### Escopo
+1. validar portal GitHub Pages → Cloud Run;
+2. validar YouTube transcript → fallback Gemini;
+3. validar conversão de documento comum;
+4. validar Deep OCR somente quando configurado;
+5. validar exportações/downloads;
+6. validar DevTrail no Chrome;
+7. registrar falhas observadas e corrigir somente regressões reproduzíveis;
+8. manter cada correção em micro-PR próprio com CI verde.
+
+#### Critério de saída
+A Fase 18 será considerada concluída quando os fluxos críticos tiverem:
+- teste automatizado existente ou novo quando aplicável;
+- validação manual documentada para integrações externas;
+- nenhuma falha crítica reproduzível no portal publicado;
+- CI verde na branch de validação;
+- `PROJECT_STATE.md` atualizado com os resultados reais.
+
+#### Próxima sequência após a validação
+- Fase 19: hardening dos downloads e nomenclatura de arquivos, somente se o problema de nomes/UUID for confirmado como comportamento do MarkAI;
+- depois: validação operacional do agente autônomo no Chrome;
+- somente então novas funcionalidades estruturais.
