@@ -381,7 +381,22 @@ A Fase 18 será considerada concluída quando os fluxos críticos tiverem:
 - CI verde na branch de validação;
 - `PROJECT_STATE.md` atualizado com os resultados reais.
 
-#### Próxima sequência após a validação
-- Fase 19: hardening dos downloads e nomenclatura de arquivos, somente se o problema de nomes/UUID for confirmado como comportamento do MarkAI;
-- depois: validação operacional do agente autônomo no Chrome;
-- somente então novas funcionalidades estruturais.
+#### Resultado da validação de produção
+A validação manual informada pelo usuário foi concluída com o fluxo crítico operacional:
+- portal público → Cloud Run;
+- YouTube → tentativa de transcript → fallback Gemini direto no vídeo;
+- geração do Markdown;
+- download do resultado.
+
+Também foi integrada a correção do PR #104 para nomenclatura da saída de Deep OCR, com CI verde:
+- PR #104 — `fix: preserve deep OCR output filename`;
+- merge commit: `343397963195f22ef19b4cd4257355e09d561ffd`;
+- regressão coberta: `apresentacao.pptx → apresentacao.md`.
+
+Com o fluxo YouTube validado manualmente e a regressão de nome de arquivo corrigida, não há falha crítica reproduzível reportada nesta etapa.
+
+### Próxima sequência após a validação
+1. Atualizar o baseline operacional para o merge do PR #104.
+2. Validar operacionalmente o agente autônomo no Chrome.
+3. Corrigir somente problemas observados no teste real, sempre em micro-PR com CI.
+4. Depois da estabilização do DevTrail, iniciar novas funcionalidades estruturais.
