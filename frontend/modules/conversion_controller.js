@@ -74,7 +74,7 @@
         if (workspace) workspace.scheduleSave();
         ui.renderQueue();
         ui.setProgress(1);
-        ui.loadMarkdown(result.markdown, item.name.replace(/\\.[^.]+$/, '') + '.md');
+        ui.loadMarkdown(result.markdown, item.name.replace(/\.[^.]+$/, '') + '.md');
         ui.setStatus(item.name + ' — leitura profunda concluída', 'idle');
         ui.toast('✓ OCR + IA aplicado: ' + item.name, 'success');
         return result.markdown;
