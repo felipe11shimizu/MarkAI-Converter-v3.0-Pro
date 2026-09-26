@@ -59,6 +59,8 @@ YOUTUBE_VISUAL_MAX_HEIGHT = max(180, int(os.getenv("MARKAI_YOUTUBE_VISUAL_MAX_HE
 OCR_ENABLED = os.getenv("MARKAI_OCR_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 OCR_MODEL = os.getenv("MARKAI_OCR_MODEL", "gpt-4o")
 OCR_API_KEY = os.getenv("MARKAI_OCR_API_KEY") or os.getenv("OPENAI_API_KEY")
+GEMINI_API_KEY = os.getenv("MARKAI_GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GEMINI_YOUTUBE_MODEL = os.getenv("MARKAI_GEMINI_YOUTUBE_MODEL", "gemini-3.8-flash")
 
 YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
 REMOTE_CONTENT_TYPES = {
@@ -788,6 +790,60 @@ def _youtube_error(exc: YouTubeServiceError) -> HTTPException:
     )
 
 
+def _gemini_youtube_transcribe(url: str, task_prompt: str = "") -> dict:
+    """Analyze a public YouTube URL directly through Gemini video input."""
+    if not GEMINI_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="Gemini YouTube não está configurado. Defina MARKAI_GEMINI_API_KEY, GEMINI_API_KEY ou GOOGLE_API_KEY.",
+        )
+    try:
+        source = _youtube_service.parse_url(url)
+    except YouTubeServiceError as exc:
+        raise _youtube_error(exc) from exc
+
+    try:
+        from google import genai
+        from google.genai import types
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        prompt = task_prompt.strip() or (
+            "Analise este vídeo do YouTube e produza uma transcrição estruturada em português. "
+            "Preserve a ordem temporal e inclua timestamps quando possível. "
+            "Não invente conteúdo. Retorne Markdown pronto para o MarkAI Converter."
+        )
+        response = client.models.generate_content(
+            model=GEMINI_YOUTUBE_MODEL,
+            contents=types.Content(
+                parts=[
+                    types.Part(file_data=types.FileData(file_uri=source.canonical_url)),
+                    types.Part(text=prompt),
+                ]
+            ),
+        )
+        markdown = (response.text or "").strip()
+        if not markdown:
+            raise HTTPException(status_code=422, detail="Gemini não retornou conteúdo para o vídeo.")
+        return {
+            "ok": True,
+            "engine": "gemini-youtube-url",
+            "provider": "gemini",
+            "model": GEMINI_YOUTUBE_MODEL,
+            "video_id": source.video_id,
+            "url": source.original_url,
+            "canonical_url": source.canonical_url,
+            "source_type": source.source_type,
+            "markdown": markdown,
+            "transcript": {"provider": "gemini", "mode": "youtube_url"},
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Falha ao processar URL do YouTube com Gemini: {type(exc).__name__}",
+        ) from exc
+
+
 def _youtube_languages(payload: dict) -> list[str]:
     value = payload.get("languages")
     if isinstance(value, str):
@@ -809,7 +865,7 @@ def health():
         "url_engine": {"enabled": True, "max_mb": MAX_URL_MB, "timeout_seconds": URL_TIMEOUT_SECONDS, "max_redirects": URL_MAX_REDIRECTS, "youtube": True},
         "ocr": {"enabled": OCR_ENABLED, "configured": bool(OCR_API_KEY), "model": OCR_MODEL if OCR_ENABLED and OCR_API_KEY else None},
         "video_analysis": {"enabled": bool(VIDEO_API_KEY), "max_mb": VIDEO_MAX_MB, "model": VIDEO_MODEL if VIDEO_API_KEY else None, "frame_interval_seconds": VIDEO_FRAME_INTERVAL},
-        "youtube": {"enabled": True, "provider": "youtube-transcript-api", "cache_ttl_seconds": YOUTUBE_CACHE_TTL_SECONDS, "proxy_configured": bool(YOUTUBE_HTTP_PROXY or YOUTUBE_HTTPS_PROXY), "default_languages": list(DEFAULT_LANGUAGES), "visual_analysis": {"enabled": YOUTUBE_VISUAL_ENABLED, "max_mb": YOUTUBE_VISUAL_MAX_MB, "max_duration_seconds": YOUTUBE_VISUAL_MAX_DURATION_SECONDS, "max_height": YOUTUBE_VISUAL_MAX_HEIGHT, "provider": "yt-dlp"}},
+        "youtube": {"enabled": True, "provider": "youtube-transcript-api", "cache_ttl_seconds": YOUTUBE_CACHE_TTL_SECONDS, "proxy_configured": bool(YOUTUBE_HTTP_PROXY or YOUTUBE_HTTPS_PROXY), "default_languages": list(DEFAULT_LANGUAGES), "gemini": {"enabled": bool(GEMINI_API_KEY), "model": GEMINI_YOUTUBE_MODEL if GEMINI_API_KEY else None}, "visual_analysis": {"enabled": YOUTUBE_VISUAL_ENABLED, "max_mb": YOUTUBE_VISUAL_MAX_MB, "max_duration_seconds": YOUTUBE_VISUAL_MAX_DURATION_SECONDS, "max_height": YOUTUBE_VISUAL_MAX_HEIGHT, "provider": "yt-dlp"}},
     }
 
 
@@ -842,6 +898,13 @@ async def youtube_resolve(payload: dict):
         "canonical_url": source.canonical_url,
         "source_type": source.source_type,
     }
+
+
+@app.post("/api/youtube/gemini")
+async def youtube_gemini(payload: dict):
+    url = str(payload.get("url") or "").strip()
+    task_prompt = str(payload.get("task_prompt") or "").strip()
+    return _gemini_youtube_transcribe(url, task_prompt)
 
 
 @app.post("/api/youtube/transcripts")
