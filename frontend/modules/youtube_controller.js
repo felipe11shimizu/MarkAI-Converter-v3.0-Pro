@@ -65,20 +65,32 @@
       ui.setStatus?.('Transcrevendo YouTube…', 'busy');
       ui.setStatusText?.('Consultando legendas disponíveis.');
       try {
-        const body = await request('/api/youtube/transcribe', {
-          url: normalized,
-          languages: languagePriority(options.language || 'auto'),
-          translate_to: options.translateTo || null,
-          preserve_formatting: false
-        });
+        let body;
+        try {
+          body = await request('/api/youtube/transcribe', {
+            url: normalized,
+            languages: languagePriority(options.language || 'auto'),
+            translate_to: options.translateTo || null,
+            preserve_formatting: false
+          });
+        } catch (primaryError) {
+          ui.setStatusText?.('Legendas bloqueadas/indisponíveis. Tentando Gemini diretamente no vídeo…');
+          body = await request('/api/youtube/gemini', {
+            url: normalized,
+            task_prompt: options.taskPrompt || ''
+          }, Math.max(timeoutMs, 180000));
+          body._fallbackReason = primaryError?.message || 'provider de transcript indisponível';
+        }
         ui.loadMarkdown?.(body.markdown, 'youtube_' + (body.video_id || 'video') + '_transcricao.md');
         ui.setStatus?.('Transcrição do YouTube concluída', 'idle');
-        const origin = body.is_generated ? 'legenda automática' : 'legenda manual';
+        const origin = body.engine === 'gemini-youtube-url'
+          ? 'Gemini · vídeo YouTube'
+          : (body.is_generated ? 'legenda automática' : 'legenda manual');
         const quality = body.quality || {};
         ui.setStatusText?.(
           origin + ' · ' + (body.language_code || 'idioma desconhecido') +
           ' · ' + (quality.segments || 0) + ' segmentos · ' +
-          (quality.words || 0) + ' palavras'
+          (quality.words || 0) + ' palavras' + (body.engine === 'gemini-youtube-url' ? ' · análise direta' : '')
         );
         ui.toast?.('✓ Transcrição do YouTube concluída!', 'success');
         return body;
