@@ -23,7 +23,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   let mergeOptions = null;
   const quality = { metrics: x => ({ characters:x.length, lines:1, headings:1, tables:0, links:0 }), diffScore: () => 3 };
   const ui = {
-    renderQueue(){}, setStatus(){}, setProgress(){}, loadMarkdown(md){ calls.push(['load',md]); },
+    renderQueue(){}, setStatus(){}, setProgress(){}, loadMarkdown(md, name){ calls.push(['load',md,name]); },
     toast(){}, showProcessing(){}, hideProcessing(){}, setProcessingSub(){},
     showComparison(){ calls.push(['compare']); }
   };
@@ -36,6 +36,7 @@ const Controller = require('../frontend/modules/conversion_controller.js');
   assert.strictEqual(deepResult, '# OCR profundo');
   assert.strictEqual(items[2].engine, 'markitdown-ocr-deep');
   assert.strictEqual(items[2].extractionMode, 'deep-ocr-ai');
+  assert.ok(calls.some(x => x[0] === 'load' && x[1] === '# OCR profundo' && x[2] === 'apresentacao.md'));
 
   const result = await controller.convertItem('1');
   assert.strictEqual(result, '# remote');
