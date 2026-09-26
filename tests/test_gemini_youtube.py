@@ -23,10 +23,7 @@ def test_gemini_youtube_transcribe_uses_public_url(monkeypatch):
     fake_genai = types.SimpleNamespace(Client=FakeClient)
     fake_types = types.SimpleNamespace(
         Content=lambda parts: types.SimpleNamespace(parts=parts),
-        Part=types.SimpleNamespace(
-            file_data=lambda file_data: types.SimpleNamespace(file_data=file_data),
-            text=lambda text: types.SimpleNamespace(text=text),
-        ),
+        Part=lambda **kwargs: types.SimpleNamespace(**kwargs),
         FileData=lambda file_uri: types.SimpleNamespace(file_uri=file_uri),
     )
 
