@@ -4,6 +4,9 @@ from backend import app as backend_app
 
 
 def test_gemini_youtube_transcribe_uses_public_url(monkeypatch):
+    import sys
+    import types as py_types
+
     class FakeResponse:
         text = "# Transcrição\n\nOlá, mundo."
 
@@ -20,18 +23,22 @@ def test_gemini_youtube_transcribe_uses_public_url(monkeypatch):
             assert api_key == "test-key"
             self.models = FakeModels()
 
-    fake_genai = types.SimpleNamespace(Client=FakeClient)
-    fake_types = types.SimpleNamespace(
-        Content=lambda parts: types.SimpleNamespace(parts=parts),
-        Part=lambda **kwargs: types.SimpleNamespace(**kwargs),
-        FileData=lambda file_uri: types.SimpleNamespace(file_uri=file_uri),
-    )
+    fake_genai = py_types.ModuleType("google.genai")
+    fake_genai.Client = FakeClient
+
+    fake_google = py_types.ModuleType("google")
+    fake_google.genai = fake_genai
+
+    fake_genai_types = py_types.ModuleType("google.genai.types")
+    fake_genai_types.Content = lambda parts: py_types.SimpleNamespace(parts=parts)
+    fake_genai_types.Part = lambda **kwargs: py_types.SimpleNamespace(**kwargs)
+    fake_genai_types.FileData = lambda file_uri: py_types.SimpleNamespace(file_uri=file_uri)
 
     monkeypatch.setattr(backend_app, "GEMINI_API_KEY", "test-key")
     monkeypatch.setattr(backend_app, "GEMINI_YOUTUBE_MODEL", "gemini-test")
-    monkeypatch.setitem(__import__("sys").modules, "google", types.SimpleNamespace(genai=fake_genai))
-    monkeypatch.setitem(__import__("sys").modules, "google.genai", fake_genai)
-    monkeypatch.setitem(__import__("sys").modules, "google.genai.types", fake_types)
+    monkeypatch.setitem(sys.modules, "google", fake_google)
+    monkeypatch.setitem(sys.modules, "google.genai", fake_genai)
+    monkeypatch.setitem(sys.modules, "google.genai.types", fake_genai_types)
 
     result = backend_app._gemini_youtube_transcribe(
         "https://youtu.be/dQw4w9WgXcQ"
