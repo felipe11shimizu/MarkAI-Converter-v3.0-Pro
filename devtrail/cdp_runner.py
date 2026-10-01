@@ -153,7 +153,12 @@ def execute_click(client: CDPClient, selector: str) -> dict[str, Any]:
 
 
 def markdown_map(
-    target: dict[str, Any],\n    dom: list[dict[str, Any]],\n    plan: dict[str, Any],\n    network_count: int,\n    network_events: list[dict[str, Any]] | None = None,\n) -> str:
+    target: dict[str, Any],
+    dom: list[dict[str, Any]],
+    plan: dict[str, Any],
+    network_count: int,
+    network_events: list[dict[str, Any]] | None = None,
+) -> str:
     lines = [
         "# DevTrail Standalone System Map", "",
         f"- URL: \x60{target.get('url', '')}\x60",
