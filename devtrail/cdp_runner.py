@@ -226,6 +226,11 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         client.command("Page.enable")
         client.command("Runtime.enable")
         client.command("Network.enable")
+        client.events.clear()
+        # Reload after enabling Network so the map captures the page's real
+        # bootstrap requests instead of only events that happen during commands.
+        client.command("Page.reload", {"ignoreCache": False})
+        client.drain_events(2.0)
         dom_before = snapshot_dom(client)
         plan = build_plan(dom_before)
         action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
