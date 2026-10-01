@@ -4,6 +4,7 @@
 from __future__ import annotations
 import argparse
 import json
+import os
 import time
 import urllib.request
 from pathlib import Path
@@ -11,12 +12,15 @@ from typing import Any
 import websocket
 
 
+DEFAULT_CDP_ENDPOINT = os.environ.get("DEVTRAIL_CDP_ENDPOINT", "http://127.0.0.1:9223")
+
+
 def _get_json(endpoint: str, path: str) -> Any:
     with urllib.request.urlopen(endpoint.rstrip("/") + path, timeout=5) as response:
         return json.load(response)
 
 
-def list_targets(endpoint: str = "http://127.0.0.1:9222") -> list[dict[str, Any]]:
+def list_targets(endpoint: str = DEFAULT_CDP_ENDPOINT) -> list[dict[str, Any]]:
     """Return page targets from the legacy endpoint and Browser.getTargets fallback."""
     legacy = _get_json(endpoint, "/json/list")
     pages = [t for t in legacy if t.get("type") == "page" and t.get("webSocketDebuggerUrl")]
@@ -200,7 +204,7 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="DevTrail standalone Chrome CDP runner")
-    parser.add_argument("--endpoint", default="http://127.0.0.1:9222")
+    parser.add_argument("--endpoint", default=DEFAULT_CDP_ENDPOINT)
     parser.add_argument("--contains")
     parser.add_argument("--output", default="devtrail-output")
     args = parser.parse_args()
