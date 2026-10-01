@@ -1,4 +1,4 @@
-from devtrail.cdp_runner import build_plan, markdown_map, select_target
+from devtrail.cdp_runner import CDPClient, build_plan, markdown_map, select_target
 
 
 def test_select_target_by_title():
@@ -46,3 +46,40 @@ def test_markdown_map():
     assert "# DevTrail Standalone System Map" in md
     assert "Network events: 3" in md
     assert "#go" in md
+
+
+class FakeWebSocket:
+    def __init__(self):
+        self.sent = []
+        self.messages = [
+            {"method": "Network.requestWillBeSent", "params": {"request": {"url": "https://example.com/api"}}},
+            {"id": 1, "result": {}},
+        ]
+
+    def send(self, payload):
+        self.sent.append(payload)
+
+    def recv(self):
+        import json
+        return json.dumps(self.messages.pop(0))
+
+
+def test_cdp_client_captures_network_events():
+    client = CDPClient("ws://test")
+    client.ws = FakeWebSocket()
+    client.command("Runtime.enable")
+    assert len(client.events) == 1
+    assert client.events[0]["method"] == "Network.requestWillBeSent"
+    assert client.events[0]["params"]["request"]["url"] == "https://example.com/api"
+
+
+def test_markdown_map_includes_network_events():
+    md = markdown_map(
+        {"title": "Teste", "url": "https://example.com"},
+        [{"tag": "button", "selector": "#go"}],
+        {"actions": [{"type": "click", "selector": "#go", "description": "Executar"}]},
+        1,
+        [{"method": "Network.requestWillBeSent", "params": {"request": {"url": "https://example.com/api"}}}],
+    )
+    assert "Network events: 1" in md
+    assert "https://example.com/api" in md
