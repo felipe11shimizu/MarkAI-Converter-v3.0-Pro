@@ -1,4 +1,10 @@
-from devtrail.cdp_runner import CDPClient, build_plan, markdown_map, select_target
+from devtrail.cdp_runner import (
+    CDPClient,
+    build_plan,
+    markdown_map,
+    select_target,
+    summarize_network_events,
+)
 
 
 def test_select_target_by_title():
@@ -83,3 +89,63 @@ def test_markdown_map_includes_network_events():
     )
     assert "Network events: 1" in md
     assert "https://example.com/api" in md
+
+
+def test_summarize_network_events_groups_request_and_response():
+    events = [
+        {
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "requestId": "1",
+                "type": "Fetch",
+                "request": {
+                    "url": "https://example.com/api/items?limit=10",
+                    "method": "GET",
+                },
+            },
+        },
+        {
+            "method": "Network.responseReceived",
+            "params": {
+                "requestId": "1",
+                "type": "Fetch",
+                "response": {
+                    "url": "https://example.com/api/items?limit=10",
+                    "status": 200,
+                },
+            },
+        },
+    ]
+    summary = summarize_network_events(events)
+    assert len(summary) == 1
+    assert summary[0]["endpoint"] == "https://example.com/api/items"
+    assert summary[0]["method"] == "GET"
+    assert summary[0]["status"] == 200
+    assert summary[0]["resource_type"] == "Fetch"
+    assert summary[0]["count"] == 1
+
+
+def test_summarize_network_events_marks_failures():
+    events = [
+        {
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "requestId": "2",
+                "request": {
+                    "url": "https://example.com/api/fail",
+                    "method": "POST",
+                },
+            },
+        },
+        {
+            "method": "Network.loadingFailed",
+            "params": {
+                "requestId": "2",
+                "errorText": "net::ERR_FAILED",
+            },
+        },
+    ]
+    summary = summarize_network_events(events)
+    assert len(summary) == 1
+    assert summary[0]["failed"] is True
+    assert summary[0]["error"] == "net::ERR_FAILED"
