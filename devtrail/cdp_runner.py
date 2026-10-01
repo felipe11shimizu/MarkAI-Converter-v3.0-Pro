@@ -241,6 +241,30 @@ def summarize_network_events(events: list[dict[str, Any]]) -> list[dict[str, Any
     )
 
 
+def correlate_action_network(
+    action: dict[str, Any] | None,
+    network_summary: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Create a conservative correlation between the executed action and observed traffic."""
+    if not action:
+        return {"action": None, "matched_requests": [], "confidence": "none"}
+
+    candidates = [
+        item for item in network_summary
+        if item.get("status") is not None or item.get("failed")
+    ]
+    return {
+        "action": {
+            "type": action.get("type"),
+            "selector": action.get("selector"),
+            "description": action.get("description"),
+            "result": action.get("result"),
+        },
+        "matched_requests": candidates,
+        "confidence": "observed_window",
+    }
+
+
 def markdown_map(
     target: dict[str, Any],
     dom: list[dict[str, Any]],
@@ -306,6 +330,11 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         dom_after = snapshot_dom(client)
         client.drain_events(0.2)
         network_events = list(client.events)
+            executed_action = None
+        if plan["actions"]:
+            executed_action = {**plan["actions"][0], "result": action_result}
+        network_summary = summarize_network_events(network_events)
+        correlation = correlate_action_network(executed_action, network_summary)
         result = {
             "status": "ok", "target": {
                 "target_id": target.get("targetId") or target.get("id"),
@@ -314,7 +343,8 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
             "dom_before": dom_before, "plan": plan, "action_result": action_result,
             "dom_after": dom_after,
             "network_events": network_events,
-            "network_summary": summarize_network_events(network_events),
+            "network_summary": network_summary,
+            "correlation": correlation,
         }
         if output:
             output.mkdir(parents=True, exist_ok=True)
