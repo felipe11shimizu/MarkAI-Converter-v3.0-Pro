@@ -9,6 +9,15 @@ def test_select_target_by_title():
     assert select_target(targets, "markai")["title"] == "MarkAI"
 
 
+def test_select_target_from_browser_discovery():
+    targets = [
+        {"type": "background_page", "title": "OCR", "url": "chrome-extension://ocr"},
+        {"type": "service_worker", "title": "DevTrail", "url": "chrome-extension://devtrail"},
+        {"type": "page", "targetId": "page-1", "title": "MarkAI Converter", "url": "https://example.test"},
+    ]
+    assert select_target(targets, "markai")["targetId"] == "page-1"
+
+
 def test_select_target_rejects_missing_page():
     try:
         select_target([{"type": "service_worker", "webSocketDebuggerUrl": "ws://1"}])
