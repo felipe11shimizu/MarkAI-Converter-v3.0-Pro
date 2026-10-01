@@ -11,13 +11,37 @@ from typing import Any
 import websocket
 
 
-def list_targets(endpoint: str = "http://127.0.0.1:9222") -> list[dict[str, Any]]:
-    with urllib.request.urlopen(endpoint.rstrip("/") + "/json/list", timeout=5) as response:
+def _get_json(endpoint: str, path: str) -> Any:
+    with urllib.request.urlopen(endpoint.rstrip("/") + path, timeout=5) as response:
         return json.load(response)
 
 
+def list_targets(endpoint: str = "http://127.0.0.1:9222") -> list[dict[str, Any]]:
+    """Return page targets from the legacy endpoint and Browser.getTargets fallback."""
+    legacy = _get_json(endpoint, "/json/list")
+    pages = [t for t in legacy if t.get("type") == "page" and t.get("webSocketDebuggerUrl")]
+    if pages:
+        return pages
+
+    browser_ws_url = _get_json(endpoint, "/json/version").get("webSocketDebuggerUrl")
+    if not browser_ws_url:
+        return []
+
+    client = CDPClient(browser_ws_url)
+    client.connect()
+    try:
+        result = client.command("Target.getTargets")
+        return [
+            target
+            for target in result.get("targetInfos", [])
+            if target.get("type") == "page"
+        ]
+    finally:
+        client.close()
+
+
 def select_target(targets: list[dict[str, Any]], contains: str | None = None) -> dict[str, Any]:
-    pages = [t for t in targets if t.get("type") == "page" and t.get("webSocketDebuggerUrl")]
+    pages = [t for t in targets if t.get("type") == "page"]
     if contains:
         needle = contains.lower()
         pages = [t for t in pages if needle in (t.get("title", "") + " " + t.get("url", "")).lower()]
@@ -31,6 +55,7 @@ class CDPClient:
         self.ws_url = ws_url
         self.timeout = timeout
         self._id = 0
+        self.session_id: str | None = None
         self.ws = None
 
     def connect(self) -> None:
@@ -43,13 +68,29 @@ class CDPClient:
     def command(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         self._id += 1
         request_id = self._id
-        self.ws.send(json.dumps({"id": request_id, "method": method, "params": params or {}}))
+        message: dict[str, Any] = {
+            "id": request_id,
+            "method": method,
+            "params": params or {},
+        }
+        if self.session_id:
+            message["sessionId"] = self.session_id
+        self.ws.send(json.dumps(message))
         while True:
-            message = json.loads(self.ws.recv())
-            if message.get("id") == request_id:
-                if "error" in message:
-                    raise RuntimeError(f"CDP {method}: {message['error']}")
-                return message.get("result", {})
+            response = json.loads(self.ws.recv())
+            if response.get("id") == request_id:
+                if "error" in response:
+                    raise RuntimeError(f"CDP {method}: {response['error']}")
+                return response.get("result", {})
+
+    def attach_to_target(self, target_id: str) -> None:
+        result = self.command(
+            "Target.attachToTarget",
+            {"targetId": target_id, "flatten": True},
+        )
+        self.session_id = result.get("sessionId")
+        if not self.session_id:
+            raise RuntimeError("CDP não retornou sessionId para o target selecionado.")
 
 
 DOM_SCRIPT = """() => {
@@ -119,9 +160,19 @@ def markdown_map(target: dict[str, Any], dom: list[dict[str, Any]], plan: dict[s
 
 def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, Any]:
     target = select_target(list_targets(endpoint), contains)
-    client = CDPClient(target["webSocketDebuggerUrl"])
+    if target.get("webSocketDebuggerUrl"):
+        client = CDPClient(target["webSocketDebuggerUrl"])
+    else:
+        browser_ws_url = _get_json(endpoint, "/json/version").get("webSocketDebuggerUrl")
+        if not browser_ws_url:
+            raise RuntimeError("Chrome CDP não forneceu WebSocket do Browser.")
+        client = CDPClient(browser_ws_url)
+
     client.connect()
     try:
+        if not target.get("webSocketDebuggerUrl"):
+            client.attach_to_target(target["targetId"])
+
         client.command("Page.enable")
         client.command("Runtime.enable")
         client.command("Network.enable")
@@ -131,7 +182,10 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         time.sleep(0.2)
         dom_after = snapshot_dom(client)
         result = {
-            "status": "ok", "target": {"title": target.get("title"), "url": target.get("url")},
+            "status": "ok", "target": {
+                "target_id": target.get("targetId") or target.get("id"),
+                "title": target.get("title"), "url": target.get("url")
+            },
             "dom_before": dom_before, "plan": plan, "action_result": action_result,
             "dom_after": dom_after,
         }
