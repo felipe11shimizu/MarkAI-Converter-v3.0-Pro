@@ -93,6 +93,28 @@ class CDPClient:
                     raise RuntimeError(f"CDP {method}: {response['error']}")
                 return response.get("result", {})
 
+    def drain_events(self, duration: float = 1.0) -> None:
+        """Collect asynchronous CDP events for a short observation window."""
+        if not self.ws or duration <= 0:
+            return
+        original_timeout = self.ws.gettimeout() if hasattr(self.ws, "gettimeout") else self.timeout
+        deadline = time.monotonic() + duration
+        try:
+            while time.monotonic() < deadline:
+                remaining = max(0.01, deadline - time.monotonic())
+                try:
+                    self.ws.settimeout(remaining)
+                    response = json.loads(self.ws.recv())
+                except (websocket.WebSocketTimeoutException, TimeoutError):
+                    break
+                if response.get("method", "").startswith("Network."):
+                    self.events.append({
+                        "method": response["method"],
+                        "params": response.get("params", {}),
+                    })
+        finally:
+            self.ws.settimeout(original_timeout)
+
     def attach_to_target(self, target_id: str) -> None:
         result = self.command(
             "Target.attachToTarget",
@@ -207,8 +229,9 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         dom_before = snapshot_dom(client)
         plan = build_plan(dom_before)
         action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
-        time.sleep(0.2)
+        client.drain_events(1.0)
         dom_after = snapshot_dom(client)
+        client.drain_events(0.2)
         network_events = list(client.events)
         result = {
             "status": "ok", "target": {
