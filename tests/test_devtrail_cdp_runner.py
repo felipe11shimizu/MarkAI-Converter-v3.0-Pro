@@ -149,3 +149,34 @@ def test_summarize_network_events_marks_failures():
     assert len(summary) == 1
     assert summary[0]["failed"] is True
     assert summary[0]["error"] == "net::ERR_FAILED"
+
+
+def test_action_window_can_be_summarized_independently():
+    events = [
+        {
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "requestId": "bootstrap",
+                "request": {"url": "https://example.com/app.js", "method": "GET"},
+            },
+        },
+        {
+            "method": "Network.requestWillBeSent",
+            "params": {
+                "requestId": "action",
+                "request": {"url": "https://example.com/api/upload", "method": "POST"},
+            },
+        },
+        {
+            "method": "Network.responseReceived",
+            "params": {
+                "requestId": "action",
+                "response": {"url": "https://example.com/api/upload", "status": 201},
+            },
+        },
+    ]
+    action_events = events[1:]
+    summary = summarize_network_events(action_events)
+    assert len(summary) == 1
+    assert summary[0]["endpoint"] == "https://example.com/api/upload"
+    assert summary[0]["status"] == 201
