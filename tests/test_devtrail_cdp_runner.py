@@ -180,3 +180,16 @@ def test_action_window_can_be_summarized_independently():
     assert len(summary) == 1
     assert summary[0]["endpoint"] == "https://example.com/api/upload"
     assert summary[0]["status"] == 201
+
+
+def test_build_plan_catalogs_interactive_candidates():
+    plan = build_plan([
+        {"tag": "button", "selector": "#upload", "text": "Selecionar arquivo", "disabled": False, "type": "button"},
+        {"tag": "input", "selector": "#file", "text": "", "disabled": False, "type": "file"},
+        {"tag": "button", "selector": "#delete", "text": "Excluir", "disabled": False, "type": "button"},
+    ])
+    assert plan["candidate_count"] == 3
+    assert plan["safe_action_count"] == 1
+    assert plan["actions"][0]["selector"] == "#upload"
+    assert plan["candidates"][1]["type"] == "file"
+    assert plan["candidates"][2]["destructive"] is True
