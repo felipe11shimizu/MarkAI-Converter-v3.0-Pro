@@ -338,7 +338,7 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         dom_after = snapshot_dom(client)
         client.drain_events(0.2)
         network_events = list(client.events)
-            executed_action = None
+        executed_action = None
         if plan["actions"]:
             executed_action = {**plan["actions"][0], "result": action_result}
         network_summary = summarize_network_events(network_events)
