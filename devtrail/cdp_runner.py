@@ -333,16 +333,19 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         client.drain_events(2.0)
         dom_before = snapshot_dom(client)
         plan = build_plan(dom_before)
+        pre_action_event_count = len(client.events)
         action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
         client.drain_events(1.0)
         dom_after = snapshot_dom(client)
         client.drain_events(0.2)
         network_events = list(client.events)
+        action_network_events = network_events[pre_action_event_count:]
         executed_action = None
         if plan["actions"]:
             executed_action = {**plan["actions"][0], "result": action_result}
         network_summary = summarize_network_events(network_events)
-        correlation = correlate_action_network(executed_action, network_summary)
+        action_network_summary = summarize_network_events(action_network_events)
+        correlation = correlate_action_network(executed_action, action_network_summary)
         result = {
             "status": "ok", "target": {
                 "target_id": target.get("targetId") or target.get("id"),
@@ -352,6 +355,8 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
             "dom_after": dom_after,
             "network_events": network_events,
             "network_summary": network_summary,
+            "action_network_events": action_network_events,
+            "action_network_summary": action_network_summary,
             "correlation": correlation,
         }
         if output:
@@ -379,6 +384,8 @@ def main() -> int:
         "planned_actions": len(result["plan"]["actions"]),
         "network_events": len(result["network_events"]),
         "unique_requests": len(result["network_summary"]),
+        "action_network_events": len(result["action_network_events"]),
+        "action_unique_requests": len(result["action_network_summary"]),
         "action_result": result["action_result"],
     }, ensure_ascii=False, indent=2))
     return 0
