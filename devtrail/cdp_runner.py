@@ -423,6 +423,8 @@ def main() -> int:
         "status": result["status"], "target": result["target"],
         "dom_before": len(result["dom_before"]), "dom_after": len(result["dom_after"]),
         "planned_actions": len(result["plan"]["actions"]),
+        "interactive_candidates": result["plan"].get("candidate_count", 0),
+        "safe_action_candidates": result["plan"].get("safe_action_count", 0),
         "network_events": len(result["network_events"]),
         "unique_requests": len(result["network_summary"]),
         "action_network_events": len(result["action_network_events"]),
