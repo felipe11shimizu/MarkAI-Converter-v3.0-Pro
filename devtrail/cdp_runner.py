@@ -216,7 +216,10 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         if output:
             output.mkdir(parents=True, exist_ok=True)
             (output / "system_map.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-            (output / "system_map.md").write_text(\n                markdown_map(target, dom_after, plan, len(network_events), network_events),\n                encoding="utf-8",\n            )
+            (output / "system_map.md").write_text(
+                markdown_map(target, dom_after, plan, len(network_events), network_events),
+                encoding="utf-8",
+            )
         return result
     finally:
         client.close()
@@ -232,7 +235,9 @@ def main() -> int:
     print(json.dumps({
         "status": result["status"], "target": result["target"],
         "dom_before": len(result["dom_before"]), "dom_after": len(result["dom_after"]),
-        "planned_actions": len(result["plan"]["actions"]),\n        "network_events": len(result["network_events"]),\n        "action_result": result["action_result"],
+        "planned_actions": len(result["plan"]["actions"]),
+        "network_events": len(result["network_events"]),
+        "action_result": result["action_result"],
     }, ensure_ascii=False, indent=2))
     return 0
 
