@@ -174,6 +174,73 @@ def execute_click(client: CDPClient, selector: str) -> dict[str, Any]:
     return result.get("result", {}).get("value", {"ok": False})
 
 
+def summarize_network_events(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Normalize noisy CDP Network.* events into unique request summaries."""
+    requests: dict[str, dict[str, Any]] = {}
+    request_ids: dict[str, str] = {}
+
+    for event in events:
+        method = event.get("method", "")
+        params = event.get("params", {})
+        request_id = str(params.get("requestId", ""))
+
+        if method == "Network.requestWillBeSent":
+            request = params.get("request", {})
+            url = request.get("url")
+            if not url:
+                continue
+            key = f"{request.get('method', 'GET')} {url}"
+            item = requests.setdefault(key, {
+                "method": request.get("method", "GET"),
+                "url": url,
+                "endpoint": url.split("?", 1)[0],
+                "status": None,
+                "resource_type": params.get("type"),
+                "count": 0,
+                "failed": False,
+                "error": None,
+            })
+            item["count"] += 1
+            if params.get("type"):
+                item["resource_type"] = params["type"]
+            if request_id:
+                request_ids[request_id] = key
+
+        elif method == "Network.responseReceived":
+            response = params.get("response", {})
+            url = response.get("url")
+            key = request_ids.get(request_id)
+            if not key and url:
+                key = f"{response.get('requestHeaders', {}).get(':method', 'GET')} {url}"
+            if key:
+                item = requests.setdefault(key, {
+                    "method": "GET",
+                    "url": url or "",
+                    "endpoint": (url or "").split("?", 1)[0],
+                    "status": None,
+                    "resource_type": params.get("type"),
+                    "count": 0,
+                    "failed": False,
+                    "error": None,
+                })
+                if response.get("status") is not None:
+                    item["status"] = response["status"]
+                if params.get("type"):
+                    item["resource_type"] = params["type"]
+
+        elif method == "Network.loadingFailed":
+            key = request_ids.get(request_id)
+            if key:
+                item = requests[key]
+                item["failed"] = True
+                item["error"] = params.get("errorText") or params.get("blockedReason")
+
+    return sorted(
+        requests.values(),
+        key=lambda item: (item["endpoint"], item["method"]),
+    )
+
+
 def markdown_map(
     target: dict[str, Any],
     dom: list[dict[str, Any]],
@@ -193,18 +260,19 @@ def markdown_map(
         lines.append(f"- \x60{action['type']}\x60 — {action['description']} — \x60{action['selector']}\x60")
     if not plan.get("actions"):
         lines.append("- Nenhuma ação segura encontrada.")
-    if network_events:
-        lines.extend(["", "## Network events"])
-        for event in network_events:
-            method = event.get("method", "unknown")
-            params = event.get("params", {})
-            request = params.get("request", {})
-            url = request.get("url")
-            status = params.get("response", {}).get("status")
-            suffix = f" — {url}" if url else ""
-            if status is not None:
-                suffix += f" — status {status}"
-            lines.append(f"- `{method}`{suffix}")
+    summaries = summarize_network_events(network_events or [])
+    lines.extend(["", "## Network summary", f"- Unique requests: {len(summaries)}"])
+    if summaries:
+        lines.append("")
+        for item in summaries:
+            status = f" — status {item['status']}" if item["status"] is not None else ""
+            resource = f" — {item['resource_type']}" if item["resource_type"] else ""
+            failure = f" — ERROR: {item['error']}" if item["failed"] and item["error"] else (" — FAILED" if item["failed"] else "")
+            lines.append(
+                f"- `{item['method']}` — {item['endpoint']}{status}{resource} — {item['count']}x{failure}"
+            )
+    elif network_count:
+        lines.append("- Eventos capturados, mas nenhum request pôde ser normalizado.")
     return "\n".join(lines) + "\n"
 
 
@@ -244,7 +312,9 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
                 "title": target.get("title"), "url": target.get("url")
             },
             "dom_before": dom_before, "plan": plan, "action_result": action_result,
-            "dom_after": dom_after, "network_events": network_events,
+            "dom_after": dom_after,
+            "network_events": network_events,
+            "network_summary": summarize_network_events(network_events),
         }
         if output:
             output.mkdir(parents=True, exist_ok=True)
@@ -270,6 +340,7 @@ def main() -> int:
         "dom_before": len(result["dom_before"]), "dom_after": len(result["dom_after"]),
         "planned_actions": len(result["plan"]["actions"]),
         "network_events": len(result["network_events"]),
+        "unique_requests": len(result["network_summary"]),
         "action_result": result["action_result"],
     }, ensure_ascii=False, indent=2))
     return 0
