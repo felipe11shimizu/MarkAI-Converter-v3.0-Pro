@@ -1,3 +1,10 @@
+from devtrail.exploration_state import (
+    action_key,
+    empty_state,
+    fingerprint_dom,
+    record_observation,
+    should_explore,
+)
 from devtrail.cdp_runner import (
     CDPClient,
     build_plan,
@@ -193,3 +200,20 @@ def test_build_plan_catalogs_interactive_candidates():
     assert plan["actions"][0]["selector"] == "#upload"
     assert plan["candidates"][1]["type"] == "file"
     assert plan["candidates"][2]["destructive"] is True
+
+
+def test_exploration_state_fingerprint_is_stable():
+    dom = [{"tag": "button", "id": "go", "selector": "#go", "text": "Executar"}]
+    assert fingerprint_dom(dom) == fingerprint_dom(list(dom))
+
+
+def test_exploration_state_records_action_and_prevents_repeat():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    dom = [{"tag": "button", "id": "go", "selector": "#go", "text": "Executar"}]
+    action = {"type": "click", "selector": "#go", "description": "Executar"}
+    assert should_explore(state, action) is True
+    state_id, key = record_observation(state, dom, action, {"ok": True, "tag": "button"})
+    assert key == action_key(action)
+    assert state_id in state["states"]
+    assert state["actions"][key]["attempts"] == 1
+    assert should_explore(state, action) is False
