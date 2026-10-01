@@ -61,6 +61,7 @@ class CDPClient:
         self._id = 0
         self.session_id: str | None = None
         self.ws = None
+        self.events: list[dict[str, Any]] = []
 
     def connect(self) -> None:
         self.ws = websocket.create_connection(self.ws_url, timeout=self.timeout)
@@ -82,6 +83,11 @@ class CDPClient:
         self.ws.send(json.dumps(message))
         while True:
             response = json.loads(self.ws.recv())
+            if response.get("method", "").startswith("Network."):
+                self.events.append({
+                    "method": response["method"],
+                    "params": response.get("params", {}),
+                })
             if response.get("id") == request_id:
                 if "error" in response:
                     raise RuntimeError(f"CDP {method}: {response['error']}")
@@ -146,7 +152,7 @@ def execute_click(client: CDPClient, selector: str) -> dict[str, Any]:
     return result.get("result", {}).get("value", {"ok": False})
 
 
-def markdown_map(target: dict[str, Any], dom: list[dict[str, Any]], plan: dict[str, Any], network_count: int) -> str:
+def markdown_map(\n    target: dict[str, Any],\n    dom: list[dict[str, Any]],\n    plan: dict[str, Any],\n    network_count: int,\n    network_events: list[dict[str, Any]] | None = None,\n) -> str:
     lines = [
         "# DevTrail Standalone System Map", "",
         f"- URL: \x60{target.get('url', '')}\x60",
@@ -159,6 +165,18 @@ def markdown_map(target: dict[str, Any], dom: list[dict[str, Any]], plan: dict[s
         lines.append(f"- \x60{action['type']}\x60 — {action['description']} — \x60{action['selector']}\x60")
     if not plan.get("actions"):
         lines.append("- Nenhuma ação segura encontrada.")
+    if network_events:
+        lines.extend(["", "## Network events"])
+        for event in network_events:
+            method = event.get("method", "unknown")
+            params = event.get("params", {})
+            request = params.get("request", {})
+            url = request.get("url")
+            status = params.get("response", {}).get("status")
+            suffix = f" — {url}" if url else ""
+            if status is not None:
+                suffix += f" — status {status}"
+            lines.append(f"- `{method}`{suffix}")
     return "\n".join(lines) + "\n"
 
 
@@ -185,18 +203,19 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
         time.sleep(0.2)
         dom_after = snapshot_dom(client)
+        network_events = list(client.events)
         result = {
             "status": "ok", "target": {
                 "target_id": target.get("targetId") or target.get("id"),
                 "title": target.get("title"), "url": target.get("url")
             },
             "dom_before": dom_before, "plan": plan, "action_result": action_result,
-            "dom_after": dom_after,
+            "dom_after": dom_after, "network_events": network_events,
         }
         if output:
             output.mkdir(parents=True, exist_ok=True)
             (output / "system_map.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-            (output / "system_map.md").write_text(markdown_map(target, dom_after, plan, 0), encoding="utf-8")
+            (output / "system_map.md").write_text(\n                markdown_map(target, dom_after, plan, len(network_events), network_events),\n                encoding="utf-8",\n            )
         return result
     finally:
         client.close()
@@ -212,7 +231,7 @@ def main() -> int:
     print(json.dumps({
         "status": result["status"], "target": result["target"],
         "dom_before": len(result["dom_before"]), "dom_after": len(result["dom_after"]),
-        "planned_actions": len(result["plan"]["actions"]), "action_result": result["action_result"],
+        "planned_actions": len(result["plan"]["actions"]),\n        "network_events": len(result["network_events"]),\n        "action_result": result["action_result"],
     }, ensure_ascii=False, indent=2))
     return 0
 
