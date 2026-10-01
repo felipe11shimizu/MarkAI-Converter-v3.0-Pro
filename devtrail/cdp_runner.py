@@ -286,6 +286,14 @@ def markdown_map(
         lines.append("- Nenhuma ação segura encontrada.")
     summaries = summarize_network_events(network_events or [])
     lines.extend(["", "## Network summary", f"- Unique requests: {len(summaries)}"])
+    action = plan.get("actions", [None])[0]
+    correlation = correlate_action_network(action, summaries)
+    lines.extend([
+        "",
+        "## Action → Network correlation",
+        f"- Confidence: {correlation['confidence']}",
+        f"- Matched requests: {len(correlation['matched_requests'])}",
+    ])
     if summaries:
         lines.append("")
         for item in summaries:
