@@ -131,13 +131,28 @@ DOM_SCRIPT = """() => {
     const r = el.getBoundingClientRect();
     return s.display !== 'none' && s.visibility !== 'hidden' && r.width > 0 && r.height > 0;
   };
+  const selectorFor = el => {
+    if (el.id) return '#' + CSS.escape(el.id);
+    const parts = [];
+    let node = el;
+    while (node && node.nodeType === 1 && parts.length < 6) {
+      let part = node.tagName.toLowerCase();
+      if (node.parentElement) {
+        const siblings = [...node.parentElement.children].filter(x => x.tagName === node.tagName);
+        if (siblings.length > 1) part += ':nth-of-type(' + (siblings.indexOf(node) + 1) + ')';
+      }
+      parts.unshift(part);
+      node = node.parentElement;
+    }
+    return parts.join(' > ');
+  };
   return [...document.querySelectorAll('a,button,input,select,textarea,[role],[contenteditable="true"]')]
     .filter(visible).map((el, index) => ({
       index, tag: el.tagName.toLowerCase(), id: el.id || null,
       name: el.getAttribute('name'), role: el.getAttribute('role'),
       text: (el.innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 200),
       type: el.getAttribute('type'), disabled: !!el.disabled,
-      selector: el.id ? '#' + CSS.escape(el.id) : null
+      href: el.getAttribute('href'), selector: selectorFor(el)
     }));
 }"""
 
@@ -152,15 +167,39 @@ def snapshot_dom(client: CDPClient) -> list[dict[str, Any]]:
 
 
 def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    safe_actions: list[dict[str, Any]] = []
     for item in dom:
-        if not item.get("disabled") and item["tag"] in {"button", "a"} and item.get("selector"):
-            return {"actions": [{
-                "type": "click",
-                "selector": item["selector"],
-                "description": item.get("text") or item["tag"],
-                "requires_validation": True,
-            }]}
-    return {"actions": []}
+        if item.get("disabled") or not item.get("selector"):
+            continue
+        tag = item.get("tag")
+        item_type = (item.get("type") or "").lower()
+        text = (item.get("text") or "").strip()
+        dangerous_terms = ("delete", "excluir", "remover", "apagar", "logout", "sair", "cancelar")
+        is_destructive = any(term in text.lower() for term in dangerous_terms)
+        candidate_type = "click" if tag in {"button", "a"} else (
+            "file" if tag == "input" and item_type == "file" else "input"
+        )
+        candidate = {
+            "type": candidate_type,
+            "selector": item["selector"],
+            "description": text or item.get("name") or tag,
+            "tag": tag,
+            "input_type": item_type or None,
+            "href": item.get("href"),
+            "disabled": bool(item.get("disabled")),
+            "destructive": is_destructive,
+            "requires_validation": True,
+        }
+        candidates.append(candidate)
+        if candidate_type == "click" and not is_destructive:
+            safe_actions.append(candidate)
+    return {
+        "candidates": candidates,
+        "actions": safe_actions[:1],
+        "candidate_count": len(candidates),
+        "safe_action_count": len(safe_actions),
+    }
 
 
 def execute_click(client: CDPClient, selector: str) -> dict[str, Any]:
@@ -280,6 +319,8 @@ def markdown_map(
         f"- Network events: {network_count}", "",
         "## Planned actions",
     ]
+    lines.append(f"- Interactive candidates: {plan.get('candidate_count', 0)}")
+    lines.append(f"- Safe click candidates: {plan.get('safe_action_count', 0)}")
     for action in plan.get("actions", []):
         lines.append(f"- \x60{action['type']}\x60 — {action['description']} — \x60{action['selector']}\x60")
     if not plan.get("actions"):
