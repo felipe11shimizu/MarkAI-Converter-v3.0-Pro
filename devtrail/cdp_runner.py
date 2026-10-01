@@ -11,6 +11,14 @@ from pathlib import Path
 from typing import Any
 import websocket
 
+from devtrail.exploration_state import (
+    action_key,
+    load_state,
+    record_observation,
+    save_state,
+    should_explore,
+)
+
 
 DEFAULT_CDP_ENDPOINT = os.environ.get("DEVTRAIL_CDP_ENDPOINT", "http://127.0.0.1:9223")
 
@@ -351,6 +359,8 @@ def markdown_map(
 
 def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, Any]:
     target = select_target(list_targets(endpoint), contains)
+    state_path = (output or Path("devtrail-output")) / "exploration_state.json"
+    state = load_state(state_path, target)
     if target.get("webSocketDebuggerUrl"):
         client = CDPClient(target["webSocketDebuggerUrl"])
     else:
@@ -374,6 +384,10 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         client.drain_events(2.0)
         dom_before = snapshot_dom(client)
         plan = build_plan(dom_before)
+        selected_action = plan["actions"][0] if plan["actions"] else None
+        if selected_action and not should_explore(state, selected_action):
+            plan["actions"] = []
+            plan["skipped_already_explored"] = 1
         pre_action_event_count = len(client.events)
         action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
         client.drain_events(1.0)
@@ -387,6 +401,15 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         network_summary = summarize_network_events(network_events)
         action_network_summary = summarize_network_events(action_network_events)
         correlation = correlate_action_network(executed_action, action_network_summary)
+        state_id, explored_action_key = record_observation(
+            state,
+            dom_before,
+            executed_action,
+            action_result,
+        )
+        state["last_state_id"] = state_id
+        state["last_action_key"] = explored_action_key
+        save_state(state_path, state)
         result = {
             "status": "ok", "target": {
                 "target_id": target.get("targetId") or target.get("id"),
@@ -399,6 +422,13 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
             "action_network_events": action_network_events,
             "action_network_summary": action_network_summary,
             "correlation": correlation,
+            "exploration": {
+                "state_id": state_id,
+                "action_key": explored_action_key,
+                "state_count": len(state["states"]),
+                "action_count": len(state["actions"]),
+                "skipped_already_explored": plan.get("skipped_already_explored", 0),
+            },
         }
         if output:
             output.mkdir(parents=True, exist_ok=True)
@@ -430,6 +460,7 @@ def main() -> int:
         "action_network_events": len(result["action_network_events"]),
         "action_unique_requests": len(result["action_network_summary"]),
         "action_result": result["action_result"],
+        "exploration": result["exploration"],
     }, ensure_ascii=False, indent=2))
     return 0
 
