@@ -272,3 +272,15 @@ def test_record_transition_updates_coverage_metrics():
     assert state["metrics"]["new_states"] == 1
     record_transition(state, "state-a", {"type": "click", "selector": "#loop", "description": "Abrir"}, {"ok": True}, "state-a", [])
     assert state["metrics"]["loops"] == 1
+
+
+def test_score_action_prefers_unseen_action_from_current_state():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    action = {"type": "click", "tag": "button", "selector": "#next", "description": "Continuar"}
+    first_score, first_reasons = score_action(action, state, "state-a")
+    record_transition(state, "state-a", action, {"ok": True}, "state-b", [])
+    second_score, second_reasons = score_action(action, state, "state-a")
+    assert first_score > 0
+    assert "never_executed" in first_reasons
+    assert second_score < 0
+    assert "transition_already_explored" in second_reasons
