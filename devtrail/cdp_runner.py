@@ -175,6 +175,45 @@ def snapshot_dom(client: CDPClient) -> list[dict[str, Any]]:
     return result.get("result", {}).get("value", [])
 
 
+def score_action(action: dict[str, Any], state: dict[str, Any]) -> tuple[int, list[str]]:
+    """Score safe actions so exploration prefers useful, low-risk interactions."""
+    score = 0
+    reasons: list[str] = []
+    text = (action.get("description") or "").lower()
+    tag = action.get("tag")
+
+    if not should_explore(state, action):
+        return -1000, ["already_explored"]
+
+    if tag == "button":
+        score += 30
+        reasons.append("button")
+    elif tag == "a":
+        score += 20
+        reasons.append("link")
+
+    useful_terms = {
+        "upload": 50, "arquivo": 45, "file": 45, "converter": 40,
+        "convert": 40, "processar": 35, "iniciar": 30, "abrir": 25,
+        "continuar": 25, "next": 25, "avançar": 25, "gerar": 25,
+    }
+    for term, points in useful_terms.items():
+        if term in text:
+            score += points
+            reasons.append(term)
+
+    navigation_terms = ("logout", "sair", "cancelar", "delete", "excluir", "remover", "apagar")
+    if any(term in text for term in navigation_terms):
+        score -= 500
+        reasons.append("risk_term")
+
+    if action.get("href"):
+        score += 5
+        reasons.append("has_href")
+
+    return score, reasons
+
+
 def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     safe_actions: list[dict[str, Any]] = []
@@ -397,16 +436,21 @@ def run(
             state_id = register_state(state, dom_before)
             plan = build_plan(dom_before)
 
-            selected_action = next(
-                (action for action in plan["candidates"]
-                 if action.get("type") == "click"
-                 and not action.get("destructive")
-                 and should_explore(state, action)),
-                None,
+            ranked_actions = []
+            for action in plan["candidates"]:
+                if action.get("type") != "click" or action.get("destructive"):
+                    continue
+                score, reasons = score_action(action, state)
+                if score >= 0:
+                    ranked_actions.append({**action, "score": score, "score_reasons": reasons})
+            ranked_actions.sort(
+                key=lambda item: (-item["score"], item.get("selector", ""))
             )
+            selected_action = ranked_actions[0] if ranked_actions else None
             if not selected_action:
                 break
 
+            plan["ranked_actions"] = ranked_actions
             plan["actions"] = [selected_action]
             pre_action_event_count = len(client.events)
             action_result = execute_click(client, selected_action["selector"])
