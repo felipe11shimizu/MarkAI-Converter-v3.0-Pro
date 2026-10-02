@@ -5,6 +5,9 @@ from devtrail.exploration_state import (
     record_observation,
     register_state,
     should_explore,
+    record_transition,
+    transition_key,
+    classify_transition,
 )
 from devtrail.cdp_runner import (
     CDPClient,
