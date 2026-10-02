@@ -287,3 +287,14 @@ def test_score_action_prefers_unseen_action_from_current_state():
     assert "never_executed" in first_reasons
     assert second_score < 0
     assert "transition_already_explored" in second_reasons
+
+
+def test_build_plan_catalogs_form_fields_without_executing_them():
+    plan = build_plan([
+        {"tag": "input", "selector": "#name", "text": "Nome", "type": "text", "disabled": False},
+        {"tag": "input", "selector": "#password", "text": "Senha", "type": "password", "disabled": False},
+        {"tag": "select", "selector": "#type", "text": "Tipo", "type": "", "disabled": False},
+    ])
+    assert plan["form_field_count"] == 3
+    assert all(item["type"] == "input" for item in plan["candidates"])
+    assert plan["actions"] == []
