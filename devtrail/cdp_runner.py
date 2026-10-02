@@ -176,15 +176,28 @@ def snapshot_dom(client: CDPClient) -> list[dict[str, Any]]:
     return result.get("result", {}).get("value", [])
 
 
-def score_action(action: dict[str, Any], state: dict[str, Any]) -> tuple[int, list[str]]:
+def score_action(
+    action: dict[str, Any],
+    state: dict[str, Any],
+    from_state: str | None = None,
+) -> tuple[int, list[str]]:
     """Score safe actions so exploration prefers useful, low-risk interactions."""
     score = 0
     reasons: list[str] = []
     text = (action.get("description") or "").lower()
     tag = action.get("tag")
 
-    if not should_explore(state, action):
-        return -1000, ["already_explored"]
+    if not should_explore(state, action, from_state):
+        return -1000, ["transition_already_explored" if from_state else "already_explored"]
+
+    history = state.get("actions", {}).get(action_key(action), {})
+    attempts = int(history.get("attempts", 0))
+    score -= min(attempts * 10, 30)
+    if attempts:
+        reasons.append(f"attempts:{attempts}")
+    else:
+        score += 20
+        reasons.append("never_executed")
 
     if tag == "button":
         score += 30
@@ -442,10 +455,7 @@ def run(
             for action in plan["candidates"]:
                 if action.get("type") != "click" or action.get("destructive"):
                     continue
-                score, reasons = score_action(action, state)
-                if not should_explore(state, action, state_id):
-                    score = -1000
-                    reasons = ["transition_already_explored"]
+                score, reasons = score_action(action, state, state_id)
                 if score >= 0:
                     ranked_actions.append({**action, "score": score, "score_reasons": reasons})
             ranked_actions.sort(
@@ -456,6 +466,8 @@ def run(
                 break
 
             plan["ranked_actions"] = ranked_actions
+            plan["coverage_strategy"] = "prefer_unseen_actions_then_high_utility"
+            plan["selected_score"] = selected_action["score"]
             plan["actions"] = [selected_action]
             pre_action_event_count = len(client.events)
             action_result = execute_click(client, selected_action["selector"])
