@@ -17,6 +17,7 @@ from devtrail.exploration_state import (
     record_observation,
     save_state,
     should_explore,
+    register_state,
 )
 
 
@@ -357,7 +358,12 @@ def markdown_map(
     return "\n".join(lines) + "\n"
 
 
-def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, Any]:
+def run(
+    endpoint: str,
+    contains: str | None,
+    output: Path | None,
+    max_actions: int = 3,
+) -> dict[str, Any]:
     target = select_target(list_targets(endpoint), contains)
     state_path = (output or Path("devtrail-output")) / "exploration_state.json"
     state = load_state(state_path, target)
@@ -378,92 +384,111 @@ def run(endpoint: str, contains: str | None, output: Path | None) -> dict[str, A
         client.command("Runtime.enable")
         client.command("Network.enable")
         client.events.clear()
-        # Reload after enabling Network so the map captures the page's real
-        # bootstrap requests instead of only events that happen during commands.
         client.command("Page.reload", {"ignoreCache": False})
         client.drain_events(2.0)
-        dom_before = snapshot_dom(client)
-        plan = build_plan(dom_before)
-        selected_action = plan["actions"][0] if plan["actions"] else None
-        if selected_action and not should_explore(state, selected_action):
-            plan["actions"] = []
-            plan["skipped_already_explored"] = 1
-        pre_action_event_count = len(client.events)
-        action_result = execute_click(client, plan["actions"][0]["selector"]) if plan["actions"] else None
-        client.drain_events(1.0)
-        dom_after = snapshot_dom(client)
-        client.drain_events(0.2)
-        network_events = list(client.events)
-        action_network_events = network_events[pre_action_event_count:]
-        executed_action = None
-        if plan["actions"]:
-            executed_action = {**plan["actions"][0], "result": action_result}
-        network_summary = summarize_network_events(network_events)
-        action_network_summary = summarize_network_events(action_network_events)
-        correlation = correlate_action_network(executed_action, action_network_summary)
-        state_id, explored_action_key = record_observation(
-            state,
-            dom_before,
-            executed_action,
-            action_result,
-        )
-        state["last_state_id"] = state_id
-        state["last_action_key"] = explored_action_key
+
+        initial_dom = snapshot_dom(client)
+        initial_state_id = register_state(state, initial_dom)
+        action_records: list[dict[str, Any]] = []
+        all_network_events = list(client.events)
+
+        for step in range(max(0, max_actions)):
+            dom_before = snapshot_dom(client)
+            state_id = register_state(state, dom_before)
+            plan = build_plan(dom_before)
+
+            selected_action = next(
+                (action for action in plan["candidates"]
+                 if action.get("type") == "click"
+                 and not action.get("destructive")
+                 and should_explore(state, action)),
+                None,
+            )
+            if not selected_action:
+                break
+
+            plan["actions"] = [selected_action]
+            pre_action_event_count = len(client.events)
+            action_result = execute_click(client, selected_action["selector"])
+            client.drain_events(1.0)
+            dom_after = snapshot_dom(client)
+            client.drain_events(0.2)
+
+            action_network_events = list(client.events)[pre_action_event_count:]
+            all_network_events.extend(action_network_events)
+            executed_action = {**selected_action, "result": action_result}
+            action_network_summary = summarize_network_events(action_network_events)
+            correlation = correlate_action_network(executed_action, action_network_summary)
+
+            _, explored_action_key = record_observation(
+                state, dom_before, executed_action, action_result
+            )
+            post_state_id = register_state(state, dom_after)
+            state["last_state_id"] = post_state_id
+            state["last_action_key"] = explored_action_key
+
+            action_records.append({
+                "step": step + 1,
+                "from_state": state_id,
+                "to_state": post_state_id,
+                "action": executed_action,
+                "network_events": len(action_network_events),
+                "network_summary": action_network_summary,
+                "correlation": correlation,
+            })
+
+            # Stop immediately after a navigation or failed action; the next
+            # iteration is only attempted when the current target remains usable.
+            if not action_result.get("ok"):
+                break
+
+        state["last_state_id"] = state.get("last_state_id", initial_state_id)
         save_state(state_path, state)
+
+        final_dom = snapshot_dom(client)
+        final_plan = build_plan(final_dom)
+        network_summary = summarize_network_events(all_network_events)
         result = {
-            "status": "ok", "target": {
+            "status": "ok",
+            "target": {
                 "target_id": target.get("targetId") or target.get("id"),
-                "title": target.get("title"), "url": target.get("url")
+                "title": target.get("title"),
+                "url": target.get("url"),
             },
-            "dom_before": dom_before, "plan": plan, "action_result": action_result,
-            "dom_after": dom_after,
-            "network_events": network_events,
+            "dom_before": initial_dom,
+            "plan": final_plan,
+            "action_result": action_records[-1]["action"]["result"] if action_records else None,
+            "dom_after": final_dom,
+            "network_events": all_network_events,
             "network_summary": network_summary,
-            "action_network_events": action_network_events,
-            "action_network_summary": action_network_summary,
-            "correlation": correlation,
+            "action_records": action_records,
             "exploration": {
-                "state_id": state_id,
-                "action_key": explored_action_key,
+                "initial_state_id": initial_state_id,
                 "state_count": len(state["states"]),
                 "action_count": len(state["actions"]),
-                "skipped_already_explored": plan.get("skipped_already_explored", 0),
+                "actions_executed": len(action_records),
+                "max_actions": max_actions,
             },
         }
+
         if output:
             output.mkdir(parents=True, exist_ok=True)
-            (output / "system_map.json").write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+            (output / "system_map.json").write_text(
+                json.dumps(result, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            (output / "exploration_state.json").write_text(
+                json.dumps(state, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
             (output / "system_map.md").write_text(
-                markdown_map(target, dom_after, plan, len(network_events), network_events),
+                markdown_map(
+                    target, final_dom, final_plan,
+                    len(all_network_events), all_network_events
+                ),
                 encoding="utf-8",
             )
         return result
     finally:
         client.close()
 
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description="DevTrail standalone Chrome CDP runner")
-    parser.add_argument("--endpoint", default=DEFAULT_CDP_ENDPOINT)
-    parser.add_argument("--contains")
-    parser.add_argument("--output", default="devtrail-output")
-    args = parser.parse_args()
-    result = run(args.endpoint, args.contains, Path(args.output))
-    print(json.dumps({
-        "status": result["status"], "target": result["target"],
-        "dom_before": len(result["dom_before"]), "dom_after": len(result["dom_after"]),
-        "planned_actions": len(result["plan"]["actions"]),
-        "interactive_candidates": result["plan"].get("candidate_count", 0),
-        "safe_action_candidates": result["plan"].get("safe_action_count", 0),
-        "network_events": len(result["network_events"]),
-        "unique_requests": len(result["network_summary"]),
-        "action_network_events": len(result["action_network_events"]),
-        "action_unique_requests": len(result["action_network_summary"]),
-        "action_result": result["action_result"],
-        "exploration": result["exploration"],
-    }, ensure_ascii=False, indent=2))
-    return 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
