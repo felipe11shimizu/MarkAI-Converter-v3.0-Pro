@@ -3,6 +3,7 @@ from devtrail.exploration_state import (
     empty_state,
     fingerprint_dom,
     record_observation,
+    register_state,
     should_explore,
 )
 from devtrail.cdp_runner import (
@@ -10,6 +11,7 @@ from devtrail.cdp_runner import (
     build_plan,
     markdown_map,
     select_target,
+    score_action,
     summarize_network_events,
 )
 
@@ -227,3 +229,12 @@ def test_register_state_tracks_distinct_dom_states():
     second = register_state(state, dom_b)
     assert first != second
     assert len(state["states"]) == 2
+
+
+def test_score_action_prefers_useful_unexplored_action():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    upload = {"type": "click", "tag": "button", "selector": "#upload", "description": "Selecionar arquivo"}
+    generic = {"type": "click", "tag": "button", "selector": "#x", "description": "Abrir"}
+    assert score_action(upload, state)[0] > score_action(generic, state)[0]
+    record_observation(state, [{"tag": "button", "selector": "#upload"}], upload, {"ok": True})
+    assert score_action(upload, state)[0] < 0
