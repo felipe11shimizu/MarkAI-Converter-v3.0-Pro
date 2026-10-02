@@ -18,6 +18,7 @@ from devtrail.exploration_state import (
     save_state,
     should_explore,
     register_state,
+    record_transition,
 )
 
 
@@ -441,6 +442,9 @@ def run(
                 if action.get("type") != "click" or action.get("destructive"):
                     continue
                 score, reasons = score_action(action, state)
+                if not should_explore(state, action, state_id):
+                    score = -1000
+                    reasons = ["transition_already_explored"]
                 if score >= 0:
                     ranked_actions.append({**action, "score": score, "score_reasons": reasons})
             ranked_actions.sort(
@@ -468,6 +472,14 @@ def run(
                 state, dom_before, executed_action, action_result
             )
             post_state_id = register_state(state, dom_after)
+            transition_id = record_transition(
+                state,
+                state_id,
+                executed_action,
+                action_result,
+                post_state_id,
+                action_network_summary,
+            )
             state["last_state_id"] = post_state_id
             state["last_action_key"] = explored_action_key
 
@@ -475,6 +487,7 @@ def run(
                 "step": step + 1,
                 "from_state": state_id,
                 "to_state": post_state_id,
+                "transition_id": transition_id,
                 "action": executed_action,
                 "network_events": len(action_network_events),
                 "network_summary": action_network_summary,
@@ -512,6 +525,11 @@ def run(
                 "action_count": len(state["actions"]),
                 "actions_executed": len(action_records),
                 "max_actions": max_actions,
+                "transition_count": len(state["transitions"]),
+                "graph": {
+                    "nodes": list(state["states"].keys()),
+                    "edges": list(state["transitions"].values()),
+                },
             },
         }
 
