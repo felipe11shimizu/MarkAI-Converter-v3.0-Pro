@@ -237,6 +237,33 @@ def score_action(
     return score, reasons
 
 
+def synthetic_value(field: dict[str, Any]) -> str | None:
+    """Return deterministic synthetic data for non-sensitive test fields only."""
+    field_type = (field.get("input_type") or "text").lower()
+    name = f"{field.get('name') or ''} {field.get('description') or ''}".lower()
+    if field_type in {"password", "file"}:
+        return None
+    if any(term in name for term in ("senha", "password", "token", "secret", "cartao", "card")):
+        return None
+    if field_type == "email" or "email" in name or "e-mail" in name:
+        return "devtrail@example.invalid"
+    if field_type in {"tel"} or any(term in name for term in ("telefone", "phone", "celular")):
+        return "11999990000"
+    if field_type in {"number"}:
+        return "1"
+    if field_type in {"date"}:
+        return "2026-01-15"
+    if field_type in {"url"}:
+        return "https://example.invalid/"
+    if any(term in name for term in ("cpf", "documento")):
+        return "00000000000"
+    if field_type in {"text", "search", ""}:
+        return "DevTrail Test"
+    if field_type == "textarea":
+        return "DevTrail synthetic test"
+    return None
+
+
 def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
     candidates: list[dict[str, Any]] = []
     safe_actions: list[dict[str, Any]] = []
@@ -261,6 +288,16 @@ def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
             "disabled": bool(item.get("disabled")),
             "destructive": is_destructive,
             "requires_validation": True,
+            "synthetic_value": synthetic_value({
+                **item,
+                "description": text or item.get("name") or tag,
+                "input_type": item_type or None,
+            }) if candidate_type == "input" else None,
+            "sensitive": synthetic_value({
+                **item,
+                "description": text or item.get("name") or tag,
+                "input_type": item_type or None,
+            }) is None if candidate_type == "input" else False,
         }
         candidates.append(candidate)
         if candidate_type == "click" and not is_destructive:
@@ -271,6 +308,7 @@ def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
         "candidate_count": len(candidates),
         "safe_action_count": len(safe_actions),
         "form_field_count": sum(1 for item in candidates if item["type"] == "input"),
+        "synthetic_field_count": sum(1 for item in candidates if item["type"] == "input" and item.get("synthetic_value") is not None),
     }
 
 
