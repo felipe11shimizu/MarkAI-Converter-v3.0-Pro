@@ -51,6 +51,7 @@ def empty_state(target: dict[str, Any]) -> dict[str, Any]:
         },
         "states": {},
         "actions": {},
+        "transitions": {},
     }
 
 
@@ -118,6 +119,37 @@ def record_observation(
     return state_id, key
 
 
-def should_explore(state: dict[str, Any], action: dict[str, Any]) -> bool:
-    """Return False when this exact action has already been explored."""
+def transition_key(from_state: str, action: dict[str, Any]) -> str:
+    payload = {"from_state": from_state, "action": action_key(action)}
+    return hashlib.sha256(_stable_json(payload).encode("utf-8")).hexdigest()[:16]
+
+
+def record_transition(
+    state: dict[str, Any],
+    from_state: str,
+    action: dict[str, Any],
+    result: dict[str, Any] | None,
+    to_state: str,
+    network_summary: list[dict[str, Any]] | None = None,
+) -> str:
+    """Record an edge in the exploration graph."""
+    key = transition_key(from_state, action)
+    state["transitions"][key] = {
+        "from_state": from_state,
+        "action_key": action_key(action),
+        "to_state": to_state,
+        "ok": result.get("ok") if result else None,
+        "network_requests": len(network_summary or []),
+    }
+    return key
+
+
+def should_explore(
+    state: dict[str, Any],
+    action: dict[str, Any],
+    from_state: str | None = None,
+) -> bool:
+    """Return False when this action has already been explored from this state."""
+    if from_state:
+        return transition_key(from_state, action) not in state.get("transitions", {})
     return action_key(action) not in state.get("actions", {})
