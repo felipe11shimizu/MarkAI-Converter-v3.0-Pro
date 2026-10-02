@@ -162,7 +162,10 @@ DOM_SCRIPT = """() => {
       name: el.getAttribute('name'), role: el.getAttribute('role'),
       text: (el.innerText || el.getAttribute('aria-label') || el.getAttribute('placeholder') || '').slice(0, 200),
       type: el.getAttribute('type'), disabled: !!el.disabled,
-      href: el.getAttribute('href'), selector: selectorFor(el)
+      required: !!el.required, autocomplete: el.getAttribute('autocomplete'),
+      href: el.getAttribute('href'), selector: selectorFor(el),
+      form_selector: el.form ? selectorFor(el.form) : null,
+      option_count: el.tagName.toLowerCase() === 'select' ? el.options.length : null
     }));
 }"""
 
@@ -199,6 +202,12 @@ def score_action(
         score += 20
         reasons.append("never_executed")
 
+    if tag in {"input", "textarea", "select"}:
+        score += 15
+        reasons.append("form_field")
+        if action.get("input_type") not in {"password", "file"}:
+            score += 10
+            reasons.append("synthetic_safe")
     if tag == "button":
         score += 30
         reasons.append("button")
@@ -261,6 +270,7 @@ def build_plan(dom: list[dict[str, Any]]) -> dict[str, Any]:
         "actions": safe_actions[:1],
         "candidate_count": len(candidates),
         "safe_action_count": len(safe_actions),
+        "form_field_count": sum(1 for item in candidates if item["type"] == "input"),
     }
 
 
@@ -520,6 +530,7 @@ def run(
         final_dom = snapshot_dom(client)
         final_plan = build_plan(final_dom)
         network_summary = summarize_network_events(all_network_events)
+        form_fields = [item for item in final_plan.get("candidates", []) if item.get("type") == "input"]
         result = {
             "status": "ok",
             "target": {
@@ -529,6 +540,7 @@ def run(
             },
             "dom_before": initial_dom,
             "plan": final_plan,
+            "form_fields": form_fields,
             "action_result": action_records[-1]["action"]["result"] if action_records else None,
             "dom_after": final_dom,
             "network_events": all_network_events,
