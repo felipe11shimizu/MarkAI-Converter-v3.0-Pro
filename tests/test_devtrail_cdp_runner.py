@@ -15,6 +15,7 @@ from devtrail.cdp_runner import (
     markdown_map,
     select_target,
     score_action,
+    synthetic_value,
     summarize_network_events,
 )
 
@@ -298,3 +299,14 @@ def test_build_plan_catalogs_form_fields_without_executing_them():
     assert plan["form_field_count"] == 3
     assert all(item["type"] == "input" for item in plan["candidates"])
     assert plan["actions"] == []
+
+
+def test_synthetic_value_rejects_sensitive_fields():
+    assert synthetic_value({"input_type": "password", "description": "Senha"}) is None
+    assert synthetic_value({"input_type": "text", "description": "Token secreto"}) is None
+
+
+def test_synthetic_value_is_deterministic_for_safe_fields():
+    assert synthetic_value({"input_type": "email", "description": "E-mail"}) == "devtrail@example.invalid"
+    assert synthetic_value({"input_type": "text", "description": "Nome"}) == "DevTrail Test"
+    assert synthetic_value({"input_type": "number", "description": "Quantidade"}) == "1"
