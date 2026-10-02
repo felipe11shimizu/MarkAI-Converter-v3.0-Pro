@@ -52,6 +52,13 @@ def empty_state(target: dict[str, Any]) -> dict[str, Any]:
         "states": {},
         "actions": {},
         "transitions": {},
+        "metrics": {
+            "sessions": 0,
+            "actions": 0,
+            "new_states": 0,
+            "revisited_states": 0,
+            "loops": 0,
+        },
     }
 
 
@@ -124,6 +131,15 @@ def transition_key(from_state: str, action: dict[str, Any]) -> str:
     return hashlib.sha256(_stable_json(payload).encode("utf-8")).hexdigest()[:16]
 
 
+def classify_transition(state: dict[str, Any], from_state: str, to_state: str) -> str:
+    """Classify an edge for coverage and loop detection."""
+    if from_state == to_state:
+        return "self_loop"
+    if to_state in state.get("states", {}):
+        return "revisit"
+    return "new_state"
+
+
 def record_transition(
     state: dict[str, Any],
     from_state: str,
@@ -134,13 +150,23 @@ def record_transition(
 ) -> str:
     """Record an edge in the exploration graph."""
     key = transition_key(from_state, action)
+    classification = classify_transition(state, from_state, to_state)
     state["transitions"][key] = {
         "from_state": from_state,
         "action_key": action_key(action),
         "to_state": to_state,
         "ok": result.get("ok") if result else None,
         "network_requests": len(network_summary or []),
+        "classification": classification,
     }
+    metrics = state.setdefault("metrics", {})
+    metrics["actions"] = metrics.get("actions", 0) + 1
+    if classification == "new_state":
+        metrics["new_states"] = metrics.get("new_states", 0) + 1
+    elif classification == "self_loop":
+        metrics["loops"] = metrics.get("loops", 0) + 1
+    else:
+        metrics["revisited_states"] = metrics.get("revisited_states", 0) + 1
     return key
 
 
