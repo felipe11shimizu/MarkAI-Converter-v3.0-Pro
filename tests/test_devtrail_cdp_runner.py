@@ -252,3 +252,23 @@ def test_transition_graph_is_state_aware():
     assert should_explore(state, action, "state-a") is False
     assert should_explore(state, action, "state-b") is False
     assert should_explore(state, action, "state-c") is True
+
+
+def test_transition_classification_distinguishes_new_revisit_and_loop():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    state["states"]["state-a"] = {"dom_count": 1, "observations": 1}
+    assert classify_transition(state, "state-a", "state-b") == "new_state"
+    assert classify_transition(state, "state-a", "state-a") == "self_loop"
+    state["states"]["state-b"] = {"dom_count": 1, "observations": 1}
+    assert classify_transition(state, "state-a", "state-b") == "revisit"
+
+
+def test_record_transition_updates_coverage_metrics():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    state["states"]["state-a"] = {"dom_count": 1, "observations": 1}
+    action = {"type": "click", "selector": "#next", "description": "Continuar"}
+    record_transition(state, "state-a", action, {"ok": True}, "state-b", [])
+    assert state["metrics"]["actions"] == 1
+    assert state["metrics"]["new_states"] == 1
+    record_transition(state, "state-a", {"type": "click", "selector": "#loop", "description": "Abrir"}, {"ok": True}, "state-a", [])
+    assert state["metrics"]["loops"] == 1
