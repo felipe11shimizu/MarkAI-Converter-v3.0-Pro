@@ -429,6 +429,7 @@ def run(
 
         initial_dom = snapshot_dom(client)
         initial_state_id = register_state(state, initial_dom)
+        state.setdefault("metrics", {})["sessions"] = state.get("metrics", {}).get("sessions", 0) + 1
         action_records: list[dict[str, Any]] = []
         all_network_events = list(client.events)
 
@@ -471,7 +472,7 @@ def run(
             _, explored_action_key = record_observation(
                 state, dom_before, executed_action, action_result
             )
-            post_state_id = register_state(state, dom_after)
+            post_state_id = fingerprint_dom(dom_after)
             transition_id = record_transition(
                 state,
                 state_id,
@@ -480,6 +481,7 @@ def run(
                 post_state_id,
                 action_network_summary,
             )
+            register_state(state, dom_after)
             state["last_state_id"] = post_state_id
             state["last_action_key"] = explored_action_key
 
@@ -488,6 +490,7 @@ def run(
                 "from_state": state_id,
                 "to_state": post_state_id,
                 "transition_id": transition_id,
+                "classification": state["transitions"][transition_id]["classification"],
                 "action": executed_action,
                 "network_events": len(action_network_events),
                 "network_summary": action_network_summary,
@@ -526,6 +529,7 @@ def run(
                 "actions_executed": len(action_records),
                 "max_actions": max_actions,
                 "transition_count": len(state["transitions"]),
+                "metrics": state.get("metrics", {}),
                 "graph": {
                     "nodes": list(state["states"].keys()),
                     "edges": list(state["transitions"].values()),
