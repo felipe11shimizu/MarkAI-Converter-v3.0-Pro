@@ -74,17 +74,23 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
     )
 
 
+def register_state(state: dict[str, Any], dom: list[dict[str, Any]]) -> str:
+    """Register an observed DOM state and return its stable identifier."""
+    state_id = fingerprint_dom(dom)
+    state["states"][state_id] = {
+        "dom_count": len(dom),
+        "observations": state["states"].get(state_id, {}).get("observations", 0) + 1,
+    }
+    return state_id
+
+
 def record_observation(
     state: dict[str, Any],
     dom: list[dict[str, Any]],
     action: dict[str, Any] | None,
     result: dict[str, Any] | None,
 ) -> tuple[str, str | None]:
-    state_id = fingerprint_dom(dom)
-    state["states"][state_id] = {
-        "dom_count": len(dom),
-        "observations": state["states"].get(state_id, {}).get("observations", 0) + 1,
-    }
+    state_id = register_state(state, dom)
 
     if not action:
         return state_id, None
