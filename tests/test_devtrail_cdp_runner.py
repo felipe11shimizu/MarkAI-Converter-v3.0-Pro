@@ -217,3 +217,13 @@ def test_exploration_state_records_action_and_prevents_repeat():
     assert state_id in state["states"]
     assert state["actions"][key]["attempts"] == 1
     assert should_explore(state, action) is False
+
+
+def test_register_state_tracks_distinct_dom_states():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    dom_a = [{"tag": "button", "selector": "#a", "text": "A"}]
+    dom_b = [{"tag": "button", "selector": "#b", "text": "B"}]
+    first = register_state(state, dom_a)
+    second = register_state(state, dom_b)
+    assert first != second
+    assert len(state["states"]) == 2
