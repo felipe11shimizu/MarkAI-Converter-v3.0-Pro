@@ -238,3 +238,17 @@ def test_score_action_prefers_useful_unexplored_action():
     assert score_action(upload, state)[0] > score_action(generic, state)[0]
     record_observation(state, [{"tag": "button", "selector": "#upload"}], upload, {"ok": True})
     assert score_action(upload, state)[0] < 0
+
+
+def test_transition_graph_is_state_aware():
+    state = empty_state({"title": "Teste", "url": "https://example.com"})
+    action = {"type": "click", "selector": "#next", "description": "Continuar"}
+    first = record_transition(state, "state-a", action, {"ok": True}, "state-b", [{"endpoint": "/api/next"}])
+    second = record_transition(state, "state-b", action, {"ok": True}, "state-c", [])
+    assert first == transition_key("state-a", action)
+    assert second == transition_key("state-b", action)
+    assert first != second
+    assert len(state["transitions"]) == 2
+    assert should_explore(state, action, "state-a") is False
+    assert should_explore(state, action, "state-b") is False
+    assert should_explore(state, action, "state-c") is True
