@@ -13,6 +13,7 @@ import os
 import re
 import secrets
 import time
+import unicodedata
 from urllib.parse import urlencode
 
 import httpx
@@ -87,7 +88,8 @@ def _session_from_header(authorization: str | None) -> dict:
 
 
 def _slug(title: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower().strip())
+    normalized = unicodedata.normalize("NFKD", title.lower().strip()).encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", normalized)
     slug = re.sub(r"-{2,}", "-", slug).strip("-")
     if not slug:
         raise HTTPException(status_code=422, detail="Informe um título que gere um nome de arquivo válido.")
