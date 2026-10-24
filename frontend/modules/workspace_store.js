@@ -349,9 +349,16 @@ const WorkspaceStore = (() => {
     if (documents.length > MAX_DOCUMENTS || versions.length > MAX_HISTORY_RECORDS || aiHistory.length > MAX_HISTORY_RECORDS) {
       throw new RangeError('O backup excede a quantidade máxima de registros permitida.');
     }
+    const sourceDocumentIds = new Set();
     for (const doc of documents) {
       if (!doc || typeof doc.name !== 'string' || !doc.name.trim()) {
         throw new TypeError('O backup contém documento sem nome válido.');
+      }
+      if (doc.id != null) {
+        if (typeof doc.id !== 'string' || !doc.id.trim() || sourceDocumentIds.has(doc.id)) {
+          throw new TypeError('O backup contém identificadores de documento inválidos ou duplicados.');
+        }
+        sourceDocumentIds.add(doc.id);
       }
     }
     for (const version of versions) {
