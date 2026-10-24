@@ -362,13 +362,24 @@ const WorkspaceStore = (() => {
       }
     }
     for (const version of versions) {
-      if (!version || typeof version.markdown !== 'string') {
+      if (!version || typeof version !== 'object' || Array.isArray(version) || typeof version.markdown !== 'string') {
         throw new TypeError('O backup contém versão sem conteúdo Markdown válido.');
       }
+      for (const field of ['documentId', 'name', 'source', 'prompt']) {
+        if (version[field] != null && typeof version[field] !== 'string') {
+          throw new TypeError('O backup contém campo inválido na versão: ' + field + '.');
+        }
+      }
     }
+    const historyFields = ['provider', 'model', 'prompt', 'inputMarkdown', 'outputMarkdown', 'documentName'];
     for (const item of aiHistory) {
-      if (!item || typeof item !== 'object') {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
         throw new TypeError('O backup contém registro de histórico inválido.');
+      }
+      for (const field of historyFields) {
+        if (item[field] != null && typeof item[field] !== 'string') {
+          throw new TypeError('O backup contém campo inválido no histórico de IA: ' + field + '.');
+        }
       }
     }
 
