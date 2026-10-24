@@ -19,6 +19,16 @@ Status: controles implementados parcialmente na branch `feature/jarvis-bridge-ba
 - A gravação da fila exige projeto existente, evitando registros órfãos.
 - `deleteProject` apaga projeto, documentos, versões e histórico de IA numa única transação entre stores.
 
+### Procedimento de backup e restauração do Workspace
+1. Abra **Workspace** e selecione o projeto que deseja preservar.
+2. Use **Exportar JSON** para baixar o backup do projeto.
+3. Guarde o arquivo em local aprovado e protegido; o JSON pode conter conteúdo Markdown e histórico de IA.
+4. Para recuperar, abra **Workspace → Restaurar JSON**, selecione o arquivo e confirme. A restauração cria um novo projeto e não substitui projetos existentes.
+5. Confira documentos, resultados Markdown, versões e histórico após a restauração.
+6. Reimporte os arquivos binários originais separadamente se precisar reprocessá-los: o JSON não contém esses arquivos.
+
+O limite atual de importação é 25 MB. A restauração é transacional no IndexedDB; se a transação falhar, o projeto restaurado não deve ficar parcialmente gravado. Esse comportamento ainda precisa de teste de navegador real.
+
 ### Publicação MarkAI → JARVIS
 - Repositório de destino e categorias são definidos no backend; o cliente não pode escolher outro repositório.
 - A publicação exige sessão autenticada, conteúdo não vazio, limite de 100 KB e confirmação explícita.
