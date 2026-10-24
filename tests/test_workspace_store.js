@@ -58,8 +58,8 @@ async function main() {
       project: { name: 'Invalid' },
       documents: [{ id: 'd1', name: 'one.md' }],
       versions: [],
-      aiHistory: []
-    , extra: 'x'.repeat(26 * 1024 * 1024) }),
+      aiHistory: [],
+      extra: 'x'.repeat(26 * 1024 * 1024) }),
     error => error instanceof RangeError && /25 MB/.test(error.message)
   );
 
