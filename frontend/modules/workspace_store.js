@@ -33,6 +33,8 @@ const WorkspaceStore = (() => {
         if (!db.objectStoreNames.contains('versions')) {
           const s = db.createObjectStore('versions', { keyPath: 'id' });
           s.createIndex('projectId', 'projectId', { unique: false });
+          s.createIndex('documentId', 'documentId', { unique: false });
+          s.createIndex('createdAt', 'createdAt', { unique: false });
         }
         if (!db.objectStoreNames.contains('aiHistory')) {
           const s = db.createObjectStore('aiHistory', { keyPath: 'id' });
