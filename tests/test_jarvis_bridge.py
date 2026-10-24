@@ -3,6 +3,7 @@ import time
 
 import pytest
 from fastapi import HTTPException
+from fastapi.responses import RedirectResponse
 
 from backend import jarvis_bridge as bridge
 
@@ -51,6 +52,15 @@ def test_allowed_categories_are_fixed():
     assert bridge.TARGET_REPO == "felipe11shimizu/jarvis-segundo-cerebro"
 
 
+def test_sensitive_redirect_headers_prevent_caching_and_referrer_leaks():
+    response = RedirectResponse("https://example.test/#session=synthetic-token", status_code=302)
+    secured = bridge._apply_sensitive_redirect_headers(response)
+    assert secured.headers["cache-control"] == "no-store"
+    assert secured.headers["pragma"] == "no-cache"
+    assert secured.headers["referrer-policy"] == "no-referrer"
+    assert secured.headers["x-content-type-options"] == "nosniff"
+
+
 def test_preview_requires_valid_session(monkeypatch):
     monkeypatch.setenv("JARVIS_SESSION_SECRET", "test-secret-with-at-least-32-characters")
     with pytest.raises(HTTPException) as exc:
@@ -87,19 +97,24 @@ def test_publish_refuses_existing_note_without_overwrite(monkeypatch):
 
     class FakeResponse:
         status_code = 200
+
         def raise_for_status(self):
             return None
 
     class FakeClient:
         def __init__(self, **kwargs):
             self.put_called = False
+
         def __enter__(self):
             return self
+
         def __exit__(self, *args):
             return False
+
         def get(self, url):
             assert "felipe11shimizu/jarvis-segundo-cerebro" in url
             return FakeResponse()
+
         def put(self, url, json):
             self.put_called = True
             raise AssertionError("Não deve tentar sobrescrever uma nota existente.")
