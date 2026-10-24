@@ -27,7 +27,25 @@ async function main() {
     error => error instanceof TypeError && /lista/.test(error.message)
   );
 
-  console.log('workspace_store module and queue validation tests: ok');
+  assert.equal(typeof WorkspaceStore.importProject, 'function', 'importProject should be exported');
+  await assert.rejects(
+    WorkspaceStore.importProject({ schema: 'unknown/v9', project: { name: 'Invalid' } }),
+    error => error instanceof TypeError && /incompatível/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({ schema: 'markai-workspace/v1', project: { name: 'Invalid' }, documents: {} }),
+    error => error instanceof TypeError && /listas/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({ schema: 'markai-workspace/v1', project: { name: 'Invalid' }, documents: [{ id: 'x' }] }),
+    error => error instanceof TypeError && /sem nome válido/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({ schema: 'markai-workspace/v1', project: { name: 'Invalid' }, versions: [{ id: 'v1' }] }),
+    error => error instanceof TypeError && /Markdown válido/.test(error.message)
+  );
+
+  console.log('workspace_store module, queue validation and backup import validation tests: ok');
 }
 
 main().catch(error => {
