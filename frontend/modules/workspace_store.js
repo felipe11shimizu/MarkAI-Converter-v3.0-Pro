@@ -198,41 +198,43 @@ const WorkspaceStore = (() => {
     await _transaction(['documents', 'projects'], 'readwrite', tx => {
       const documents = tx.objectStore('documents');
       const projectStore = tx.objectStore('projects');
-      const oldRequest = documents.index('projectId').getAll(projectId);
-      oldRequest.onsuccess = () => {
-        try {
-          for (const old of oldRequest.result || []) documents.delete(old.id);
-          const now = Date.now();
-          queue.forEach((item, index) => {
-            documents.put({
-              id: item.id,
-              projectId,
-              name: item.name,
-              ext: item.ext,
-              size: item.size || item.file?.size || 0,
-              status: item.status,
-              engine: item.engine || null,
-              conversionMeta: item.conversionMeta || null,
-              result: item.result || null,
-              sourceType: item.sourceType || 'file',
-              sourceUrl: item.sourceUrl || null,
-              mergeMarker: item.mergeMarker !== false,
-              file: item.file || null,
-              order: index,
-              updatedAt: now
-            });
-          });
-          const projectRequest = projectStore.get(projectId);
-          projectRequest.onsuccess = () => {
-            if (projectRequest.result) {
-              const project = projectRequest.result;
-              project.updatedAt = now;
-              projectStore.put(project);
-            }
-          };
-        } catch (error) {
+      const projectRequest = projectStore.get(projectId);
+      projectRequest.onsuccess = () => {
+        if (!projectRequest.result) {
           try { tx.abort(); } catch (_) {}
+          return;
         }
+        const project = projectRequest.result;
+        const oldRequest = documents.index('projectId').getAll(projectId);
+        oldRequest.onsuccess = () => {
+          try {
+            for (const old of oldRequest.result || []) documents.delete(old.id);
+            const now = Date.now();
+            queue.forEach((item, index) => {
+              documents.put({
+                id: item.id,
+                projectId,
+                name: item.name,
+                ext: item.ext,
+                size: item.size || item.file?.size || 0,
+                status: item.status,
+                engine: item.engine || null,
+                conversionMeta: item.conversionMeta || null,
+                result: item.result || null,
+                sourceType: item.sourceType || 'file',
+                sourceUrl: item.sourceUrl || null,
+                mergeMarker: item.mergeMarker !== false,
+                file: item.file || null,
+                order: index,
+                updatedAt: now
+              });
+            });
+            project.updatedAt = now;
+            projectStore.put(project);
+          } catch (error) {
+            try { tx.abort(); } catch (_) {}
+          }
+        };
       };
     });
   }
