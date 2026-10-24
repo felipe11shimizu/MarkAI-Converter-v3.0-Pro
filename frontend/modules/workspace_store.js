@@ -21,6 +21,7 @@ const WorkspaceStore = (() => {
   function _open() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      let settled = false;
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
@@ -32,8 +33,6 @@ const WorkspaceStore = (() => {
         if (!db.objectStoreNames.contains('versions')) {
           const s = db.createObjectStore('versions', { keyPath: 'id' });
           s.createIndex('projectId', 'projectId', { unique: false });
-          s.createIndex('documentId', 'documentId', { unique: false });
-          s.createIndex('createdAt', 'createdAt', { unique: false });
         }
         if (!db.objectStoreNames.contains('aiHistory')) {
           const s = db.createObjectStore('aiHistory', { keyPath: 'id' });
@@ -41,19 +40,64 @@ const WorkspaceStore = (() => {
           s.createIndex('createdAt', 'createdAt', { unique: false });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        settled = true;
+        const db = request.result;
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      };
+      request.onerror = () => {
+        dbPromise = null;
+        reject(request.error || new Error('Falha ao abrir o banco IndexedDB.'));
+      };
+      request.onblocked = () => {
+        dbPromise = null;
+        if (!settled) reject(new Error('Atualização do banco bloqueada por outra aba. Feche outras abas do MarkAI e tente novamente.'));
+      };
     });
     return dbPromise;
   }
 
-  function _request(store, mode, action) {
+  function _transaction(stores, mode, action) {
     return _open().then(db => new Promise((resolve, reject) => {
-      const tx = db.transaction(store, mode);
-      const request = action(tx.objectStore(store));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      let result;
+      let finished = false;
+      let tx;
+      try {
+        tx = db.transaction(stores, mode);
+        result = action(tx);
+      } catch (error) {
+        try { tx?.abort(); } catch (_) {}
+        reject(error);
+        return;
+      }
+      tx.oncomplete = () => {
+        finished = true;
+        resolve(result);
+      };
+      tx.onerror = () => {
+        if (finished) return;
+        finished = true;
+        reject(tx.error || new Error('Transação IndexedDB falhou.'));
+      };
+      tx.onabort = () => {
+        if (finished) return;
+        finished = true;
+        reject(tx.error || new Error('Transação IndexedDB foi cancelada.'));
+      };
     }));
+  }
+
+  function _request(store, mode, action) {
+    return _transaction(store, mode, tx => {
+      const result = { value: undefined };
+      const request = action(tx.objectStore(store));
+      request.onsuccess = () => { result.value = request.result; };
+      return result;
+    }).then(result => result.value);
   }
 
   async function all(store) {
@@ -120,42 +164,75 @@ const WorkspaceStore = (() => {
   }
 
   async function deleteProject(projectId) {
-    await remove('projects', projectId);
-    const [docs, versions, history] = await Promise.all([
-      byIndex('documents', 'projectId', projectId),
-      byIndex('versions', 'projectId', projectId),
-      byIndex('aiHistory', 'projectId', projectId)
-    ]);
-    await Promise.all(docs.map(x => remove('documents', x.id)));
-    await Promise.all(versions.map(x => remove('versions', x.id)));
-    await Promise.all(history.map(x => remove('aiHistory', x.id)));
+    await _transaction(['projects', 'documents', 'versions', 'aiHistory'], 'readwrite', tx => {
+      tx.objectStore('projects').delete(projectId);
+      for (const storeName of ['documents', 'versions', 'aiHistory']) {
+        const store = tx.objectStore(storeName);
+        const request = store.index('projectId').getAll(projectId);
+        request.onsuccess = () => {
+          try {
+            for (const record of request.result || []) store.delete(record.id);
+          } catch (error) {
+            try { tx.abort(); } catch (_) {}
+          }
+        };
+      }
+    });
   }
 
   async function saveQueue(projectId, queue) {
-    const oldDocs = await byIndex('documents', 'projectId', projectId);
-    await Promise.all(oldDocs.map(x => remove('documents', x.id)));
-    for (let index = 0; index < queue.length; index++) {
-      const item = queue[index];
-      await put('documents', {
-        id: item.id,
-        projectId,
-        name: item.name,
-        ext: item.ext,
-        size: item.size || item.file?.size || 0,
-        status: item.status,
-        engine: item.engine || null,
-        conversionMeta: item.conversionMeta || null,
-        result: item.result || null,
-        sourceType: item.sourceType || 'file',
-        sourceUrl: item.sourceUrl || null,
-        mergeMarker: item.mergeMarker !== false,
-        file: item.file || null,
-        order: index,
-        updatedAt: Date.now()
-      });
+    if (!Array.isArray(queue)) throw new TypeError('A fila precisa ser uma lista.');
+    const ids = new Set();
+    for (const item of queue) {
+      if (!item || typeof item.id !== 'string' || !item.id.trim()) {
+        throw new TypeError('Cada item da fila precisa ter um identificador válido.');
+      }
+      if (ids.has(item.id)) throw new TypeError('A fila contém identificadores duplicados: ' + item.id);
+      ids.add(item.id);
     }
-    const project = await get('projects', projectId);
-    if (project) await updateProject(project);
+
+    // Replaces the queue atomically: if any write fails (including quota), the
+    // browser rolls back deletes and writes together, preserving the previous queue.
+    await _transaction(['documents', 'projects'], 'readwrite', tx => {
+      const documents = tx.objectStore('documents');
+      const projectStore = tx.objectStore('projects');
+      const oldRequest = documents.index('projectId').getAll(projectId);
+      oldRequest.onsuccess = () => {
+        try {
+          for (const old of oldRequest.result || []) documents.delete(old.id);
+          const now = Date.now();
+          queue.forEach((item, index) => {
+            documents.put({
+              id: item.id,
+              projectId,
+              name: item.name,
+              ext: item.ext,
+              size: item.size || item.file?.size || 0,
+              status: item.status,
+              engine: item.engine || null,
+              conversionMeta: item.conversionMeta || null,
+              result: item.result || null,
+              sourceType: item.sourceType || 'file',
+              sourceUrl: item.sourceUrl || null,
+              mergeMarker: item.mergeMarker !== false,
+              file: item.file || null,
+              order: index,
+              updatedAt: now
+            });
+          });
+          const projectRequest = projectStore.get(projectId);
+          projectRequest.onsuccess = () => {
+            if (projectRequest.result) {
+              const project = projectRequest.result;
+              project.updatedAt = now;
+              projectStore.put(project);
+            }
+          };
+        } catch (error) {
+          try { tx.abort(); } catch (_) {}
+        }
+      };
+    });
   }
 
   async function loadQueue(projectId) {
