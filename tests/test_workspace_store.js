@@ -63,6 +63,23 @@ async function main() {
     error => error instanceof RangeError && /25 MB/.test(error.message)
   );
 
+  await assert.rejects(
+    WorkspaceStore.importProject({
+      schema: 'markai-workspace/v1',
+      project: { name: 'Invalid' },
+      versions: [{ markdown: '# Nota', prompt: { injected: true } }]
+    }),
+    error => error instanceof TypeError && /campo inválido na versão/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({
+      schema: 'markai-workspace/v1',
+      project: { name: 'Invalid' },
+      aiHistory: [{ prompt: ['not', 'a', 'string'] }]
+    }),
+    error => error instanceof TypeError && /campo inválido no histórico de IA/.test(error.message)
+  );
+
   console.log('workspace_store module, queue validation and backup import validation tests: ok');
 }
 
