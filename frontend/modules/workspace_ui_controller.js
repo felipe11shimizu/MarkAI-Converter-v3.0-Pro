@@ -75,6 +75,39 @@
       URL.revokeObjectURL(url);
     }
 
+    async function importJson(event) {
+      const input = event?.target || $('workspaceImportFile');
+      const file = input?.files?.[0];
+      if (!file) return;
+      try {
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error('O arquivo de backup excede o limite de 25 MB.');
+        }
+        const raw = await file.text();
+        let payload;
+        try { payload = JSON.parse(raw); } catch (_) {
+          throw new Error('O arquivo selecionado não contém JSON válido.');
+        }
+        const accepted = windowRef.confirm?.(
+          'Restaurar este backup criará um NOVO projeto e não substituirá projetos existentes. ' +
+          'Arquivos binários originais não estão incluídos no backup JSON. Deseja continuar?'
+        );
+        if (!accepted) return;
+        const restored = await workspaceStore.importProject(payload);
+        await workspaceController.selectProject(restored.project.id);
+        toast(
+          'Backup restaurado: ' + restored.documents + ' documentos, ' +
+          restored.versions + ' versões e ' + restored.aiHistory + ' registros de IA. ' +
+          'Arquivos originais não foram restaurados.',
+          'success'
+        );
+      } catch (error) {
+        toast('Não foi possível restaurar o backup: ' + error.message, 'error');
+      } finally {
+        if (input) input.value = '';
+      }
+    }
+
     async function exportZip() {
       const projectId = getState().currentProjectId;
       if (!projectId || !windowRef.JSZip) {
@@ -147,12 +180,14 @@
       $('btnDeleteWorkspaceProject')?.addEventListener('click', deleteProject);
       $('btnExportWorkspaceJson')?.addEventListener('click', exportJson);
       $('btnExportWorkspaceZip')?.addEventListener('click', exportZip);
+      $('btnImportWorkspaceJson')?.addEventListener('click', () => $('workspaceImportFile')?.click());
+      $('workspaceImportFile')?.addEventListener('change', importJson);
       $('workspaceTabVersions')?.addEventListener('click', () => selectHistoryMode('versions'));
       $('workspaceTabAI')?.addEventListener('click', () => selectHistoryMode('ai'));
       $('workspaceHistoryList')?.addEventListener('click', loadVersion);
     }
 
-    return { bind, openWorkspace, createProject, renameProject, deleteProject, exportJson, exportZip, selectHistoryMode };
+    return { bind, openWorkspace, createProject, renameProject, deleteProject, exportJson, importJson, exportZip, selectHistoryMode };
   }
 
   return { create };
