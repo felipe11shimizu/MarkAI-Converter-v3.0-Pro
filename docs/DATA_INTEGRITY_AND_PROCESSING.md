@@ -32,7 +32,7 @@ Status: controles implementados parcialmente na branch `feature/jarvis-bridge-ba
 
 ## 3. Riscos e itens obrigatórios antes de produção
 
-1. **Recuperação do Workspace:** implementar e testar exportação/importação com validação de schema e integridade; orientar backup local periódico. IndexedDB não substitui backup.
+1. **Recuperação do Workspace:** foi implementada a importação de backup `markai-workspace/v1`, com validação de schema, tamanho (25 MB), contagem de registros, nomes, IDs duplicados e gravação atômica em um novo projeto. A exportação inclui resultados Markdown, versões, metadados e histórico, mas não inclui os arquivos binários originais. Ainda é necessário testar exportação/importação em navegador real e documentar a rotina de backup periódico. IndexedDB não substitui backup.
 2. **Testes reais de transação:** usar um navegador headless e IndexedDB real para simular quota/abort, falha de escrita, concorrência entre abas, fechamento/upgrade e verificar que a fila anterior permanece íntegra.
 3. **Migrações:** quando `DB_VERSION` mudar, incluir migração explícita, compatibilidade com dados antigos e testes de upgrade; nunca apagar stores sem estratégia de migração.
 4. **Observabilidade:** medir duração, tamanho e taxa de falha por etapa; não registrar conteúdo de documentos, tokens, prompts ou dados pessoais nos logs.
