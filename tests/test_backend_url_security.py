@@ -36,6 +36,11 @@ def test_public_host_validation_rejects_private_or_reserved_ips(monkeypatch, add
     assert exc.value.status_code == 403
 
 
+def test_public_host_validation_accepts_public_ip(monkeypatch):
+    monkeypatch.setattr(backend_app.socket, "getaddrinfo", lambda *args, **kwargs: _addrinfo("93.184.216.34"))
+    assert backend_app._validate_public_host("example.test") is None
+
+
 def test_public_host_validation_rejects_if_any_resolved_ip_is_private(monkeypatch):
     def mixed_resolution(*args, **kwargs):
         return _addrinfo("93.184.216.34") + _addrinfo("127.0.0.1")
