@@ -8,7 +8,7 @@ async function main() {
   const required = [
     'init', 'listProjects', 'createProject', 'updateProject', 'deleteProject',
     'saveQueue', 'loadQueue', 'saveVersion', 'listVersions', 'saveAIHistory',
-    'listAIHistory', 'exportProject'
+    'listAIHistory', 'exportProject', 'importProject'
   ];
   for (const method of required) {
     assert.equal(typeof WorkspaceStore[method], 'function', method + ' should be exported');
@@ -43,6 +43,24 @@ async function main() {
   await assert.rejects(
     WorkspaceStore.importProject({ schema: 'markai-workspace/v1', project: { name: 'Invalid' }, versions: [{ id: 'v1' }] }),
     error => error instanceof TypeError && /Markdown válido/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({
+      schema: 'markai-workspace/v1',
+      project: { name: 'Invalid' },
+      documents: [{ id: 'duplicate', name: 'one.md' }, { id: 'duplicate', name: 'two.md' }]
+    }),
+    error => error instanceof TypeError && /duplicados/.test(error.message)
+  );
+  await assert.rejects(
+    WorkspaceStore.importProject({
+      schema: 'markai-workspace/v1',
+      project: { name: 'Invalid' },
+      documents: [{ id: 'd1', name: 'one.md' }],
+      versions: [],
+      aiHistory: []
+    , extra: 'x'.repeat(26 * 1024 * 1024) }),
+    error => error instanceof RangeError && /25 MB/.test(error.message)
   );
 
   console.log('workspace_store module, queue validation and backup import validation tests: ok');
