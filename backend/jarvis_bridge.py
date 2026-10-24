@@ -1,4 +1,4 @@
-"""Secure, opt-in bridge from MarkAI to the private JARVIS Markdown vault.
+""""Secure, opt-in bridge from MarkAI to the private JARVIS Markdown vault.
 
 The GitHub write credential stays server-side. OAuth identifies the human user;
 a short-lived HMAC-signed session is returned only in the redirect fragment.
@@ -96,6 +96,15 @@ def _slug(title: str) -> str:
     return slug[:90].rstrip("-")
 
 
+def _apply_sensitive_redirect_headers(response: RedirectResponse) -> RedirectResponse:
+    """Prevent caching/referrer propagation on OAuth redirects carrying session material."""
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 class NoteDraft(BaseModel):
     title: str = Field(min_length=2, max_length=120)
     category: str
@@ -167,7 +176,7 @@ def auth_callback(code: str, state: str, response: Response, markai_jarvis_oauth
     frontend_origin = _config("JARVIS_FRONTEND_ORIGIN") or "https://felipe11shimizu.github.io/MarkAI-Converter-v3.0-Pro"
     redirect = RedirectResponse(frontend_origin.rstrip("/") + "/#jarvis_session=" + _encode_session(login), status_code=302)
     redirect.delete_cookie(STATE_COOKIE, path="/api/jarvis")
-    return redirect
+    return _apply_sensitive_redirect_headers(redirect)
 
 
 @router.get("/auth/status")
