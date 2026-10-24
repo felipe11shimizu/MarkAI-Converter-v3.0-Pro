@@ -54,3 +54,46 @@ def test_public_host_validation_rejects_unresolvable_domain(monkeypatch):
     with pytest.raises(HTTPException) as exc:
         backend_app._validate_public_host("missing.example")
     assert exc.value.status_code == 422
+
+def test_redirect_destination_is_revalidated_before_request(monkeypatch):
+    validated = []
+    requests = []
+
+    def validate_public_host(hostname):
+        validated.append(hostname)
+        if hostname == "private.test":
+            raise HTTPException(status_code=403, detail="blocked")
+    
+    monkeypatch.setattr(backend_app, "_validate_public_host", validate_public_host)
+
+    class RedirectResponse:
+        status_code = 302
+        headers = {"location": "http://private.test/admin"}
+
+    class StreamContext:
+        def __enter__(self):
+            return RedirectResponse()
+
+        def __exit__(self, *args):
+            return False
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def stream(self, method, url):
+            requests.append(url)
+            return StreamContext()
+
+    monkeypatch.setattr(backend_app.httpx, "Client", FakeClient)
+    with pytest.raises(HTTPException) as exc:
+        backend_app._fetch_remote_url("https://public.test/start")
+    assert exc.value.status_code == 403
+    assert validated == ["public.test", "private.test"]
+    assert requests == ["https://public.test/start"]
