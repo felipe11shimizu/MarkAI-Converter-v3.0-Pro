@@ -296,6 +296,7 @@ const WorkspaceStore = (() => {
 
   async function exportProject(projectId) {
     const project = await get('projects', projectId);
+    if (!project) throw new Error('Projeto não encontrado para exportação.');
     const [documents, versions, aiHistory] = await Promise.all([
       byIndex('documents', 'projectId', projectId),
       byIndex('versions', 'projectId', projectId),
@@ -304,21 +305,119 @@ const WorkspaceStore = (() => {
     return {
       schema: 'markai-workspace/v1',
       exportedAt: new Date().toISOString(),
-      project,
+      backupType: 'workspace-content-without-binary-files',
+      limitations: [
+        'Arquivos binários originais não são incluídos neste backup.',
+        'Resultados Markdown, versões, metadados e histórico de IA são incluídos.',
+        'Guarde os arquivos originais separadamente se precisar reprocessá-los.'
+      ],
+      project: { id: project.id, name: project.name, createdAt: project.createdAt, updatedAt: project.updatedAt, active: project.active !== false },
       documents: documents.map(d => ({
         id: d.id, name: d.name, ext: d.ext, size: d.size, status: d.status,
         engine: d.engine, conversionMeta: d.conversionMeta, result: d.result,
-        sourceType: d.sourceType, sourceUrl: d.sourceUrl, mergeMarker: d.mergeMarker !== false
+        sourceType: d.sourceType, sourceUrl: d.sourceUrl, mergeMarker: d.mergeMarker !== false,
+        order: d.order, updatedAt: d.updatedAt, binaryFileIncluded: false
       })),
       versions,
       aiHistory
     };
   }
 
+  async function importProject(payload) {
+    const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
+    const MAX_DOCUMENTS = 5000;
+    const MAX_HISTORY_RECORDS = 10000;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new TypeError('O backup precisa ser um objeto JSON válido.');
+    }
+    let serialized;
+    try { serialized = JSON.stringify(payload); } catch (_) {
+      throw new TypeError('O backup contém dados que não podem ser serializados.');
+    }
+    if (new TextEncoder().encode(serialized).byteLength > MAX_IMPORT_BYTES) {
+      throw new RangeError('O backup excede o limite de importação de 25 MB.');
+    }
+    if (payload.schema !== 'markai-workspace/v1' || !payload.project || typeof payload.project.name !== 'string') {
+      throw new TypeError('Formato de backup incompatível. Esperado markai-workspace/v1.');
+    }
+    const documents = payload.documents ?? [];
+    const versions = payload.versions ?? [];
+    const aiHistory = payload.aiHistory ?? [];
+    if (!Array.isArray(documents) || !Array.isArray(versions) || !Array.isArray(aiHistory)) {
+      throw new TypeError('Documentos, versões e histórico precisam ser listas.');
+    }
+    if (documents.length > MAX_DOCUMENTS || versions.length > MAX_HISTORY_RECORDS || aiHistory.length > MAX_HISTORY_RECORDS) {
+      throw new RangeError('O backup excede a quantidade máxima de registros permitida.');
+    }
+    for (const doc of documents) {
+      if (!doc || typeof doc.name !== 'string' || !doc.name.trim()) {
+        throw new TypeError('O backup contém documento sem nome válido.');
+      }
+    }
+    for (const version of versions) {
+      if (!version || typeof version.markdown !== 'string') {
+        throw new TypeError('O backup contém versão sem conteúdo Markdown válido.');
+      }
+    }
+    for (const item of aiHistory) {
+      if (!item || typeof item !== 'object') {
+        throw new TypeError('O backup contém registro de histórico inválido.');
+      }
+    }
+
+    const now = Date.now();
+    const projectId = _id('project');
+    const importedProject = {
+      id: projectId,
+      name: (payload.project.name.trim() || 'Projeto restaurado').slice(0, 200) + ' (restaurado)',
+      createdAt: now,
+      updatedAt: now,
+      active: true,
+      restoredFrom: payload.project.id || null
+    };
+    const documentIds = new Map();
+    const restoredDocuments = documents.map((doc, index) => {
+      const id = _id('doc');
+      if (doc.id != null) documentIds.set(doc.id, id);
+      return {
+        id, projectId, name: doc.name.slice(0, 500), ext: typeof doc.ext === 'string' ? doc.ext.slice(0, 30) : '',
+        size: Number.isFinite(doc.size) && doc.size >= 0 ? doc.size : 0,
+        status: typeof doc.status === 'string' ? doc.status : 'restored',
+        engine: doc.engine || null, conversionMeta: doc.conversionMeta || null,
+        result: typeof doc.result === 'string' ? doc.result : null,
+        sourceType: typeof doc.sourceType === 'string' ? doc.sourceType : 'file',
+        sourceUrl: typeof doc.sourceUrl === 'string' ? doc.sourceUrl : null,
+        mergeMarker: doc.mergeMarker !== false, file: null, order: Number.isInteger(doc.order) ? doc.order : index,
+        updatedAt: now, binaryFileIncluded: false
+      };
+    });
+    const restoredVersions = versions.map(version => ({
+      ...version,
+      id: _id('version'),
+      projectId,
+      documentId: documentIds.get(version.documentId) || null,
+      createdAt: Number.isFinite(version.createdAt) ? version.createdAt : now
+    }));
+    const restoredHistory = aiHistory.map(item => ({
+      ...item,
+      id: _id('ai'),
+      projectId,
+      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now
+    }));
+
+    await _transaction(['projects', 'documents', 'versions', 'aiHistory'], 'readwrite', tx => {
+      tx.objectStore('projects').add(importedProject);
+      for (const record of restoredDocuments) tx.objectStore('documents').add(record);
+      for (const record of restoredVersions) tx.objectStore('versions').add(record);
+      for (const record of restoredHistory) tx.objectStore('aiHistory').add(record);
+    });
+    return { project: importedProject, documents: restoredDocuments.length, versions: restoredVersions.length, aiHistory: restoredHistory.length };
+  }
+
   return {
     init, listProjects, createProject, updateProject, deleteProject,
     saveQueue, loadQueue, saveVersion, listVersions, saveAIHistory,
-    listAIHistory, exportProject
+    listAIHistory, exportProject, importProject
   };
 })();
 
