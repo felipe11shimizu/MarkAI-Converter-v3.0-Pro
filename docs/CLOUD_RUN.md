@@ -61,6 +61,32 @@ MARKAI_YOUTUBE_VISUAL_ENABLED=true
 
 A análise visual do YouTube só deve permanecer habilitada se a chave correspondente estiver configurada.
 
+## Integração MarkAI → JARVIS (feature em validação)
+
+A ponte de conhecimento está em uma branch/PR separada e **não deve ser considerada ativa em produção** até concluir testes de ponta a ponta. Os endpoints usam autenticação OAuth GitHub, sessão assinada curta e destino fixo no repositório privado JARVIS. A aplicação Cloud Run continua pública para permitir chamadas do GitHub Pages, mas os endpoints de gravação exigem sessão autenticada do usuário autorizado.
+
+Variáveis necessárias exclusivamente no backend:
+
+- `JARVIS_GITHUB_OAUTH_CLIENT_ID` — ID público do OAuth App.
+- `JARVIS_GITHUB_OAUTH_CLIENT_SECRET` — secret do OAuth App.
+- `JARVIS_GITHUB_OAUTH_CALLBACK_URL` — callback HTTPS exato registrado no OAuth App, terminado em `/api/jarvis/auth/callback`.
+- `JARVIS_SESSION_SECRET` — segredo aleatório de alta entropia com pelo menos 32 caracteres.
+- `JARVIS_GITHUB_TOKEN` — token fine-grained com acesso somente ao repositório `felipe11shimizu/jarvis-segundo-cerebro` e permissão Contents: Read and write.
+- `JARVIS_ALLOWED_GITHUB_LOGIN` — login GitHub autorizado; padrão `felipe11shimizu`.
+- `JARVIS_FRONTEND_ORIGIN` — URL de retorno do portal GitHub Pages, incluindo o caminho do repositório quando aplicável.
+- `JARVIS_GITHUB_BRANCH` — opcional; padrão `main`.
+
+Armazene os secrets no Secret Manager e injete-os no Cloud Run. Não os coloque em `frontend/config.js`, HTML, JavaScript, parâmetros de URL, arquivos versionados ou logs. O token de escrita deve ser restrito ao repositório JARVIS. Configure o OAuth App com callback HTTPS exato e escopo mínimo `read:user`.
+
+Endpoints:
+- `GET /api/jarvis/auth/start` — inicia login e validação OAuth state.
+- `GET /api/jarvis/auth/callback` — valida a identidade GitHub e autoriza apenas o login configurado.
+- `GET /api/jarvis/auth/status` — verifica sessão.
+- `POST /api/jarvis/notes/preview` — valida destino e conteúdo sem gravar.
+- `POST /api/jarvis/notes` — grava somente após confirmação explícita, com limite de 100 KB e recusa de sobrescrita.
+
+Antes de configurar secrets ou publicar a revisão, executar testes de segurança e ponta a ponta em ambiente controlado. Não usar dados pessoais, credenciais ou dados restritos do DETRAN-SP como conteúdo de teste.
+
 ## Secrets
 
 As chaves utilizadas pelo backend **não devem entrar no GitHub, Dockerfile ou frontend**.

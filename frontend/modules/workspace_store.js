@@ -21,6 +21,7 @@ const WorkspaceStore = (() => {
   function _open() {
     if (dbPromise) return dbPromise;
     dbPromise = new Promise((resolve, reject) => {
+      let settled = false;
       const request = indexedDB.open(DB_NAME, DB_VERSION);
       request.onupgradeneeded = () => {
         const db = request.result;
@@ -41,19 +42,64 @@ const WorkspaceStore = (() => {
           s.createIndex('createdAt', 'createdAt', { unique: false });
         }
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        settled = true;
+        const db = request.result;
+        db.onversionchange = () => {
+          db.close();
+          dbPromise = null;
+        };
+        resolve(db);
+      };
+      request.onerror = () => {
+        dbPromise = null;
+        reject(request.error || new Error('Falha ao abrir o banco IndexedDB.'));
+      };
+      request.onblocked = () => {
+        dbPromise = null;
+        if (!settled) reject(new Error('Atualização do banco bloqueada por outra aba. Feche outras abas do MarkAI e tente novamente.'));
+      };
     });
     return dbPromise;
   }
 
-  function _request(store, mode, action) {
+  function _transaction(stores, mode, action) {
     return _open().then(db => new Promise((resolve, reject) => {
-      const tx = db.transaction(store, mode);
-      const request = action(tx.objectStore(store));
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      let result;
+      let finished = false;
+      let tx;
+      try {
+        tx = db.transaction(stores, mode);
+        result = action(tx);
+      } catch (error) {
+        try { tx?.abort(); } catch (_) {}
+        reject(error);
+        return;
+      }
+      tx.oncomplete = () => {
+        finished = true;
+        resolve(result);
+      };
+      tx.onerror = () => {
+        if (finished) return;
+        finished = true;
+        reject(tx.error || new Error('Transação IndexedDB falhou.'));
+      };
+      tx.onabort = () => {
+        if (finished) return;
+        finished = true;
+        reject(tx.error || new Error('Transação IndexedDB foi cancelada.'));
+      };
     }));
+  }
+
+  function _request(store, mode, action) {
+    return _transaction(store, mode, tx => {
+      const result = { value: undefined };
+      const request = action(tx.objectStore(store));
+      request.onsuccess = () => { result.value = request.result; };
+      return result;
+    }).then(result => result.value);
   }
 
   async function all(store) {
@@ -120,42 +166,77 @@ const WorkspaceStore = (() => {
   }
 
   async function deleteProject(projectId) {
-    await remove('projects', projectId);
-    const [docs, versions, history] = await Promise.all([
-      byIndex('documents', 'projectId', projectId),
-      byIndex('versions', 'projectId', projectId),
-      byIndex('aiHistory', 'projectId', projectId)
-    ]);
-    await Promise.all(docs.map(x => remove('documents', x.id)));
-    await Promise.all(versions.map(x => remove('versions', x.id)));
-    await Promise.all(history.map(x => remove('aiHistory', x.id)));
+    await _transaction(['projects', 'documents', 'versions', 'aiHistory'], 'readwrite', tx => {
+      tx.objectStore('projects').delete(projectId);
+      for (const storeName of ['documents', 'versions', 'aiHistory']) {
+        const store = tx.objectStore(storeName);
+        const request = store.index('projectId').getAll(projectId);
+        request.onsuccess = () => {
+          try {
+            for (const record of request.result || []) store.delete(record.id);
+          } catch (error) {
+            try { tx.abort(); } catch (_) {}
+          }
+        };
+      }
+    });
   }
 
   async function saveQueue(projectId, queue) {
-    const oldDocs = await byIndex('documents', 'projectId', projectId);
-    await Promise.all(oldDocs.map(x => remove('documents', x.id)));
-    for (let index = 0; index < queue.length; index++) {
-      const item = queue[index];
-      await put('documents', {
-        id: item.id,
-        projectId,
-        name: item.name,
-        ext: item.ext,
-        size: item.size || item.file?.size || 0,
-        status: item.status,
-        engine: item.engine || null,
-        conversionMeta: item.conversionMeta || null,
-        result: item.result || null,
-        sourceType: item.sourceType || 'file',
-        sourceUrl: item.sourceUrl || null,
-        mergeMarker: item.mergeMarker !== false,
-        file: item.file || null,
-        order: index,
-        updatedAt: Date.now()
-      });
+    if (!Array.isArray(queue)) throw new TypeError('A fila precisa ser uma lista.');
+    const ids = new Set();
+    for (const item of queue) {
+      if (!item || typeof item.id !== 'string' || !item.id.trim()) {
+        throw new TypeError('Cada item da fila precisa ter um identificador válido.');
+      }
+      if (ids.has(item.id)) throw new TypeError('A fila contém identificadores duplicados: ' + item.id);
+      ids.add(item.id);
     }
-    const project = await get('projects', projectId);
-    if (project) await updateProject(project);
+
+    // Replaces the queue atomically: if any write fails (including quota), the
+    // browser rolls back deletes and writes together, preserving the previous queue.
+    await _transaction(['documents', 'projects'], 'readwrite', tx => {
+      const documents = tx.objectStore('documents');
+      const projectStore = tx.objectStore('projects');
+      const projectRequest = projectStore.get(projectId);
+      projectRequest.onsuccess = () => {
+        if (!projectRequest.result) {
+          try { tx.abort(); } catch (_) {}
+          return;
+        }
+        const project = projectRequest.result;
+        const oldRequest = documents.index('projectId').getAll(projectId);
+        oldRequest.onsuccess = () => {
+          try {
+            for (const old of oldRequest.result || []) documents.delete(old.id);
+            const now = Date.now();
+            queue.forEach((item, index) => {
+              documents.put({
+                id: item.id,
+                projectId,
+                name: item.name,
+                ext: item.ext,
+                size: item.size || item.file?.size || 0,
+                status: item.status,
+                engine: item.engine || null,
+                conversionMeta: item.conversionMeta || null,
+                result: item.result || null,
+                sourceType: item.sourceType || 'file',
+                sourceUrl: item.sourceUrl || null,
+                mergeMarker: item.mergeMarker !== false,
+                file: item.file || null,
+                order: index,
+                updatedAt: now
+              });
+            });
+            project.updatedAt = now;
+            projectStore.put(project);
+          } catch (error) {
+            try { tx.abort(); } catch (_) {}
+          }
+        };
+      };
+    });
   }
 
   async function loadQueue(projectId) {
@@ -215,6 +296,7 @@ const WorkspaceStore = (() => {
 
   async function exportProject(projectId) {
     const project = await get('projects', projectId);
+    if (!project) throw new Error('Projeto não encontrado para exportação.');
     const [documents, versions, aiHistory] = await Promise.all([
       byIndex('documents', 'projectId', projectId),
       byIndex('versions', 'projectId', projectId),
@@ -223,21 +305,137 @@ const WorkspaceStore = (() => {
     return {
       schema: 'markai-workspace/v1',
       exportedAt: new Date().toISOString(),
-      project,
+      backupType: 'workspace-content-without-binary-files',
+      limitations: [
+        'Arquivos binários originais não são incluídos neste backup.',
+        'Resultados Markdown, versões, metadados e histórico de IA são incluídos.',
+        'Guarde os arquivos originais separadamente se precisar reprocessá-los.'
+      ],
+      project: { id: project.id, name: project.name, createdAt: project.createdAt, updatedAt: project.updatedAt, active: project.active !== false },
       documents: documents.map(d => ({
         id: d.id, name: d.name, ext: d.ext, size: d.size, status: d.status,
         engine: d.engine, conversionMeta: d.conversionMeta, result: d.result,
-        sourceType: d.sourceType, sourceUrl: d.sourceUrl, mergeMarker: d.mergeMarker !== false
+        sourceType: d.sourceType, sourceUrl: d.sourceUrl, mergeMarker: d.mergeMarker !== false,
+        order: d.order, updatedAt: d.updatedAt, binaryFileIncluded: false
       })),
       versions,
       aiHistory
     };
   }
 
+  async function importProject(payload) {
+    const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
+    const MAX_DOCUMENTS = 5000;
+    const MAX_HISTORY_RECORDS = 10000;
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new TypeError('O backup precisa ser um objeto JSON válido.');
+    }
+    let serialized;
+    try { serialized = JSON.stringify(payload); } catch (_) {
+      throw new TypeError('O backup contém dados que não podem ser serializados.');
+    }
+    if (new TextEncoder().encode(serialized).byteLength > MAX_IMPORT_BYTES) {
+      throw new RangeError('O backup excede o limite de importação de 25 MB.');
+    }
+    if (payload.schema !== 'markai-workspace/v1' || !payload.project || typeof payload.project.name !== 'string') {
+      throw new TypeError('Formato de backup incompatível. Esperado markai-workspace/v1.');
+    }
+    const documents = payload.documents ?? [];
+    const versions = payload.versions ?? [];
+    const aiHistory = payload.aiHistory ?? [];
+    if (!Array.isArray(documents) || !Array.isArray(versions) || !Array.isArray(aiHistory)) {
+      throw new TypeError('Documentos, versões e histórico precisam ser listas.');
+    }
+    if (documents.length > MAX_DOCUMENTS || versions.length > MAX_HISTORY_RECORDS || aiHistory.length > MAX_HISTORY_RECORDS) {
+      throw new RangeError('O backup excede a quantidade máxima de registros permitida.');
+    }
+    const sourceDocumentIds = new Set();
+    for (const doc of documents) {
+      if (!doc || typeof doc.name !== 'string' || !doc.name.trim()) {
+        throw new TypeError('O backup contém documento sem nome válido.');
+      }
+      if (doc.id != null) {
+        if (typeof doc.id !== 'string' || !doc.id.trim() || sourceDocumentIds.has(doc.id)) {
+          throw new TypeError('O backup contém identificadores de documento inválidos ou duplicados.');
+        }
+        sourceDocumentIds.add(doc.id);
+      }
+    }
+    for (const version of versions) {
+      if (!version || typeof version !== 'object' || Array.isArray(version) || typeof version.markdown !== 'string') {
+        throw new TypeError('O backup contém versão sem conteúdo Markdown válido.');
+      }
+      for (const field of ['documentId', 'name', 'source', 'prompt']) {
+        if (version[field] != null && typeof version[field] !== 'string') {
+          throw new TypeError('O backup contém campo inválido na versão: ' + field + '.');
+        }
+      }
+    }
+    const historyFields = ['provider', 'model', 'prompt', 'inputMarkdown', 'outputMarkdown', 'documentName'];
+    for (const item of aiHistory) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        throw new TypeError('O backup contém registro de histórico inválido.');
+      }
+      for (const field of historyFields) {
+        if (item[field] != null && typeof item[field] !== 'string') {
+          throw new TypeError('O backup contém campo inválido no histórico de IA: ' + field + '.');
+        }
+      }
+    }
+
+    const now = Date.now();
+    const projectId = _id('project');
+    const importedProject = {
+      id: projectId,
+      name: (payload.project.name.trim() || 'Projeto restaurado').slice(0, 200) + ' (restaurado)',
+      createdAt: now,
+      updatedAt: now,
+      active: true,
+      restoredFrom: payload.project.id || null
+    };
+    const documentIds = new Map();
+    const restoredDocuments = documents.map((doc, index) => {
+      const id = _id('doc');
+      if (doc.id != null) documentIds.set(doc.id, id);
+      return {
+        id, projectId, name: doc.name.slice(0, 500), ext: typeof doc.ext === 'string' ? doc.ext.slice(0, 30) : '',
+        size: Number.isFinite(doc.size) && doc.size >= 0 ? doc.size : 0,
+        status: typeof doc.status === 'string' ? doc.status : 'restored',
+        engine: doc.engine || null, conversionMeta: doc.conversionMeta || null,
+        result: typeof doc.result === 'string' ? doc.result : null,
+        sourceType: typeof doc.sourceType === 'string' ? doc.sourceType : 'file',
+        sourceUrl: typeof doc.sourceUrl === 'string' ? doc.sourceUrl : null,
+        mergeMarker: doc.mergeMarker !== false, file: null, order: Number.isInteger(doc.order) ? doc.order : index,
+        updatedAt: now, binaryFileIncluded: false
+      };
+    });
+    const restoredVersions = versions.map(version => ({
+      ...version,
+      id: _id('version'),
+      projectId,
+      documentId: documentIds.get(version.documentId) || null,
+      createdAt: Number.isFinite(version.createdAt) ? version.createdAt : now
+    }));
+    const restoredHistory = aiHistory.map(item => ({
+      ...item,
+      id: _id('ai'),
+      projectId,
+      createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now
+    }));
+
+    await _transaction(['projects', 'documents', 'versions', 'aiHistory'], 'readwrite', tx => {
+      tx.objectStore('projects').add(importedProject);
+      for (const record of restoredDocuments) tx.objectStore('documents').add(record);
+      for (const record of restoredVersions) tx.objectStore('versions').add(record);
+      for (const record of restoredHistory) tx.objectStore('aiHistory').add(record);
+    });
+    return { project: importedProject, documents: restoredDocuments.length, versions: restoredVersions.length, aiHistory: restoredHistory.length };
+  }
+
   return {
     init, listProjects, createProject, updateProject, deleteProject,
     saveQueue, loadQueue, saveVersion, listVersions, saveAIHistory,
-    listAIHistory, exportProject
+    listAIHistory, exportProject, importProject
   };
 })();
 

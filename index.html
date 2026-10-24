@@ -244,6 +244,7 @@
               <button class="btn btn-ghost btn-sm" id="btnWorkspaceToolbar"><i data-lucide="folder-kanban"></i><span>Workspace</span></button><button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCompare" title="Comparar MarkItDown x conversor local"><i data-lucide="columns-2"></i><span>Comparar</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
+              <button class="btn btn-primary btn-sm" id="btnTeachJarvis" title="Registrar o Markdown selecionado no JARVIS"><i data-lucide="brain"></i><span>Ensinar ao JARVIS</span></button>
               <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
               <button class="btn btn-ghost btn-icon-sm" id="btnReset"><i data-lucide="x"></i></button>
             </div>
@@ -306,6 +307,8 @@
               <button class="btn btn-ghost btn-sm" id="btnDeleteWorkspaceProject"><i data-lucide="trash-2"></i>Excluir projeto</button>
               <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceJson"><i data-lucide="file-json"></i>Exportar JSON</button>
               <button class="btn btn-secondary btn-sm" id="btnExportWorkspaceZip"><i data-lucide="archive"></i>Exportar ZIP</button>
+              <button class="btn btn-secondary btn-sm" id="btnImportWorkspaceJson"><i data-lucide="upload"></i>Restaurar JSON</button>
+              <input type="file" id="workspaceImportFile" accept="application/json,.json" hidden />
             </div>
           </section>
           <section class="workspace-section">
@@ -528,6 +531,40 @@
     </div>
   </dialog>
 
+  <dialog class="modal modal-lg" id="modalJarvis">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 class="modal-title"><i data-lucide="brain"></i> Ensinar ao JARVIS</h2>
+        <button class="btn btn-ghost btn-icon-sm" id="btnCloseJarvis" aria-label="Fechar"><i data-lucide="x"></i></button>
+      </div>
+      <div class="modal-body" style="display:grid;gap:1rem">
+        <p class="form-hint">Somente o documento atual será enviado. Revise a classificação e o destino. Não inclua dados pessoais, credenciais ou informações sigilosas.</p>
+        <label for="jarvisNoteTitle">Título da nota</label>
+        <input id="jarvisNoteTitle" type="text" maxlength="120" autocomplete="off" />
+        <label for="jarvisNoteCategory">Categoria de destino</label>
+        <select id="jarvisNoteCategory">
+          <option value="inbox">00-Inbox — Captura inicial</option>
+          <option value="projetos">10-Projetos — Projetos</option>
+          <option value="areas">20-Areas — Rotinas e regras</option>
+          <option value="colaboradores">30-Rede-Colaboradores — Interfaces</option>
+          <option value="entidades">40-Entidades — Sistemas e entidades</option>
+          <option value="recursos">50-Recursos-e-Modelos — Modelos</option>
+        </select>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" type="button" id="btnJarvisConnect">Conectar GitHub</button>
+          <button class="btn btn-secondary" type="button" id="btnJarvisPrepare">Preparar prévia</button>
+        </div>
+        <p id="jarvisBridgeStatus" class="form-hint" role="status" aria-live="polite">A publicação exige autenticação e confirmação explícita.</p>
+        <label for="jarvisNotePreview">Prévia (destino e conteúdo Markdown)</label>
+        <textarea id="jarvisNotePreview" class="code-editor" readonly style="width:100%;min-height:220px;resize:vertical"></textarea>
+        <a id="jarvisBridgeResultLink" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" type="button" id="btnJarvisPublish" disabled>Confirmar e publicar nota</button>
+      </div>
+    </div>
+  </dialog>
+
   <div class="toast-container" id="toastContainer"></div>
   <script src="frontend/config.js"></script>
   <script src="frontend/modules/core_state.js"></script>
@@ -555,6 +592,7 @@
   <script src="video_automation_validator.js"></script>
   <script src="frontend/modules/video_automation_controller.js"></script>
   <script src="frontend/modules/settings_controller.js"></script>
+  <script src="frontend/modules/jarvis_bridge_controller.js"></script>
   <script src="frontend/modules/devtrail_formatters.js"></script>
   <script src="frontend/modules/devtrail_analyzer.js"></script>
   <script src="frontend/modules/devtrail_specification.js"></script>

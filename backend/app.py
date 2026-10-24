@@ -84,6 +84,9 @@ app = FastAPI(
     description="MarkItDown-powered conversion engine for MarkAI Converter.",
 )
 
+from backend.jarvis_bridge import router as jarvis_bridge_router
+app.include_router(jarvis_bridge_router)
+
 # Development-friendly defaults. In production, set MARKAI_CORS_ORIGINS.
 origins = [
     origin.strip()
