@@ -43,6 +43,28 @@
     el.dataset.state = type || 'info';
   }
 
+  async function checkReadiness() {
+    try {
+      const response = await fetch(apiUrl('/api/jarvis/status'), { method: 'GET' });
+      const status = await parseResponse(response);
+      if (!status.authentication_configured) {
+        setStatus('Integração JARVIS indisponível: autenticação ainda não configurada no servidor.', 'warning');
+        return status;
+      }
+      if (!status.publishing_configured) {
+        setStatus('Autenticação disponível, mas falta configurar a credencial de gravação do JARVIS no servidor.', 'warning');
+        return status;
+      }
+      if (!sessionToken) {
+        setStatus('Integração pronta. Conecte sua conta GitHub para publicar uma nota após revisar a prévia.', 'info');
+      }
+      return status;
+    } catch (error) {
+      setStatus('Não foi possível verificar a integração JARVIS: ' + error.message, 'error');
+      return null;
+    }
+  }
+
   function captureDraft() {
     const title = document.getElementById('jarvisNoteTitle').value.trim();
     const category = document.getElementById('jarvisNoteCategory').value;
@@ -145,13 +167,14 @@
       document.getElementById('jarvisNotePreview').textContent = editor?.value || '';
       document.getElementById('btnJarvisPublish').disabled = true;
       preparedDraft = null;
-      if (!sessionToken) setStatus('Conecte sua conta GitHub para continuar.', 'warning');
+      if (!sessionToken) checkReadiness();
       modal.showModal();
     });
     document.getElementById('btnCloseJarvis').addEventListener('click', () => modal.close());
     document.getElementById('btnJarvisConnect').addEventListener('click', connect);
     document.getElementById('btnJarvisPrepare').addEventListener('click', prepare);
     document.getElementById('btnJarvisPublish').addEventListener('click', publish);
+    if (!sessionToken) checkReadiness();
     modal.addEventListener('click', event => { if (event.target === modal) modal.close(); });
   }
 
