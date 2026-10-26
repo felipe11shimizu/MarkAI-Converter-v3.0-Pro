@@ -126,3 +126,34 @@ def test_publish_refuses_existing_note_without_overwrite(monkeypatch):
         bridge.publish_note(note, authorization="Bearer " + token)
     assert exc.value.status_code == 409
     assert fake.put_called is False
+
+
+def test_bridge_status_reports_readiness_without_secrets(monkeypatch):
+    monkeypatch.setenv("JARVIS_GITHUB_OAUTH_CLIENT_ID", "public-client-id")
+    monkeypatch.setenv("JARVIS_GITHUB_OAUTH_CLIENT_SECRET", "oauth-secret")
+    monkeypatch.setenv("JARVIS_SESSION_SECRET", "test-secret-with-at-least-32-characters")
+    monkeypatch.setenv("JARVIS_GITHUB_OAUTH_CALLBACK_URL", "https://backend.example/api/jarvis/auth/callback")
+    monkeypatch.setenv("JARVIS_GITHUB_TOKEN", "write-token")
+    status = bridge.bridge_status()
+    assert status["ok"] is True
+    assert status["repository"] == "felipe11shimizu/jarvis-segundo-cerebro"
+    assert status["authentication_configured"] is True
+    assert status["publishing_configured"] is True
+    assert status["requires_user_confirmation"] is True
+    assert status["max_markdown_bytes"] == bridge.MAX_MARKDOWN_BYTES
+    assert "oauth-secret" not in repr(status)
+    assert "write-token" not in repr(status)
+
+
+def test_bridge_status_reports_missing_configuration_without_revealing_values(monkeypatch):
+    for key in (
+        "JARVIS_GITHUB_OAUTH_CLIENT_ID",
+        "JARVIS_GITHUB_OAUTH_CLIENT_SECRET",
+        "JARVIS_SESSION_SECRET",
+        "JARVIS_GITHUB_OAUTH_CALLBACK_URL",
+        "JARVIS_GITHUB_TOKEN",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    status = bridge.bridge_status()
+    assert status["authentication_configured"] is False
+    assert status["publishing_configured"] is False
