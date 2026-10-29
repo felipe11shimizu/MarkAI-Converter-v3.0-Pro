@@ -244,7 +244,7 @@
               <button class="btn btn-ghost btn-sm" id="btnWorkspaceToolbar"><i data-lucide="folder-kanban"></i><span>Workspace</span></button><button class="btn btn-ai btn-sm" id="btnEnhanceAI"><i data-lucide="sparkles"></i><span>IA</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCompare" title="Comparar MarkItDown x conversor local"><i data-lucide="columns-2"></i><span>Comparar</span></button>
               <button class="btn btn-ghost btn-sm" id="btnCopy"><i data-lucide="copy"></i><span>Copiar</span></button>
-              <button class="btn btn-primary btn-sm" id="btnTeachJarvis" title="Registrar o Markdown selecionado no JARVIS"><i data-lucide="brain"></i><span>Ensinar ao JARVIS</span></button>
+              <button class="btn btn-primary btn-sm" id="btnTeachJarvis" title="Salvar o Markdown convertido no Segundo Cérebro JARVIS"><i data-lucide="brain"></i><span>Salvar no Segundo Cérebro</span></button>
               <button class="btn btn-primary btn-sm" id="btnDownload"><i data-lucide="download"></i><span>Baixar .md</span></button>
               <button class="btn btn-ghost btn-icon-sm" id="btnReset"><i data-lucide="x"></i></button>
             </div>
@@ -534,11 +534,11 @@
   <dialog class="modal modal-lg" id="modalJarvis">
     <div class="modal-card">
       <div class="modal-header">
-        <h2 class="modal-title"><i data-lucide="brain"></i> Ensinar ao JARVIS</h2>
+        <h2 class="modal-title"><i data-lucide="brain"></i> Salvar no Segundo Cérebro JARVIS</h2>
         <button class="btn btn-ghost btn-icon-sm" id="btnCloseJarvis" aria-label="Fechar"><i data-lucide="x"></i></button>
       </div>
       <div class="modal-body" style="display:grid;gap:1rem">
-        <p class="form-hint">Somente o documento atual será enviado. Revise a classificação e o destino. Não inclua dados pessoais, credenciais ou informações sigilosas.</p>
+        <p class="form-hint">Salve o Markdown convertido no repositório privado do Segundo Cérebro JARVIS. A nota ficará disponível no Obsidian quando esse repositório estiver sincronizado com o cofre. Revise o título, a categoria e a prévia antes de confirmar. Não envie dados pessoais, credenciais ou informações sigilosas.</p>
         <label for="jarvisNoteTitle">Título da nota</label>
         <input id="jarvisNoteTitle" type="text" maxlength="120" autocomplete="off" />
         <label for="jarvisNoteCategory">Categoria de destino</label>
