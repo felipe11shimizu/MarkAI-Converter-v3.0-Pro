@@ -1,0 +1,70 @@
+name: Production Smoke — MarkAI + JARVIS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'frontend/**'
+      - 'backend/**'
+      - 'Dockerfile'
+      - 'requirements.txt'
+      - '.github/workflows/production-smoke.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-smoke-main
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      PORTAL_URL: https://felipe11shimizu.github.io/MarkAI-Converter-v3.0-Pro/
+      BACKEND_URL: https://markai-converter-v3-0-pro-690234982000.europe-west1.run.app
+    steps:
+      - name: Check public portal
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "$PORTAL_URL" -o /tmp/portal.html
+          grep -q 'Salvar no Segundo Cérebro' /tmp/portal.html
+
+      - name: Check Cloud Run health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "$BACKEND_URL/api/health" -o /tmp/health.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/health.json', encoding='utf-8'))
+          assert data.get('ok') is True, data
+          print('Cloud Run health: OK')
+          PY
+
+      - name: Check JARVIS bridge readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location \
+            --retry 12 --retry-delay 10 --retry-all-errors \
+            "$BACKEND_URL/api/jarvis/status" -o /tmp/jarvis-status.json
+          python - <<'PY'
+          import json
+          data = json.load(open('/tmp/jarvis-status.json', encoding='utf-8'))
+          assert data.get('ok') is True, data
+          assert data.get('repository') == 'felipe11shimizu/jarvis-segundo-cerebro', data
+          assert data.get('authentication_configured') is True, data
+          assert data.get('publishing_configured') is True, data
+          assert data.get('requires_user_confirmation') is True, data
+          print('JARVIS bridge readiness: OK')
+          PY
