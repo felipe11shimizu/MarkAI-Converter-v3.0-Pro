@@ -146,8 +146,11 @@
 
   function init() {
     const modal = document.getElementById('modalJarvis');
-    const openButton = document.getElementById('btnTeachJarvis');
-    if (!modal || !openButton) return;
+    const openButtons = [
+      document.getElementById('btnTeachJarvis'),
+      document.getElementById('btnAddJarvisNote')
+    ].filter(Boolean);
+    if (!modal || openButtons.length === 0) return;
 
     const hash = window.location.hash;
     const match = hash.match(/(?:^#|&)jarvis_session=([^&]+)/);
@@ -157,7 +160,7 @@
       setStatus('Conta GitHub autenticada nesta sessão. A sessão expira em 10 minutos.', 'success');
     }
 
-    openButton.addEventListener('click', () => {
+    const openJarvisModal = () => {
       const editor = document.getElementById('markdownEditor');
       const docName = document.getElementById('docName');
       const title = document.getElementById('jarvisNoteTitle');
@@ -169,7 +172,8 @@
       preparedDraft = null;
       if (!sessionToken) checkReadiness();
       modal.showModal();
-    });
+    };
+    openButtons.forEach(button => button.addEventListener('click', openJarvisModal));
     document.getElementById('btnCloseJarvis').addEventListener('click', () => modal.close());
     document.getElementById('btnJarvisConnect').addEventListener('click', connect);
     document.getElementById('btnJarvisPrepare').addEventListener('click', prepare);
