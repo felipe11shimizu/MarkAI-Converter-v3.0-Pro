@@ -115,6 +115,23 @@ class NotePublish(NoteDraft):
     confirm_publish: bool
 
 
+@router.get("/status")
+def bridge_status():
+    """Expose integration readiness without returning secrets or private credential values."""
+    client_id = _config("JARVIS_GITHUB_OAUTH_CLIENT_ID")
+    client_secret = _config("JARVIS_GITHUB_OAUTH_CLIENT_SECRET")
+    session_secret = _config("JARVIS_SESSION_SECRET")
+    callback_url = _config("JARVIS_GITHUB_OAUTH_CALLBACK_URL")
+    return {
+        "ok": True,
+        "repository": TARGET_REPO,
+        "authentication_configured": bool(client_id and client_secret and len(session_secret) >= 32 and callback_url),
+        "publishing_configured": bool(_config("JARVIS_GITHUB_TOKEN")),
+        "requires_user_confirmation": True,
+        "max_markdown_bytes": MAX_MARKDOWN_BYTES,
+    }
+
+
 @router.get("/auth/start")
 def auth_start():
     client_id, _ = _require_auth_config()
