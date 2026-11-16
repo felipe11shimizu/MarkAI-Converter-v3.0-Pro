@@ -14,6 +14,8 @@ assert.match(html, /sincronizado com o cofre/);
 assert.match(html, /id="modalJarvis"/);
 assert.match(html, /id="btnJarvisPublish"[^>]*disabled/);
 assert.match(html, /frontend\/modules\/jarvis_bridge_controller\.js/);
+assert.match(controller, /btnAddJarvisNote/);
+assert.match(controller, /openButtons\.forEach/);
 assert.match(controller, /\/api\/jarvis\/notes\/preview/);
 assert.match(controller, /confirm_publish: true/);
 assert.match(controller, /Markdown salvo no Segundo Cérebro JARVIS/);
