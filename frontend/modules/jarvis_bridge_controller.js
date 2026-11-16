@@ -104,7 +104,7 @@
         body: JSON.stringify({ ...preparedDraft, confirm_publish: true })
       });
       const result = await parseResponse(response);
-      setStatus('Nota criada com sucesso: ' + result.path + ' — commit ' + String(result.commit || '').slice(0, 7), 'success');
+      setStatus('Markdown salvo no Segundo Cérebro JARVIS: ' + result.path + ' — commit ' + String(result.commit || '').slice(0, 7), 'success');
       if (result.url) {
         const link = document.getElementById('jarvisBridgeResultLink');
         link.href = result.url;
